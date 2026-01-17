@@ -1,0 +1,27 @@
+
+> videra-site@0.1.0 build
+> next build
+
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+   ▲ Next.js 16.0.1 (Turbopack)
+   - Experiments (use with caution):
+     · optimizePackageImports
+
+   Creating an optimized production build ...
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+ ✓ Compiled successfully in 4.1s
+   Running TypeScript ...
+Failed to compile.
+
+./app/components/CarouselEditor.tsx:408:19
+Type error: Type '{ color: string; onChange: (color: string) => void; }' is not assignable to type 'IntrinsicAttributes & ColorPickerProps'.
+  Property 'color' does not exist on type 'IntrinsicAttributes & ColorPickerProps'.
+
+[0m [90m 406 |[39m                 [33m<[39m[33m/[39m[33mlabel[39m[33m>[39m
+ [90m 407 |[39m                 [33m<[39m[33mColorPicker[39m
+[31m[1m>[22m[39m[90m 408 |[39m                   color[33m=[39m{currentConfig[33m.[39mtitle_text_color [33m||[39m [32m'#000000'[39m}
+ [90m     |[39m                   [31m[1m^[22m[39m
+ [90m 409 |[39m                   onChange[33m=[39m{(color) [33m=>[39m handleConfigChange([32m'title_text_color'[39m[33m,[39m color)}
+ [90m 410 |[39m                 [33m/[39m[33m>[39m
+ [90m 411 |[39m               [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m[0m
+Next.js build worker exited with code: 1 and signal: null
