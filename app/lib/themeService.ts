@@ -263,7 +263,6 @@ export async function saveTheme(theme: ThemeConfig): Promise<boolean> {
       
       // Remover headerBg se existir
       const colorsToSave = { ...theme.colors };
-      delete colorsToSave.headerBg;
       
       const colorEntries = Object.entries(colorsToSave)
         .filter(([_, value]) => value && typeof value === 'string' && value.trim() !== '')
