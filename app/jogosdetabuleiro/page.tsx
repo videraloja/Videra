@@ -637,94 +637,112 @@ export default function JogosTabuleiroPage() {
             </section>
           )}
 
-          {/* 🆕 MODOS DE EXIBIÇÃO: Grid ou Carrosséis (FUNCIONALIDADE NOVA) */}
-          {showAllProducts ? (
-            <div>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '32px',
-                padding: '0 20px'
-              }}>
-                <h2 style={{
-                  fontSize: `${currentConfig?.view_all_title_font_size || 28}px`,
-                  fontWeight: currentConfig?.view_all_title_font_weight || '700',
-                  color: currentConfig?.view_all_title_color || colors.text,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px'
-                }}>
-                  {viewAllType === 'all' && '📦 Todos os Jogos'}
-                  {viewAllType === 'bestsellers' && '🔥 Mais Vendidos'}
-                  {viewAllType === 'new_arrivals' && '🆕 Lançamentos'}
-                  <span style={{
-                    backgroundColor: currentConfig?.view_all_badge_bg_color || colors.primary,
-                    color: currentConfig?.view_all_badge_text_color || 'white',
-                    padding: '4px 12px',
-                    borderRadius: '20px',
-                    fontSize: '14px',
-                    fontWeight: '600'
-                  }}>
-                    {viewAllType === 'all' && `${products.length} jogos`}
-                    {viewAllType === 'bestsellers' && `${bestsellers.length} jogos`}
-                    {viewAllType === 'new_arrivals' && `${newArrivals.length} jogos`}
-                  </span>
-                </h2>
-                
-                <button
-                  onClick={() => setShowAllProducts(false)}
-                  style={{
-                    padding: '8px 16px',
-                    background: currentConfig?.view_all_back_button_bg_color || 'transparent',
-                    color: currentConfig?.view_all_back_button_text_color || colors.primary,
-                    border: `1px solid ${currentConfig?.view_all_back_button_bg_color || colors.primary}`,
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = currentConfig?.view_all_back_button_hover_bg_color || colors.primary;
-                    e.currentTarget.style.color = currentConfig?.view_all_back_button_hover_text_color || 'white';
-                    e.currentTarget.style.borderColor = currentConfig?.view_all_back_button_hover_bg_color || colors.primary;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = currentConfig?.view_all_back_button_bg_color || 'transparent';
-                    e.currentTarget.style.color = currentConfig?.view_all_back_button_text_color || colors.primary;
-                    e.currentTarget.style.borderColor = currentConfig?.view_all_back_button_bg_color || colors.primary;
-                  }}
-                >
-                  ↩ Voltar para Carrosséis
-                </button>
-              </div>
-              
-              {/* Grid de produtos (não carrossel) */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                gap: '24px',
-                padding: '20px'
-              }}>
-                {(viewAllType === 'all' ? products : 
-                  viewAllType === 'bestsellers' ? bestsellers : newArrivals)
-                  .sort((a, b) => a.name.localeCompare(b.name))
-                  .map((product) => (
-                    <ProductCard 
-                      key={product.id}
-                      product={product}
-                      onAddToCart={handleAddToCart}
-                      categoryConfig={{
-                        color: colors.primary,
-                        icon: '🎲',
-                        badgeText: 'TABULEIRO'
-                      }}
-                    />
-                  ))}
-              </div>
-            </div>
-          ) : (
+  {/* 🆕 MODOS DE EXIBIÇÃO: Grid ou Carrosséis */}
+{showAllProducts ? (
+  <div>
+    {/* HEADER - Título em uma linha + Botão Voltar */}
+    <div 
+      className="view-all-header"
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '32px',
+        padding: '0 20px'
+      }}
+    >
+      <h2 
+        className="view-all-title"
+        style={{
+          fontSize: `${currentConfig?.view_all_title_font_size || 28}px`,
+          fontWeight: currentConfig?.view_all_title_font_weight || '700',
+          color: currentConfig?.view_all_title_color || colors.text,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          margin: 0,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          maxWidth: '70%'
+        }}
+      >
+        <span style={{ flexShrink: 0 }}>
+          {viewAllType === 'all' && '📦'}
+          {viewAllType === 'bestsellers' && '🔥'}
+          {viewAllType === 'new_arrivals' && '🆕'}
+        </span>
+        <span style={{
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
+        }}>
+          {viewAllType === 'all' && 'Todos os Jogos'}
+          {viewAllType === 'bestsellers' && 'Mais Vendidos'}
+          {viewAllType === 'new_arrivals' && 'Lançamentos'}
+        </span>
+        {/* BADGE REMOVIDO */}
+      </h2>
+      
+      <button
+        className="view-all-back-btn"
+        onClick={() => setShowAllProducts(false)}
+        style={{
+          padding: '8px 16px',
+          background: currentConfig?.view_all_back_button_bg_color || 'transparent',
+          color: currentConfig?.view_all_back_button_text_color || colors.primary,
+          border: `1px solid ${currentConfig?.view_all_back_button_bg_color || colors.primary}`,
+          borderRadius: '8px',
+          fontSize: '14px',
+          fontWeight: '600',
+          cursor: 'pointer',
+          transition: 'all 0.2s ease',
+          whiteSpace: 'nowrap',
+          flexShrink: 0
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = currentConfig?.view_all_back_button_hover_bg_color || colors.primary;
+          e.currentTarget.style.color = currentConfig?.view_all_back_button_hover_text_color || 'white';
+          e.currentTarget.style.borderColor = currentConfig?.view_all_back_button_hover_bg_color || colors.primary;
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = currentConfig?.view_all_back_button_bg_color || 'transparent';
+          e.currentTarget.style.color = currentConfig?.view_all_back_button_text_color || colors.primary;
+          e.currentTarget.style.borderColor = currentConfig?.view_all_back_button_bg_color || colors.primary;
+        }}
+      >
+        ↩ Voltar
+      </button>
+    </div>
+    
+    {/* GRID DE PRODUTOS - 2 por linha no mobile */}
+    <div 
+      className="product-grid-container"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+        gap: '24px',
+        padding: '20px'
+      }}
+    >
+      {(viewAllType === 'all' ? products : 
+        viewAllType === 'bestsellers' ? bestsellers : newArrivals)
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((product) => (
+          <ProductCard 
+            key={product.id}
+            product={product}
+            onAddToCart={handleAddToCart}
+            categoryConfig={{
+              color: colors.primary,
+              icon: '🎲',
+              badgeText: 'TABULEIRO'
+            }}
+          />
+        ))}
+    </div>
+  </div>
+) : (
             // 🆕 MODO CARROSSÉIS (FUNCIONALIDADE NOVA)
             <section>
               {/* Indicador de carregamento dos carrosséis */}

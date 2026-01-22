@@ -116,7 +116,7 @@ export interface ThemeConfig {
     success: string;
     warning: string;
     error: string;
-    headerBg?: string;
+    
   };
   emojis: {
     cart: string;

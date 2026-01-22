@@ -150,7 +150,6 @@ export async function getThemeById(themeId: string): Promise<ThemeConfig | null>
   success: string;
   warning: string;
   error: string;
-  headerBg?: string;
 } = {
       primary: colorsRecord.primary || '#7c3aed',
       secondary: colorsRecord.secondary || '#f1f5f9',
@@ -161,7 +160,6 @@ export async function getThemeById(themeId: string): Promise<ThemeConfig | null>
       success: colorsRecord.success || '#10b981',
       warning: colorsRecord.warning || '#f59e0b',
       error: colorsRecord.error || '#ef4444',
-      headerBg: colorsRecord.headerBg // opcional - pode ser undefined
     };
 
     // 1. Primeiro coleta como Record
@@ -223,7 +221,19 @@ const emojis: {
 export async function saveTheme(theme: ThemeConfig): Promise<boolean> {
   try {
     console.log(`💾 Salvando tema "${theme.name}"...`);
-
+    
+    // 🆕 VERIFICAR SESSÃO
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      console.error('❌ Usuário não autenticado!');
+      alert('❌ Você precisa fazer login para salvar temas.');
+      return false;
+    }
+    
+    console.log('✅ Usuário autenticado:', session.user.email);
+    
+    // 1. Salvar tema principal
     const { error: themeError } = await supabase
       .from('themes')
       .upsert({
@@ -236,55 +246,146 @@ export async function saveTheme(theme: ThemeConfig): Promise<boolean> {
         start_date: theme.startDate,
         end_date: theme.endDate,
         updated_at: new Date().toISOString()
-      }, { onConflict: 'id' });
+      }, { 
+        onConflict: 'id' 
+      });
 
-    if (themeError) throw themeError;
+    if (themeError) {
+      console.error('❌ Erro ao salvar tema principal:', themeError);
+      throw themeError;
+    }
 
+    console.log('✅ Tema principal salvo');
+
+    // 2. 🆕 CORES - USAR UPSERT COM ON CONFLICT DO UPDATE
     if (theme.colors && Object.keys(theme.colors).length > 0) {
-      const colorEntries = Object.entries(theme.colors).map(([type, value]) => ({
-        theme_id: theme.id,
-        color_type: type,
-        color_value: value
-      }));
+      console.log('🎨 Processando cores...');
+      
+      // Remover headerBg se existir
+      const colorsToSave = { ...theme.colors };
+      delete colorsToSave.headerBg;
+      
+      const colorEntries = Object.entries(colorsToSave)
+        .filter(([_, value]) => value && typeof value === 'string' && value.trim() !== '')
+        .map(([type, value]) => ({
+          theme_id: theme.id,
+          color_type: type,
+          color_value: value.trim()
+        }));
 
-      const { error: colorsError } = await supabase
-        .from('theme_colors')
-        .upsert(colorEntries, { onConflict: 'theme_id,color_type' });
+      console.log(`📝 ${colorEntries.length} cores para salvar:`, 
+        colorEntries.map(c => c.color_type));
 
-      if (colorsError) throw colorsError;
+      if (colorEntries.length > 0) {
+        // 🆕 USAR UPSERT COM ON CONFLICT - ATUALIZA SE JÁ EXISTIR
+        const { error: colorsError } = await supabase
+          .from('theme_colors')
+          .upsert(colorEntries, {
+            onConflict: 'theme_id,color_type',
+            ignoreDuplicates: false
+          });
+
+        if (colorsError) {
+          console.error('❌ Erro ao upsert cores:', colorsError);
+          console.error('🔍 Detalhes:', colorsError.message);
+          
+          // 🆕 FALLBACK: Tentar update um por um
+          console.log('🔄 Tentando update individual para cores...');
+          let updatedCount = 0;
+          
+          for (const entry of colorEntries) {
+            try {
+              const { error: updateError } = await supabase
+                .from('theme_colors')
+                .update({ color_value: entry.color_value })
+                .eq('theme_id', entry.theme_id)
+                .eq('color_type', entry.color_type);
+              
+              if (!updateError) {
+                updatedCount++;
+              }
+            } catch (singleError) {
+              console.error(`❌ Erro em ${entry.color_type}:`, singleError);
+            }
+          }
+          
+          console.log(`✅ ${updatedCount}/${colorEntries.length} cores atualizadas`);
+        } else {
+          console.log(`✅ ${colorEntries.length} cores salvas via upsert`);
+        }
+      }
     }
 
+    // 3. 🆕 EMOJIS - MESMA ABORDAGEM UPSERT
     if (theme.emojis && Object.keys(theme.emojis).length > 0) {
-      const emojiEntries = Object.entries(theme.emojis).map(([type, value]) => ({
-        theme_id: theme.id,
-        emoji_type: type,
-        emoji_value: value
-      }));
+      console.log('😀 Processando emojis...');
+      
+      const emojiEntries = Object.entries(theme.emojis)
+        .filter(([_, value]) => value && typeof value === 'string' && value.trim() !== '')
+        .map(([type, value]) => ({
+          theme_id: theme.id,
+          emoji_type: type,
+          emoji_value: value.trim()
+        }));
 
-      const { error: emojisError } = await supabase
-        .from('theme_emojis')
-        .upsert(emojiEntries, { onConflict: 'theme_id,emoji_type' });
+      if (emojiEntries.length > 0) {
+        const { error: emojisError } = await supabase
+          .from('theme_emojis')
+          .upsert(emojiEntries, {
+            onConflict: 'theme_id,emoji_type',
+            ignoreDuplicates: false
+          });
 
-      if (emojisError) throw emojisError;
+        if (emojisError) {
+          console.error('❌ Erro ao upsert emojis:', emojisError);
+          
+          // FALLBACK: Update individual
+          let updatedEmojis = 0;
+          for (const entry of emojiEntries) {
+            try {
+              const { error: updateError } = await supabase
+                .from('theme_emojis')
+                .update({ emoji_value: entry.emoji_value })
+                .eq('theme_id', entry.theme_id)
+                .eq('emoji_type', entry.emoji_type);
+              
+              if (!updateError) updatedEmojis++;
+            } catch {}
+          }
+          console.log(`✅ ${updatedEmojis}/${emojiEntries.length} emojis atualizados`);
+        } else {
+          console.log(`✅ ${emojiEntries.length} emojis salvos via upsert`);
+        }
+      }
     }
 
+    // 4. ESTILOS DE COMPONENTE (já usa upsert)
     if (theme.componentStyles) {
+      console.log('🎨 Processando estilos de componente...');
+      
       const { error: stylesError } = await supabase
         .from('component_styles')
         .upsert({
           theme_id: theme.id,
           component_type: 'productCard',
-          styles: theme.componentStyles
-        }, { onConflict: 'theme_id,component_type' });
+          styles: theme.componentStyles,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'theme_id,component_type'
+        });
 
-      if (stylesError) throw stylesError;
+      if (stylesError) {
+        console.error('❌ Erro ao salvar estilos:', stylesError);
+      } else {
+        console.log('✅ Estilos de componente salvos');
+      }
     }
 
-    console.log(`✅ Tema "${theme.name}" salvo!`);
+    console.log(`🎉 Tema "${theme.name}" salvo com sucesso!`);
     return true;
 
   } catch (error) {
-    console.error(`❌ Erro ao salvar tema:`, error);
+    console.error(`❌ ERRO ao salvar tema "${theme.name}":`, error);
     return false;
   }
 }
@@ -601,7 +702,6 @@ function getDefaultThemes(): ThemeConfig[] {
       background: '#ffffff',
       text: '#1f2937',
       cardBg: '#ffffff',
-      headerBg: '#ffffff',
        success: '#10b981',  
       warning: '#f59e0b',   
       error: '#ef4444'

@@ -585,3 +585,444 @@ th, td {
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+/* ===== MOBILE CARROSSEL OPTIMIZATIONS ===== */
+
+/* Container do carrossel */
+.carousel-container-mobile {
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 16px;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+/* Esconder scrollbar no mobile */
+.carousel-container-mobile::-webkit-scrollbar {
+  display: none;
+}
+
+/* Cards com largura fixa e snap */
+.carousel-container-mobile > div {
+  scroll-snap-align: start;
+}
+
+/* Ajustes específicos para mobile */
+@media (max-width: 768px) {
+  /* Garantir que setas não apareçam no mobile */
+  .carousel-container-mobile + div button {
+    display: none !important;
+  }
+  
+  /* Largura fixa para cards no mobile */
+  .carousel-container-mobile > div {
+    width: 280px !important;
+  }
+}
+
+/* Touch optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .carousel-container-mobile {
+    scroll-snap-type: x mandatory;
+  }
+  
+  /* Botões maiores para touch */
+  .carousel-container-mobile + div button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Animações */
+@keyframes pulse-scroll {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.7; }
+}
+
+.scroll-indicator {
+  animation: pulse-scroll 2s infinite;
+  display: inline-block;
+  margin-left: 4px;
+}
+/* ===== RESPONSIVE LAYOUT FIXES ===== */
+
+@media (max-width: 768px) {
+  /* Ajustar padding geral */
+  body {
+    padding: 0 8px;
+  }
+  
+  /* Header mais compacto */
+  .simple-header {
+    padding: 0.5rem 0;
+  }
+  
+  .logo-round {
+    width: 80px;
+    height: 80px;
+  }
+  
+  /* Ajustar espaçamento entre carrosséis */
+  .carousel-section {
+    margin-bottom: 30px;
+  }
+  
+  /* Garantir que os carrosséis não tenham overflow horizontal indesejado */
+  .page-container {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+  
+  /* Melhorar visualização dos cards no mobile */
+  .product-card-container {
+    transform: none !important; /* Remover transform no mobile se estiver atrapalhando */
+  }
+}
+/* ===== GARANTIR TÍTULOS EM UMA LINHA ===== */
+
+.carousel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  flex-wrap: nowrap; /* 👈 IMPEDE QUEBRA */
+}
+
+.carousel-title {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  max-width: 60% !important; /* Limita para caber com botão */
+}
+
+.carousel-title span {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* Para telas muito pequenas, ajustar fonte */
+@media (max-width: 480px) {
+  .carousel-title {
+    font-size: 18px !important;
+    max-width: 55% !important;
+  }
+  
+  .carousel-title span[role="img"] {
+    font-size: 18px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .carousel-title {
+    font-size: 16px !important;
+    max-width: 50% !important;
+  }
+  
+  .carousel-title span[role="img"] {
+    font-size: 16px !important;
+  }
+  
+  .carousel-header button {
+    font-size: 13px !important;
+    padding: 5px 10px !important;
+  }
+}
+/* ===== GRID "VER TODOS" - RESPONSIVO ===== */
+
+/* Container do grid de produtos */
+.product-grid-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 24px;
+  padding: 20px;
+}
+
+/* Ajustes para mobile */
+@media (max-width: 768px) {
+  .product-grid-container {
+    grid-template-columns: repeat(2, 1fr) !important; /* 👈 2 por linha */
+    gap: 12px !important;
+    padding: 12px !important;
+  }
+  
+  /* Ajustar cards para 2 colunas */
+  .product-grid-container > div {
+    width: 100% !important;
+    min-height: auto !important;
+  }
+  
+  /* Ajustar tamanho das imagens */
+  .product-grid-container img {
+    height: 140px !important;
+  }
+  
+  /* Ajustar conteúdo dos cards */
+  .product-grid-container h3 {
+    font-size: 14px !important;
+    height: 36px !important;
+    line-height: 1.3 !important;
+  }
+  
+  .product-grid-container .price {
+    font-size: 16px !important;
+  }
+  
+  .product-grid-container button {
+    font-size: 12px !important;
+    padding: 8px 12px !important;
+    height: 36px !important;
+  }
+  
+  /* Header da página "Ver Todos" */
+  .view-all-header {
+    padding: 0 12px !important;
+    margin-bottom: 20px !important;
+  }
+  
+  .view-all-title {
+    font-size: 20px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    textOverflow: ellipsis !important;
+    max-width: 60% !important;
+  }
+  
+  .view-all-back-btn {
+    padding: 6px 12px !important;
+    font-size: 13px !important;
+    white-space: nowrap !important;
+  }
+}
+
+/* Ajustes para telas muito pequenas */
+@media (max-width: 480px) {
+  .product-grid-container {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+    padding: 10px !important;
+  }
+  
+  .product-grid-container img {
+    height: 120px !important;
+  }
+  
+  .product-grid-container h3 {
+    font-size: 13px !important;
+    height: 32px !important;
+  }
+  
+  .view-all-title {
+    font-size: 18px !important;
+    max-width: 55% !important;
+  }
+}
+/* ===== GRID "VER TODOS" - MAIS COMPACTO ===== */
+
+@media (max-width: 768px) {
+  .product-grid-container {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important; /* 👈 Reduzido de 12px */
+    padding: 0px !important; /* 👈 Reduzido de 12px */
+  }
+  
+  .product-grid-container .product-card-mobile-optimized {
+    min-height: 320px !important;
+    max-height: 320px !important;
+  }
+  
+  /* Remover alguns elementos para mobile se necessário */
+  .product-grid-container .product-card-mobile-optimized .description {
+    display: none !important; /* 👈 Opcional: esconder descrição no mobile */
+  }
+  
+  /* Ajustar informações de estoque */
+  .product-grid-container .product-card-mobile-optimized .stock-info {
+    font-size: 11px !important;
+    margin-bottom: 6px !important;
+  }
+}
+/* ===== PRODUCT CARD - MAIS ESPAÇO PARA IMAGEM ===== */
+
+@media (max-width: 768px) {
+  /* Aumentar altura da imagem */
+  .product-grid-container .product-card-mobile-optimized img {
+    height: 170px !important; /* 👈 Aumentado */
+  }
+  
+  /* Diminuir o espaço acima do título */
+  .product-grid-container .product-card-mobile-optimized .card-content {
+    padding-top: 0px !important; /* 👈 Reduzido */
+  }
+  
+  /* Ajustar posição do título - mais para baixo */
+  .product-grid-container .product-card-mobile-optimized h3 {
+    margin-top: -15 !important; /* Remove margem superior */
+    padding-top: 0 !important;
+  }
+  
+  /* Ajustar badges para não atrapalhar a imagem */
+  .product-grid-container .product-card-mobile-optimized .badge {
+    top: 8px !important; /* 👈 Abaixar badges */
+    left: 8px !important;
+  }
+}
+/* ===== AUMENTAR CONTAINER DA IMAGEM ===== */
+
+@media (max-width: 768px) {
+  /* Encontrar e aumentar o container da imagem */
+  .product-grid-container .product-card-mobile-optimized > div > div:has(img) {
+    height: 150px !important; /* 👈 Aumenta o "buraco" */
+    min-height: 150px !important;
+  }
+}
+/* ===== AUMENTAR ESPAÇO DA IMAGEM NO CARD ===== */
+
+@media (max-width: 768px) {
+  /* Container que envolve a imagem (o "buraco") */
+  .product-grid-container .product-card-mobile-optimized > div[style*="height: 200px"],
+  .product-grid-container .product-card-mobile-optimized > div[style*="height: 200px;"],
+  .product-grid-container .product-card-mobile-optimized > div[style*="200px"] {
+    height: 150px !important; /* Aumenta o buraco */
+    min-height: 150px !important;
+  }
+  
+  /* Se o buraco tiver classe específica */
+  .product-grid-container .product-card-mobile-optimized .image-container,
+  .product-grid-container .product-card-mobile-optimized .image-wrapper,
+  .product-grid-container .product-card-mobile-optimized > div:first-of-type {
+    height: 20px !important;
+  }
+}
+/* ===== AJUSTES ESPECÍFICOS PARA PRODUCT CARD - GRID MOBILE ===== */
+
+@media (max-width: 768px) {
+  /* 1. NOME DA COLEÇÃO - pelo estilo inline ou classe */
+  .product-grid-container .product-card-mobile-optimized p[style*="font-size: 12px"],
+  .product-grid-container .product-card-mobile-optimized p[style*="font-weight: 600"],
+  .product-grid-container .product-card-mobile-optimized .collection-name {
+    /* ALTURA e POSIÇÃO */
+    height: 14px !important;           /* 👈 Altura reduzida */
+    min-height: 14px !important;
+    max-height: 14px !important;
+    line-height: 1 !important;         /* 👈 Linha única compacta */
+    margin-bottom: 2px !important;     /* 👈 Espaço abaixo reduzido */
+    
+    /* TEXTO */
+    font-size: 10px !important;        /* 👈 Fonte menor */
+    font-weight: 500 !important;       /* 👈 Peso da fonte */
+    opacity: 0.8 !important;           /* 👈 Mais sutil */
+    
+    /* LAYOUT */
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    text-overflow: ellipsis !important;
+  }
+  
+  /* 2. BOTÃO "ADICIONAR AO CARRINHO" */
+  .product-grid-container .product-card-mobile-optimized button,
+  .product-grid-container .product-card-mobile-optimized button[style*="font-size: 14px"] {
+    /* POSIÇÃO */
+    margin-top: auto !important;       /* 👈 Empurra para BAIXO */
+    position: relative !important;
+    
+    /* TAMANHO */
+    height: 32px !important;           /* 👈 Altura reduzida */
+    min-height: 32px !important;
+    padding: 6px 12px !important;      /* 👈 Padding reduzido */
+    
+    /* TEXTO */
+    font-size: 11px !important;        /* 👈 Fonte menor */
+    font-weight: 600 !important;
+    
+    /* LAYOUT */
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+  }
+  
+  /* 3. Container do botão - garantir posicionamento */
+  .product-grid-container .product-card-mobile-optimized > div:last-child {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+  }
+  
+  /* 4. Container do botão específico (div com height: 50px) */
+  .product-grid-container .product-card-mobile-optimized > div:last-child > div[style*="height: 50px"] {
+    height: 40px !important;           /* 👈 Reduz altura do container */
+    margin-top: auto !important;       /* 👈 Empurra container para baixo */
+    padding-top: 4px !important;
+  }
+  
+  /* 5. Ajustar altura mínima do conteúdo do card */
+  .product-grid-container .product-card-mobile-optimized > div:last-child {
+    min-height: 170px !important;      /* 👈 Ajustar conforme necessidade */
+  }
+}
+/* ===== PRODUTOS EM PROMOÇÃO - MOBILE OPTIMIZATIONS ===== */
+
+@media (max-width: 768px) {
+  /* Container dos preços em promoção */
+  .product-grid-container .product-card-mobile-optimized > div:last-child > div > div {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+    margin-bottom: -10px !important;
+  }
+  
+  /* Preço original riscado */
+  .product-grid-container .product-card-mobile-optimized s,
+  .product-grid-container .product-card-mobile-optimized [style*="text-decoration: line-through"],
+  .product-grid-container .product-card-mobile-optimized .original-price {
+    font-size: 12px !important;
+    opacity: 0.7 !important;
+    line-height: 1 !important;
+  }
+  
+  /* Preço de venda (promoção) */
+  .product-grid-container .product-card-mobile-optimized [style*="font-size: 18px"]:not(s),
+  .product-grid-container .product-card-mobile-optimized .sale-price,
+  .product-grid-container .product-card-mobile-optimized > div:last-child > div > div > span:last-child {
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    line-height: 1.2 !important;
+  }
+  
+  /* Ajustar layout dos preços lado a lado */
+  .product-grid-container .product-card-mobile-optimized > div:last-child > div > div[style*="display: flex"] {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 2px !important;
+  }
+  
+  /* Badge de desconto (ex: "🔥 20% OFF") */
+  .product-grid-container .product-card-mobile-optimized > div:first-child > div[style*="position: absolute"][style*="right: 12px"] {
+    top: 8px !important;
+    right: 8px !important;
+    padding: 2px 6px !important;
+    font-size: 9px !important;
+    border-radius: 6px !important;
+  }
+  
+  /* Ajustar margens para compensar espaço extra dos dois preços */
+  .product-grid-container .product-card-mobile-optimized > div:last-child > div {
+    margin-bottom: 6px !important;
+  }
+  
+  /* Se tiver muita informação, esconder descrição em promoções */
+  .product-grid-container .product-card-mobile-optimized .description {
+    display: none !important; /* Opcional: remove descrição para dar espaço */
+  }
+}
+@media (max-width: 768px) {
+  /* Aplicar apenas no grid "Ver Todos" */
+  .product-grid-container .product-card-mobile-optimized > div:last-child > div:nth-last-child(2) {
+    /* Este é o container do estoque (ícone + texto) */
+    margin-top: auto !important; /* 👈 Empurra para BAIXO */
+    margin-bottom: -10px !important; /* 👈 Espaço acima do botão */
+  }
+}

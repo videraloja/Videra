@@ -6,6 +6,7 @@ import { useThemeEditor } from '../contexts/ThemeEditorContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { ProductCardPreview } from './ProductCardPreview';
 import { ComponentStyles, ProductCardStyles } from '../types';
+import { supabase } from '@/lib/supabaseClient';
 
 export function ThemeEditor() {
   const { editorState, setDraftTheme, updateDraftProperty, saveDraft } = useThemeEditor();
@@ -28,6 +29,16 @@ export function ThemeEditor() {
     allThemesCount: allThemes.length,
     draftThemeHasStyles: !!editorState.draftTheme?.componentStyles?.productCard
   });
+
+  // Dentro do componente ThemeEditor, adicione:
+useEffect(() => {
+  const checkAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    console.log('🔐 ThemeEditor - Sessão:', session ? 'AUTENTICADO' : 'NÃO AUTENTICADO');
+    console.log('🔐 Email do usuário:', session?.user?.email);
+  };
+  checkAuth();
+}, []);
 
   // 🆕 CORREÇÃO: CARREGAR TEMA INICIAL APENAS UMA VEZ
   useEffect(() => {

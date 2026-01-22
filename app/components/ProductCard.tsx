@@ -156,6 +156,7 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
 
   return (
     <div
+    className="product-card-mobile-optimized"
       style={{
         ...cardContainerStyles,
         background: cardStyles.cardBackground,
@@ -175,24 +176,7 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
         e.currentTarget.style.boxShadow = cardStyles.shadow;
       }}
     >
-      {/* Badge de Categoria */}
-      {config.badgeText && (
-        <div style={{
-          ...applyCardStyles('badgeType', {
-            position: 'absolute',
-            top: '12px',
-            left: '12px',
-            padding: '4px 8px',
-            borderRadius: '8px',
-            fontSize: '10px',
-            fontWeight: '700',
-            zIndex: 2
-          })
-        }}>
-          {config.badgeText}
-        </div>
-      )}
-
+    
       {/* Badge de Promoção */}
       {product.on_sale && originalPrice && (
         <div style={{
@@ -228,23 +212,7 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
             objectFit: 'cover'
           }}
         />
-        
-        {/* Badge Urgente (Estoque baixo) */}
-        {currentStock <= 3 && currentStock > 0 && (
-          <div style={{
-            ...applyCardStyles('badgeUrgent', {
-              position: 'absolute',
-              bottom: '12px',
-              left: '12px',
-              padding: '4px 8px',
-              borderRadius: '12px',
-              fontSize: '12px',
-              fontWeight: '700'
-            })
-          }}>
-            ⚡ RÁPIDO!
-          </div>
-        )}
+
       </div>
 
       {/* Conteúdo do Card */}
@@ -271,37 +239,7 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
         }}>
           {product.name}
         </h3>
-        
-        {/* Nome da Coleção */}
-        {product.collection && (
-          <p style={{
-            ...applyCardStyles('collectionName', {
-              fontSize: '12px',
-              fontWeight: '600',
-              marginBottom: '8px'
-            })
-          }}>
-            {product.collection}
-          </p>
-        )}
-        
-        {/* Descrição */}
-        {product.description && (
-          <p style={{
-            ...applyCardStyles('description', {
-              fontSize: '14px',
-              lineHeight: '1.4',
-              height: '40px',
-              overflow: 'hidden',
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              marginBottom: '12px'
-            })
-          }}>
-            {product.description}
-          </p>
-        )}
+
         
         {/* Preços */}
         <div style={{ marginBottom: '12px' }}>

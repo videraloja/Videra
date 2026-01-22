@@ -1,4 +1,4 @@
-// app/admin/themes/page.tsx - VERSÃO ATUALIZADA COM EDITOR DE CARROSSÉIS
+// app/admin/themes/page.tsx - VERSÃO ATUALIZADA COM AUTHGUARD
 'use client';
 
 import React, { useState } from 'react';
@@ -7,9 +7,10 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { usePageTheme, PAGE_IDS } from '../../contexts/PageThemeContext';
 import { ThemeEditor } from '../../components/ThemeEditor';
 import { supabase } from '@/lib/supabaseClient';
-import CarouselEditor from '../../components/CarouselEditor'; // 🆕 NOVO IMPORT
+import CarouselEditor from '../../components/CarouselEditor';
+import AuthGuard from '../../components/AuthGuard'; // 🆕 IMPORT DO AUTHGUARD
 
-export default function ThemesAdminPage() {
+function ThemesAdminPageContent() {
   const { allThemes, activateSeasonalTheme, deactivateSeasonalTheme, currentThemeConfig, isLoading, createNewTheme, deleteTheme } = useTheme();
   const { pageThemes, setPageTheme, clearPageTheme, currentPageId } = usePageTheme();
   
@@ -21,10 +22,9 @@ export default function ThemesAdminPage() {
   const [newThemeName, setNewThemeName] = useState('');
   const [baseThemeId, setBaseThemeId] = useState('default');
   const [isCreating, setIsCreating] = useState(false);
-  const [activeSection, setActiveSection] = useState<'themes' | 'editor' | 'carrosséis'>('themes'); // 🆕 ADICIONADA NOVA SEÇÃO
+  const [activeSection, setActiveSection] = useState<'themes' | 'editor' | 'carrosséis'>('themes');
   const [isActivating, setIsActivating] = useState<string | null>(null);
 
-  // 🆕 FUNÇÕES CORRIGIDAS PARA ATIVAÇÃO/DESATIVAÇÃO
   const handleActivateTheme = async (themeId: string, themeName: string) => {
     if (confirm(`Ativar tema "${themeName}" globalmente?`)) {
       setIsActivating(themeId);
@@ -41,7 +41,6 @@ export default function ThemesAdminPage() {
   };
 
   const handleDeactivateTheme = async (themeId: string, themeName: string) => {
-    // 🆕 CORREÇÃO: Se for o tema padrão, apenas confirma
     if (themeId === 'default') {
       if (confirm(`O tema padrão não pode ser desativado. Deseja continuar?`)) {
         return;
@@ -51,7 +50,6 @@ export default function ThemesAdminPage() {
     if (confirm(`Desativar tema "${themeName}" e voltar para o tema padrão?`)) {
       setIsActivating('default');
       try {
-        // Chama a função para ativar o tema padrão
         await activateSeasonalTheme('default');
         alert(`✅ Tema padrão ativado! O tema "${themeName}" foi desativado.`);
         setTimeout(() => window.location.reload(), 800);
@@ -63,7 +61,6 @@ export default function ThemesAdminPage() {
     }
   };
 
-  // 🆕 MOSTRAR LOADING ENQUANTO CARREGA
   if (isLoading) {
     return (
       <div style={{ padding: '40px', maxWidth: '1200px', margin: '0 auto', textAlign: 'center' }}>
@@ -74,7 +71,6 @@ export default function ThemesAdminPage() {
     );
   }
 
-  // 🆕 VERIFICAR SE TEM TEMAS CARREGADOS
   if (!allThemes || allThemes.length === 0) {
     return (
       <div style={{ padding: '40px', maxWidth: '1200px', margin: '0 auto', textAlign: 'center' }}>
@@ -102,7 +98,6 @@ export default function ThemesAdminPage() {
     );
   }
 
-  // 🆕 AGORA USA OS TEMAS REAIS DO CONTEXT
   const themes = allThemes.map(theme => ({
     ...theme,
     status: theme.isActive ? 'ativo' : 'inativo',
@@ -112,13 +107,11 @@ export default function ThemesAdminPage() {
       .map(([pageId]) => PAGE_IDS[pageId as keyof typeof PAGE_IDS] || pageId)
   }));
 
-  // 🆕 ABRIR MODAL PARA APLICAR À PÁGINA
   const handleOpenPageModal = (themeId: string) => {
     setSelectedTheme(themeId);
     setShowPageModal(true);
   };
 
-  // 🆕 APLICAR TEMA À PÁGINA - VERSÃO CORRIGIDA QUE SALVA NO SUPABASE
   const handleApplyToPage = async (pageId: string) => {
     const theme = allThemes.find(t => t.id === selectedTheme);
     const pageName = PAGE_IDS[pageId as keyof typeof PAGE_IDS] || pageId;
@@ -127,7 +120,6 @@ export default function ThemesAdminPage() {
       try {
         console.log(`🎯 Aplicando tema ${selectedTheme} à página ${pageId}...`);
         
-        // 🆕 PRIMEIRO: Salvar no Supabase (upsert: se existir, atualiza)
         const { error } = await supabase
           .from('page_themes')
           .upsert({
@@ -135,7 +127,7 @@ export default function ThemesAdminPage() {
             theme_id: selectedTheme,
             updated_at: new Date().toISOString()
           }, {
-            onConflict: 'page_path', // Se já existe tema para esta página, atualiza
+            onConflict: 'page_path',
             ignoreDuplicates: false
           });
         
@@ -147,15 +139,12 @@ export default function ThemesAdminPage() {
         
         console.log(`✅ Tema salvo no Supabase para página ${pageId}`);
         
-        // 🆕 SEGUNDO: Atualizar contexto/local
         setPageTheme(pageId, selectedTheme);
-        
         setShowPageModal(false);
         setSelectedTheme('');
         
         alert(`🎉 Tema "${theme.name}" aplicado à página "${pageName}"!`);
         
-        // 🆕 TERCEIRO: Recarregar a página após 1 segundo
         setTimeout(() => {
           window.location.reload();
         }, 1000);
@@ -167,7 +156,6 @@ export default function ThemesAdminPage() {
     }
   };
 
-  // 🆕 REMOVER TEMA DA PÁGINA - VERSÃO CORRIGIDA QUE REMOVE DO SUPABASE
   const handleRemoveFromPage = async (pageId: string, themeName: string) => {
     const pageName = PAGE_IDS[pageId as keyof typeof PAGE_IDS] || pageId;
     
@@ -175,7 +163,6 @@ export default function ThemesAdminPage() {
       try {
         console.log(`🗑️ Removendo tema da página ${pageId}...`);
         
-        // 🆕 PRIMEIRO: Remover do Supabase
         const { error } = await supabase
           .from('page_themes')
           .delete()
@@ -189,12 +176,10 @@ export default function ThemesAdminPage() {
         
         console.log(`✅ Tema removido do Supabase para página ${pageId}`);
         
-        // 🆕 SEGUNDO: Remover do contexto/local
         clearPageTheme(pageId);
         
         alert(`✅ Tema "${themeName}" removido da página "${pageName}"!`);
         
-        // 🆕 TERCEIRO: Recarregar a página após 1 segundo
         setTimeout(() => {
           window.location.reload();
         }, 1000);
@@ -206,14 +191,12 @@ export default function ThemesAdminPage() {
     }
   };
 
-  // 🆕 ABRIR MODAL DE CRIAÇÃO
   const handleOpenCreateModal = () => {
     setNewThemeName('');
     setBaseThemeId('default');
     setShowCreateModal(true);
   };
 
-  // 🆕 CRIAR NOVO TEMA - CORRIGIDO
   const handleCreateTheme = async () => {
     if (!newThemeName.trim()) {
       alert('Por favor, digite um nome para o novo tema');
@@ -242,13 +225,11 @@ export default function ThemesAdminPage() {
     }
   };
 
-  // 🆕 ABRIR MODAL DE EXCLUSÃO
   const handleOpenDeleteModal = (theme: any) => {
     setThemeToDelete(theme);
     setShowDeleteModal(true);
   };
 
-  // 🆕 EXCLUIR TEMA
   const handleDeleteTheme = () => {
     if (themeToDelete) {
       deleteTheme(themeToDelete.id);
@@ -261,15 +242,12 @@ export default function ThemesAdminPage() {
     }
   };
 
-  // 🆕 ESTATÍSTICAS
   const activeThemesCount = themes.filter(theme => theme.status === 'ativo').length;
   const seasonalThemesCount = themes.filter(theme => theme.type === 'sazonal').length;
   const pagesWithCustomThemes = Object.keys(pageThemes).length;
 
-  // 🆕 RENDERIZAÇÃO CONDICIONAL DAS SEÇÕES
   const renderThemesSection = () => (
     <>
-      {/* Estatísticas Rápidas */}
       <div style={{ 
         display: 'grid', 
         gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
@@ -329,7 +307,6 @@ export default function ThemesAdminPage() {
         </div>
       </div>
 
-      {/* Lista de Temas */}
       <div style={{ 
         background: 'white', 
         borderRadius: '12px', 
@@ -457,7 +434,6 @@ export default function ThemesAdminPage() {
                     🎯 Aplicar à Página
                   </button>
                   
-                  {/* 🆕 BOTÃO DE EXCLUSÃO - SÓ PARA TEMAS PERSONALIZADOS */}
                   {theme.id !== 'default' && (
                     <button 
                       onClick={() => handleOpenDeleteModal(theme)}
@@ -476,7 +452,6 @@ export default function ThemesAdminPage() {
                     </button>
                   )}
                   
-                  {/* 🆕 BOTÕES DE ATIVAÇÃO/DESATIVAÇÃO CORRIGIDOS */}
                   {theme.status === 'inativo' ? (
                     <button 
                       onClick={() => handleActivateTheme(theme.id, theme.name)}
@@ -531,7 +506,6 @@ export default function ThemesAdminPage() {
                 </div>
               </div>
 
-              {/* 🆕 PÁGINAS ONDE O TEMA ESTÁ APLICADO */}
               {theme.appliedPages.length > 0 && (
                 <div style={{ 
                   marginTop: '12px',
@@ -588,7 +562,6 @@ export default function ThemesAdminPage() {
         </div>
       </div>
 
-      {/* Informações */}
       <div style={{ 
         marginTop: '30px',
         background: 'white', 
@@ -615,7 +588,6 @@ export default function ThemesAdminPage() {
     </div>
   );
 
-  // 🆕 NOVA SEÇÃO: EDITOR DE CARROSSÉIS
   const renderCarouselsSection = () => (
     <div style={{ marginTop: '20px' }}>
       <CarouselEditor pageSlug="pokemontcg" />
@@ -624,7 +596,6 @@ export default function ThemesAdminPage() {
 
   return (
     <div style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}>
-      {/* Cabeçalho com Navegação */}
       <div style={{ marginBottom: '30px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
           <div>
@@ -637,7 +608,6 @@ export default function ThemesAdminPage() {
           </div>
         </div>
 
-        {/* 🆕 NAVEGAÇÃO ENTRE SEÇÕES - ATUALIZADA COM NOVA ABA */}
         <div style={{ 
           display: 'flex', 
           gap: '8px', 
@@ -701,7 +671,6 @@ export default function ThemesAdminPage() {
         </div>
       </div>
 
-      {/* Modal para Aplicar à Página */}
       {showPageModal && (
         <div style={{
           position: 'fixed',
@@ -787,7 +756,6 @@ export default function ThemesAdminPage() {
         </div>
       )}
 
-      {/* 🆕 MODAL DE CRIAÇÃO DE TEMA */}
       {showCreateModal && (
         <div style={{
           position: 'fixed',
@@ -814,7 +782,6 @@ export default function ThemesAdminPage() {
             </h3>
             
             <div style={{ marginBottom: '20px' }}>
-              {/* Nome do Tema */}
               <div style={{ marginBottom: '16px' }}>
                 <label style={{
                   display: 'block',
@@ -843,7 +810,6 @@ export default function ThemesAdminPage() {
                 />
               </div>
 
-              {/* Tema Base */}
               <div style={{ marginBottom: '20px' }}>
                 <label style={{
                   display: 'block',
@@ -919,7 +885,6 @@ export default function ThemesAdminPage() {
         </div>
       )}
 
-      {/* 🆕 MODAL DE EXCLUSÃO DE TEMA */}
       {showDeleteModal && themeToDelete && (
         <div style={{
           position: 'fixed',
@@ -1021,10 +986,18 @@ export default function ThemesAdminPage() {
         </div>
       )}
 
-      {/* 🆕 RENDERIZAÇÃO DA SEÇÃO ATIVA */}
       {activeSection === 'themes' && renderThemesSection()}
       {activeSection === 'editor' && renderEditorSection()}
       {activeSection === 'carrosséis' && renderCarouselsSection()}
     </div>
+  );
+}
+
+// 🆕 ENVOLVA O CONTEÚDO COM AUTHGUARD
+export default function ThemesAdminPage() {
+  return (
+    <AuthGuard>
+      <ThemesAdminPageContent />
+    </AuthGuard>
   );
 }

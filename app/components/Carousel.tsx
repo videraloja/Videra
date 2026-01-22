@@ -33,12 +33,25 @@ export default function Carousel({
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
-  const { colors, getShadow } = useThemeColors();
+  const [isMobile, setIsMobile] = useState(false);
+  const { colors } = useThemeColors();
+
+  // Detectar se é mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const scroll = (direction: 'left' | 'right') => {
     if (!carouselRef.current) return;
     
-    const scrollAmount = 320 + 24; // Largura do card + gap
+    const scrollAmount = 280 + 16;
     carouselRef.current.scrollBy({
       left: direction === 'left' ? -scrollAmount : scrollAmount,
       behavior: 'smooth'
@@ -88,7 +101,7 @@ export default function Carousel({
         if (carouselRef.current.scrollLeft >= maxScroll) {
           carouselRef.current.scrollTo({ left: 0, behavior: 'smooth' });
         } else {
-          carouselRef.current.scrollBy({ left: 320 + 24, behavior: 'smooth' });
+          carouselRef.current.scrollBy({ left: 280 + 16, behavior: 'smooth' });
         }
       }
     }, config.auto_scroll_interval);
@@ -99,96 +112,85 @@ export default function Carousel({
   if (products.length === 0) return null;
 
   return (
-    <div style={{ marginBottom: '60px' }}>
+    <div style={{ marginBottom: '40px', position: 'relative' }}>
       {/* Cabeçalho do Carrossel */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: '24px',
-        padding: '0 8px'
+        marginBottom: '16px',
+        padding: '0 8px',
+        minHeight: '40px' // Altura fixa para evitar quebras
       }}>
+        {/* Título - SEM BADGE AO LADO */}
         <h3 style={{
-          fontSize: `${config.title_font_size}px`,
-          fontWeight: config.title_font_weight,
-          color: config.title_text_color,
+          fontSize: '20px',
+          fontWeight: config.title_font_weight || '600',
+          color: config.title_text_color || colors.text,
           margin: 0,
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: '8px',
+          whiteSpace: 'nowrap', // 👈 IMPEDE QUEBRA DE LINHA
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          maxWidth: '70%' // Limita largura para caber junto com botão
         }}>
           {categoryConfig?.icon && (
-            <span style={{ fontSize: `${config.title_font_size}px` }}>
+            <span style={{ fontSize: '20px', flexShrink: 0 }}>
               {categoryConfig.icon}
             </span>
           )}
-          {title}
-          {config.show_badges && config.badge_bg_color && (
-            <span style={{
-              backgroundColor: config.badge_bg_color,
-              color: config.badge_text_color,
-              padding: '2px 8px',
-              borderRadius: '12px',
-              fontSize: `${Math.max(config.title_font_size - 8, 12)}px`,
-              fontWeight: '600',
-              marginLeft: '12px'
-            }}>
-              {categoryConfig?.badgeText || 'NEW'}
-            </span>
-          )}
+          <span style={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}>
+            {title}
+          </span>
+          {/* REMOVIDO: Badge ao lado do título */}
         </h3>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '12px',
+          flexShrink: 0 // 👈 Evita compressão
+        }}>
           {showViewAll && onViewAll && (
-  <button
-    onClick={onViewAll}
-    style={{
-      padding: '8px 16px',
-      background: config.view_all_button_bg_color || 'transparent',
-      color: config.view_all_button_text_color || colors.primary,
-      border: `1px solid ${config.view_all_button_border_color || colors.primary}`,
-      borderRadius: '8px',
-      fontSize: '14px',
-      fontWeight: '600',
-      cursor: 'pointer',
-      transition: 'all 0.2s ease'
-    }}
-    onMouseEnter={(e) => {
-      e.currentTarget.style.background = config.view_all_button_hover_bg_color || colors.primary;
-      e.currentTarget.style.color = config.view_all_button_hover_text_color || 'white';
-      e.currentTarget.style.borderColor = config.view_all_button_hover_border_color || colors.primary;
-    }}
-    onMouseLeave={(e) => {
-      e.currentTarget.style.background = config.view_all_button_bg_color || 'transparent';
-      e.currentTarget.style.color = config.view_all_button_text_color || colors.primary;
-      e.currentTarget.style.borderColor = config.view_all_button_border_color || colors.primary;
-    }}
-  >
-    Ver Todos
-  </button>
-)}
+            <button
+              onClick={onViewAll}
+              style={{
+                padding: '6px 12px',
+                background: config.view_all_button_bg_color || 'transparent',
+                color: config.view_all_button_text_color || colors.primary,
+                border: `1px solid ${config.view_all_button_border_color || colors.primary}`,
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                whiteSpace: 'nowrap' // 👈 Botão sem quebra
+              }}
+            >
+              Ver Todos
+            </button>
+          )}
           
-          {config.show_arrows && products.length > config.items_per_view && (
+          {/* Setas - MOSTRAR APENAS EM DESKTOP */}
+          {!isMobile && config.show_arrows && products.length > 2 && (
             <div style={{ display: 'flex', gap: '8px' }}>
               <button
                 onClick={() => scroll('left')}
                 style={{
                   padding: '8px 12px',
-                  background: config.arrow_bg_color,
-                  color: config.arrow_text_color,
+                  background: config.arrow_bg_color || colors.primary,
+                  color: config.arrow_text_color || 'white',
                   border: 'none',
                   borderRadius: '8px',
                   cursor: 'pointer',
                   fontSize: '16px',
                   transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = config.arrow_hover_bg_color;
-                  e.currentTarget.style.color = config.arrow_hover_text_color;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = config.arrow_bg_color;
-                  e.currentTarget.style.color = config.arrow_text_color;
                 }}
               >
                 ◀
@@ -197,21 +199,13 @@ export default function Carousel({
                 onClick={() => scroll('right')}
                 style={{
                   padding: '8px 12px',
-                  background: config.arrow_bg_color,
-                  color: config.arrow_text_color,
+                  background: config.arrow_bg_color || colors.primary,
+                  color: config.arrow_text_color || 'white',
                   border: 'none',
                   borderRadius: '8px',
                   cursor: 'pointer',
                   fontSize: '16px',
                   transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = config.arrow_hover_bg_color;
-                  e.currentTarget.style.color = config.arrow_hover_text_color;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = config.arrow_bg_color;
-                  e.currentTarget.style.color = config.arrow_text_color;
                 }}
               >
                 ▶
@@ -222,57 +216,32 @@ export default function Carousel({
       </div>
 
       {/* Carrossel de Produtos */}
-      <div style={{ position: 'relative' }}>
-        {config.show_arrows && products.length > config.items_per_view && (
-          <div style={{
-            position: 'absolute',
-            top: '50%',
-            right: '0',
-            transform: 'translateY(-50%)',
-            background: colors.secondary,
-            color: colors.text,
-            padding: '8px 12px',
-            borderRadius: '20px',
-            fontSize: '12px',
-            fontWeight: '600',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            zIndex: 5
-          }}>
-            <span>Deslize</span>
-            <span style={{ animation: 'bounceX 2s infinite' }}>→</span>
+      <div
+        ref={carouselRef}
+        className="carousel-container-mobile"
+        style={{
+          display: 'flex',
+          gap: '16px',
+          overflowX: 'auto',
+          flexWrap: 'nowrap',
+          scrollBehavior: 'smooth',
+          padding: '8px',
+          cursor: isDragging ? 'grabbing' : 'grab'
+        }}
+        onMouseDown={handleMouseDown}
+        onMouseLeave={handleMouseLeave}
+        onMouseUp={handleMouseUp}
+        onMouseMove={handleMouseMove}
+      >
+        {products.map((product) => (
+          <div key={product.id} style={{ flex: '0 0 auto' }}>
+            <ProductCard 
+              product={product}
+              categoryConfig={categoryConfig}
+              onAddToCart={onAddToCart}
+            />
           </div>
-        )}
-
-        <div
-          ref={carouselRef}
-          style={{
-            display: 'flex',
-            gap: '24px',
-            overflowX: 'auto',
-            flexWrap: 'nowrap',
-            scrollBehavior: 'smooth',
-            padding: '8px',
-            scrollbarWidth: 'thin',
-            scrollbarColor: `${colors.secondary} transparent`,
-            cursor: isDragging ? 'grabbing' : 'grab'
-          }}
-          onMouseDown={handleMouseDown}
-          onMouseLeave={handleMouseLeave}
-          onMouseUp={handleMouseUp}
-          onMouseMove={handleMouseMove}
-        >
-          {products.map((product) => (
-            <div key={product.id} style={{ flex: '0 0 auto' }}>
-              <ProductCard 
-                product={product}
-                categoryConfig={categoryConfig}
-                onAddToCart={onAddToCart}
-              />
-            </div>
-          ))}
-        </div>
+        ))}
       </div>
     </div>
   );
