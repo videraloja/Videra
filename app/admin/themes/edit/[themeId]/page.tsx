@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTheme } from '../../../../contexts/ThemeContext';
 import { useThemeEditor } from '../../../../contexts/ThemeEditorContext';
 import ColorPicker from '../../../../components/ColorPicker';
 import EmojiSelector from '../../../../components/EmojiSelector';
+import { supabase } from '@/lib/supabaseClient';
 
 export default function EditThemePage() {
   const params = useParams();
@@ -17,11 +18,11 @@ export default function EditThemePage() {
   
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [hasAttemptedLoad, setHasAttemptedLoad] = useState(false); // 🆕 CONTROLE DE TENTATIVAS
+  const [hasAttemptedLoad, setHasAttemptedLoad] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   // 🔧 CORREÇÃO COMPLETA: useEffect sem loop
   useEffect(() => {
-    // 🆕 Só executar uma vez quando o themeId mudar OU quando allThemes for carregado
     if (hasAttemptedLoad) return;
 
     const loadThemeForEditing = async () => {
@@ -30,7 +31,6 @@ export default function EditThemePage() {
         
         let themeToEdit = allThemes.find(theme => theme.id === themeId);
         
-        // 🆕 Se não encontrou nos temas carregados, tentar recarregar uma vez
         if (!themeToEdit && allThemes.length > 0) {
           console.log('🔄 Tema não encontrado no context, tentando localStorage...');
           const savedThemes = localStorage.getItem('videra-themes');
@@ -53,13 +53,10 @@ export default function EditThemePage() {
         setError('Erro inesperado ao carregar o tema.');
       } finally {
         setIsLoading(false);
-        setHasAttemptedLoad(true); // 🆕 MARCA QUE JÁ TENTOU CARREGAR
+        setHasAttemptedLoad(true);
       }
     };
 
-    // 🆕 Estratégia de carregamento: 
-    // 1. Se allThemes já tem dados, carrega imediatamente
-    // 2. Se não, espera um pouco e tenta recarregar
     if (allThemes.length > 0) {
       loadThemeForEditing();
     } else {
@@ -71,18 +68,98 @@ export default function EditThemePage() {
 
       return () => clearTimeout(timer);
     }
-  }, [themeId, allThemes.length, hasAttemptedLoad]); // 🆕 DEPENDÊNCIAS CORRETAS
+  }, [themeId, allThemes.length, hasAttemptedLoad]);
 
   // 🔧 Função para atualizar propriedades
   const handleUpdateProperty = (path: string, value: any) => {
     updateDraftProperty(path, value);
   };
 
+  // 🆕 🆕 🆕 FUNÇÃO PARA UPLOAD DE IMAGEM
+  const handleImageUpload = useCallback(async (file: File) => {
+    if (!editorState.draftTheme) return;
+    
+    try {
+      setUploading(true);
+      
+      // Validar tipo de arquivo
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+      if (!validTypes.includes(file.type)) {
+        alert('Tipo de arquivo inválido. Use JPG, PNG, WebP ou GIF.');
+        return;
+      }
+      
+      // Validar tamanho (máximo 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Arquivo muito grande. Tamanho máximo: 5MB.');
+        return;
+      }
+      
+      console.log('📤 Iniciando upload de imagem...');
+      
+      // Gerar nome único para o arquivo
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${themeId}-${Date.now()}.${fileExt}`;
+      const filePath = `theme-backgrounds/${fileName}`;
+      
+      // Upload para Supabase Storage (bucket: product-images)
+      const { error: uploadError, data } = await supabase.storage
+        .from('product-images')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+      
+      if (uploadError) {
+        console.error('❌ Erro no upload:', uploadError);
+        alert(`Erro no upload: ${uploadError.message}`);
+        return;
+      }
+      
+      console.log('✅ Upload realizado com sucesso:', data);
+      
+      // Obter URL pública
+      const { data: urlData } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(filePath);
+      
+      const publicUrl = urlData.publicUrl;
+      console.log('🔗 URL pública:', publicUrl);
+      
+      // Atualizar tema com a nova imagem
+      handleUpdateProperty('backgroundImage.url', publicUrl);
+      
+      alert('✅ Imagem enviada com sucesso!');
+      
+    } catch (err) {
+      console.error('❌ Erro no upload:', err);
+      alert('Erro ao enviar imagem. Tente novamente.');
+    } finally {
+      setUploading(false);
+    }
+  }, [editorState.draftTheme, themeId]);
+
+  // 🆕 🆕 🆕 FUNÇÃO PARA REMOVER IMAGEM
+  const handleRemoveImage = useCallback(() => {
+    if (confirm('Remover imagem de fundo deste tema?')) {
+      handleUpdateProperty('backgroundImage', undefined);
+    }
+  }, [handleUpdateProperty]);
+
+  // 🆕 🆕 🆕 FUNÇÃO PARA ATUALIZAR OVERLAY
+  const handleOverlayChange = useCallback((property: string, value: string) => {
+    const currentBg = editorState.draftTheme?.backgroundImage || { url: '' };
+    const newBg = {
+      ...currentBg,
+      [property]: value
+    };
+    handleUpdateProperty('backgroundImage', newBg);
+  }, [editorState.draftTheme?.backgroundImage, handleUpdateProperty]);
+
   const handleSave = () => {
     if (editorState.draftTheme) {
       console.log('💾 Salvando tema:', editorState.draftTheme.name);
       saveDraft();
-      // 🆕 Redirecionar após salvar com sucesso
       setTimeout(() => {
         router.push('/admin/themes');
       }, 1500);
@@ -99,7 +176,6 @@ export default function EditThemePage() {
     }
   };
 
-  // 🆕 Função para tentar recarregar o tema
   const handleRetry = () => {
     setHasAttemptedLoad(false);
     setIsLoading(true);
@@ -239,6 +315,7 @@ export default function EditThemePage() {
 
   const draft = editorState.draftTheme;
   const isActive = currentThemeConfig?.id === draft.id;
+  const backgroundImage = draft.backgroundImage;
 
   return (
     <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
@@ -317,7 +394,7 @@ export default function EditThemePage() {
               >
                 {tab === 'colors' && '🎨 Cores'}
                 {tab === 'emojis' && '😊 Emojis'}
-                {tab === 'images' && '🖼️ Imagens'}
+                {tab === 'images' && '🖼️ Imagem de Fundo'}
                 {tab === 'effects' && '🎪 Efeitos'}
               </button>
             ))}
@@ -424,14 +501,291 @@ export default function EditThemePage() {
               </div>
             )}
 
-            {/* ABA IMAGENS */}
+            {/* 🆕 🆕 🆕 ABA IMAGENS - COM UPLOAD */}
             {editorState.activeTab === 'images' && (
               <div style={{ background: 'white', padding: '24px', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
-                <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '20px' }}>Imagens do Tema</h3>
-                <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
-                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>🖼️</div>
-                  <p style={{ fontSize: '16px', marginBottom: '16px' }}>Sistema de imagens em desenvolvimento</p>
-                  <p style={{ fontSize: '14px', color: '#9ca3af' }}>Em breve você poderá fazer upload de imagens personalizadas para cada tema</p>
+                <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '20px' }}>Imagem de Fundo do Tema</h3>
+                
+                <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '20px' }}>
+                  Configure uma imagem de fundo para este tema. A imagem aparecerá atrás da logo em todas as páginas onde este tema for aplicado.
+                </p>
+
+                {/* Área de Upload/Preview */}
+                <div style={{ marginBottom: '30px' }}>
+                  {backgroundImage?.url ? (
+                    <div style={{ marginBottom: '20px' }}>
+                      <label style={{ 
+                        display: 'block', 
+                        fontSize: '14px', 
+                        color: '#6b7280',
+                        marginBottom: '8px',
+                        fontWeight: '500'
+                      }}>
+                        Imagem Atual:
+                      </label>
+                      <div style={{
+                        width: '100%',
+                        height: '200px',
+                        backgroundImage: `url(${backgroundImage.url})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        borderRadius: '8px',
+                        border: '1px solid #e5e7eb',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        marginBottom: '12px'
+                      }}>
+                        {backgroundImage.overlayColor && (
+                          <div style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            backgroundColor: backgroundImage.overlayColor,
+                            opacity: backgroundImage.opacity || 0.5
+                          }} />
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+                        <button
+                          onClick={handleRemoveImage}
+                          style={{
+                            padding: '8px 16px',
+                            background: '#fef2f2',
+                            color: '#dc2626',
+                            border: '1px solid #fecaca',
+                            borderRadius: '6px',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                            flex: 1
+                          }}
+                        >
+                          🗑️ Remover Imagem
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ 
+                      border: '2px dashed #d1d5db', 
+                      borderRadius: '8px', 
+                      padding: '40px', 
+                      textAlign: 'center',
+                      background: '#f9fafb',
+                      marginBottom: '20px'
+                    }}>
+                      <div style={{ fontSize: '48px', marginBottom: '16px', color: '#9ca3af' }}>
+                        🖼️
+                      </div>
+                      <p style={{ color: '#6b7280', fontSize: '16px', marginBottom: '16px' }}>
+                        Nenhuma imagem configurada
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Upload de Arquivo */}
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ 
+                      display: 'block', 
+                      fontSize: '14px', 
+                      color: '#6b7280',
+                      marginBottom: '8px',
+                      fontWeight: '500'
+                    }}>
+                      Enviar do Computador:
+                    </label>
+                    <div style={{ 
+                      border: '2px dashed #7c3aed', 
+                      borderRadius: '8px', 
+                      padding: '30px', 
+                      textAlign: 'center',
+                      background: '#f8fafc',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => document.getElementById('file-input')?.click()}
+                    >
+                      <input
+                        id="file-input"
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleImageUpload(file);
+                        }}
+                        disabled={uploading}
+                      />
+                      <div style={{ fontSize: '32px', marginBottom: '12px', color: '#7c3aed' }}>
+                        📤
+                      </div>
+                      <p style={{ color: '#7c3aed', fontSize: '16px', fontWeight: '500', marginBottom: '8px' }}>
+                        {uploading ? 'Enviando...' : 'Clique para escolher uma imagem'}
+                      </p>
+                      <p style={{ color: '#9ca3af', fontSize: '12px' }}>
+                        JPG, PNG, WebP ou GIF • Máximo 5MB
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* URL Manual (alternativa) */}
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ 
+                      display: 'block', 
+                      fontSize: '14px', 
+                      color: '#6b7280',
+                      marginBottom: '8px',
+                      fontWeight: '500'
+                    }}>
+                      Ou use uma URL:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="https://exemplo.com/imagem.jpg"
+                      value={backgroundImage?.url || ''}
+                      onChange={(e) => handleUpdateProperty('backgroundImage.url', e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
+                    />
+                    <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '8px' }}>
+                      Cole a URL de uma imagem da internet
+                    </p>
+                  </div>
+                </div>
+
+                {/* Configurações do Overlay */}
+                <div style={{ 
+                  padding: '20px', 
+                  background: '#f8fafc', 
+                  borderRadius: '8px',
+                  border: '1px solid #e5e7eb'
+                }}>
+                  <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>
+                    Configurações do Overlay (opcional)
+                  </h4>
+                  
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ 
+                      display: 'block', 
+                      fontSize: '13px', 
+                      color: '#6b7280',
+                      marginBottom: '6px'
+                    }}>
+                      Cor do Overlay:
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <input
+                        type="color"
+                        value={backgroundImage?.overlayColor || '#000000'}
+                        onChange={(e) => handleOverlayChange('overlayColor', e.target.value)}
+                        style={{ 
+                          width: '40px', 
+                          height: '36px', 
+                          borderRadius: '6px', 
+                          border: '1px solid #d1d5db',
+                          cursor: 'pointer'
+                        }}
+                      />
+                      <input
+                        type="text"
+                        value={backgroundImage?.overlayColor || ''}
+                        onChange={(e) => handleOverlayChange('overlayColor', e.target.value)}
+                        placeholder="#000000"
+                        style={{
+                          flex: 1,
+                          padding: '10px 12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          fontSize: '13px',
+                          fontFamily: 'monospace'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ 
+                      display: 'block', 
+                      fontSize: '13px', 
+                      color: '#6b7280',
+                      marginBottom: '6px'
+                    }}>
+                      Opacidade do Overlay:
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={(backgroundImage?.opacity || 50) * 100}
+                        onChange={(e) => handleOverlayChange('opacity', (parseInt(e.target.value) / 100).toString())}
+                        style={{
+                          flex: 1,
+                          height: '6px',
+                          borderRadius: '3px',
+                          background: '#e5e7eb',
+                          outline: 'none'
+                        }}
+                      />
+                      <span style={{ fontSize: '13px', color: '#6b7280', minWidth: '40px' }}>
+                        {Math.round((backgroundImage?.opacity || 0.5) * 100)}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Preview com Overlay */}
+                  {backgroundImage?.url && (
+                    <div style={{ marginTop: '20px' }}>
+                      <label style={{ 
+                        display: 'block', 
+                        fontSize: '13px', 
+                        color: '#6b7280',
+                        marginBottom: '6px'
+                      }}>
+                        Preview com Overlay:
+                      </label>
+                      <div style={{
+                        width: '100%',
+                        height: '100px',
+                        backgroundImage: `url(${backgroundImage.url})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        borderRadius: '6px',
+                        border: '1px solid #e5e7eb',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}>
+                        {backgroundImage.overlayColor && (
+                          <div style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            backgroundColor: backgroundImage.overlayColor,
+                            opacity: backgroundImage.opacity || 0
+                          }} />
+                        )}
+                        <div style={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          color: 'white',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          textShadow: '0 2px 4px rgba(0,0,0,0.5)'
+                        }}>
+                          {draft.name}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -603,6 +957,11 @@ export default function EditThemePage() {
               <div style={{ marginBottom: '8px' }}>
                 <strong>Status:</strong> {isActive ? 'Ativo' : 'Inativo'}
               </div>
+              {backgroundImage?.url && (
+                <div style={{ marginBottom: '8px' }}>
+                  <strong>Imagem:</strong> {backgroundImage.url ? '✅ Configurada' : '❌ Não configurada'}
+                </div>
+              )}
               {draft.startDate && draft.endDate && (
                 <>
                   <div style={{ marginBottom: '8px' }}>

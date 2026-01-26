@@ -1,11 +1,11 @@
-// app/hooks/useThemeColors.ts - VERSÃO COM ATUALIZAÇÃO AUTOMÁTICA
+// app/hooks/useThemeColors.ts - VERSÃO COM backgroundImage (CORRIGIDA)
 'use client';
 
 import { useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { ThemeContext } from '../app/contexts/ThemeContext';
 import { PageThemeContext } from '../app/contexts/PageThemeContext';
 import { ThemeConfig, ComponentStyles, ProductCardStyles } from '../app/types';
-import { getEffectiveTheme, getThemeById } from '@/app/lib/themeService';
+import { getEffectiveTheme } from '@/app/lib/themeService';
 
 // CONSTANTES DE EMERGÊNCIA
 const emergencyColors = {
@@ -77,6 +77,13 @@ const emergencyComponentStyles: ComponentStyles = {
   }
 };
 
+// 🆕 🆕 🆕 IMAGEM DE FUNDO PADRÃO PARA TEMAS
+const defaultBackgroundImage = {
+  url: 'https://images.unsplash.com/photo-1607082350899-7e105aa886ae?w=1200&h=400&fit=crop',
+  overlayColor: '#000000',
+  opacity: 0.3
+};
+
 export const useThemeColors = () => {
   const themeContext = useContext(ThemeContext);
   const pageThemeContext = useContext(PageThemeContext);
@@ -108,7 +115,6 @@ export const useThemeColors = () => {
       setLoading(true);
       console.log('🔍 [useThemeColors] Iniciando busca de tema...');
 
-      // 🆕 USANDO A NOVA FUNÇÃO getEffectiveTheme QUE FAZ TODA A LÓGICA
       const currentPage = pageThemeContext?.currentPageId || window.location.pathname;
       currentPageRef.current = currentPage;
       
@@ -119,12 +125,13 @@ export const useThemeColors = () => {
 
       if (theme) {
         setEffectiveTheme(theme);
-        setLastUpdate(Date.now()); // 🆕 MARCA TEMPO DA ÚLTIMA ATUALIZAÇÃO
+        setLastUpdate(Date.now());
         
         console.log(`✅✅✅ [useThemeColors] TEMA EFETIVO DEFINIDO: "${theme.name}"`);
         console.log(`📊 [useThemeColors] Página: ${currentPage}`);
         console.log(`🎨 [useThemeColors] Cores: ${Object.keys(theme.colors || {}).length}`);
         console.log(`😀 [useThemeColors] Emojis: ${Object.keys(theme.emojis || {}).length}`);
+        console.log(`🖼️ [useThemeColors] Background Image: ${theme.backgroundImage ? '✅' : '❌'}`);
         console.log(`🔄 [useThemeColors] Tem estilos: ${!!theme.componentStyles}`);
         console.log(`⏰ [useThemeColors] Última atualização: ${new Date().toLocaleTimeString()}`);
       } else {
@@ -140,7 +147,7 @@ export const useThemeColors = () => {
     }
   }, [isMounted, pageThemeContext?.currentPageId]);
 
-  // 🆕 EFFECT PARA INICIAR POLLING (verificar mudanças a cada 10 segundos)
+  // 🆕 EFFECT PARA INICIAR POLLING
   useEffect(() => {
     if (!isMounted) return;
 
@@ -149,7 +156,6 @@ export const useThemeColors = () => {
       clearInterval(pollingRef.current);
     }
 
-    // Configurar novo polling apenas para páginas específicas
     const currentPage = pageThemeContext?.currentPageId || window.location.pathname;
     
     // Não fazer polling em páginas de admin
@@ -162,8 +168,8 @@ export const useThemeColors = () => {
     
     pollingRef.current = setInterval(() => {
       console.log(`⏰ [useThemeColors] Verificando atualizações... (${new Date().toLocaleTimeString()})`);
-      fetchEffectiveTheme(true); // Forçar refresh
-    }, 10000); // 10 segundos
+      fetchEffectiveTheme(true);
+    }, 10000);
 
     return () => {
       if (pollingRef.current) {
@@ -182,12 +188,11 @@ export const useThemeColors = () => {
   // 🎯 EFFECT PARA OUVIR MUDANÇAS NO CONTEXTO DE PÁGINA
   useEffect(() => {
     if (isMounted && pageThemeContext?.currentPageId) {
-      // Recarregar tema quando a página mudar
       fetchEffectiveTheme();
     }
   }, [pageThemeContext?.currentPageId, isMounted, fetchEffectiveTheme]);
 
-  // 🆕 FUNÇÃO PARA FORÇAR ATUALIZAÇÃO MANUAL (útil para testar)
+  // 🆕 FUNÇÃO PARA FORÇAR ATUALIZAÇÃO MANUAL
   const forceRefreshTheme = useCallback(() => {
     console.log('🔄 [useThemeColors] Forçando atualização manual do tema');
     fetchEffectiveTheme(true);
@@ -197,6 +202,7 @@ export const useThemeColors = () => {
   const colors = effectiveTheme.colors || emergencyColors;
   const emojis = effectiveTheme.emojis || emergencyEmojis;
   const componentStyles = effectiveTheme.componentStyles || emergencyComponentStyles;
+  const backgroundImage = effectiveTheme.backgroundImage || defaultBackgroundImage;
 
   // 🎯 FUNÇÕES BÁSICAS
   const applyThemeStyles = (styles: React.CSSProperties, elementType?: string) => {
@@ -234,13 +240,13 @@ export const useThemeColors = () => {
   const getCategoryConfig = (category: string) => {
     const configs = {
       'pokemon': { color: colors.primary, icon: '🎴', badgeText: 'POKÉMON' },
-      'board-games': { color: '#059669', icon: '🎲', badgeText: 'TABULEIRO' },
-      'acessorios': { color: '#7c3aed', icon: '🛡️', badgeText: 'ACESSÓRIO' },
-      'hot-wheels': { color: '#dc2626', icon: '🏎️', badgeText: 'HOT WHEELS' },
+      'board-games': { color: colors.primary, icon: '🎲', badgeText: 'TABULEIRO' },
+      'acessorios': { color: colors.primary, icon: '🛡️', badgeText: 'ACESSÓRIO' },
+      'hot-wheels': { color: colors.primary, icon: '🏎️', badgeText: 'HOT WHEELS' },
       'home': { color: colors.primary, icon: '🏠', badgeText: 'DESTAQUE' },
       'pokemontcg': { color: colors.primary, icon: '🎴', badgeText: 'POKÉMON' },
-      'jogosdetabuleiro': { color: '#059669', icon: '🎲', badgeText: 'TABULEIRO' },
-      'hotwheels': { color: '#dc2626', icon: '🏎️', badgeText: 'HOT WHEELS' },
+      'jogosdetabuleiro': { color: colors.primary, icon: '🎲', badgeText: 'TABULEIRO' },
+      'hotwheels': { color: colors.primary, icon: '🏎️', badgeText: 'HOT WHEELS' },
       'default': { color: colors.primary, icon: '📦', badgeText: 'PRODUTO' }
     };
     return (configs as any)[category] || configs.default;
@@ -345,6 +351,7 @@ export const useThemeColors = () => {
     emojis,
     themeName: effectiveTheme.name,
     isSpecialTheme: effectiveTheme.name !== 'Tema Padrão Videra',
+    theme: effectiveTheme, // TEMA COMPLETO
     
     // 🎨 FUNÇÕES DE ESTILO
     applyThemeStyles,
@@ -363,14 +370,14 @@ export const useThemeColors = () => {
     isPageSpecific: hasPageSpecificStyles(),
     isMounted,
     loading,
-    lastUpdate, // 🆕 TEMPO DA ÚLTIMA ATUALIZAÇÃO
+    lastUpdate,
     
     // 🆕 NOVAS FUNÇÕES
     hasPageSpecificStyles,
     getCurrentTheme: () => effectiveTheme,
     refreshTheme: fetchEffectiveTheme,
-    forceRefreshTheme, // 🆕 FUNÇÃO PARA FORÇAR ATUALIZAÇÃO
-    stopPolling: () => { // 🆕 FUNÇÃO PARA PARAR POLLING
+    forceRefreshTheme,
+    stopPolling: () => {
       if (pollingRef.current) {
         clearInterval(pollingRef.current);
         pollingRef.current = null;
@@ -388,7 +395,8 @@ function createDefaultTheme(): ThemeConfig {
     priority: 1,
     colors: emergencyColors,
     emojis: emergencyEmojis,
-    componentStyles: emergencyComponentStyles
+    componentStyles: emergencyComponentStyles,
+    backgroundImage: defaultBackgroundImage // 🆕 AGORA É backgroundImage, NÃO pageBackgrounds
   };
 }
 
@@ -402,6 +410,7 @@ function createEmergencyTheme(): ThemeConfig {
     priority: 0,
     colors: emergencyColors,
     emojis: emergencyEmojis,
-    componentStyles: emergencyComponentStyles
+    componentStyles: emergencyComponentStyles,
+    backgroundImage: defaultBackgroundImage // 🆕 AGORA É backgroundImage
   };
 }

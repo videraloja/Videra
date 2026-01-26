@@ -1,6 +1,6 @@
-// app/lib/themeService.ts - VERSÃO ATUALIZADA COM FUNÇÕES DE PÁGINA
+// app/lib/themeService.ts - VERSÃO CORRIGIDA COM backgroundImage
 import { supabase } from '@/lib/supabaseClient';
-import { ThemeConfig, ComponentStyles, } from '@/app/types';
+import { ThemeConfig, ComponentStyles } from '@/app/types';
 
 console.log('🔄 themeService.ts CARREGADO');
 
@@ -140,17 +140,17 @@ export async function getThemeById(themeId: string): Promise<ThemeConfig | null>
     }
 
     // 2. Converte para ThemeColors com valores padrão
-      const colors: {
-  primary: string;
-  secondary: string;
-  accent: string;
-  background: string;
-  text: string;
-  cardBg: string;
-  success: string;
-  warning: string;
-  error: string;
-} = {
+    const colors: {
+      primary: string;
+      secondary: string;
+      accent: string;
+      background: string;
+      text: string;
+      cardBg: string;
+      success: string;
+      warning: string;
+      error: string;
+    } = {
       primary: colorsRecord.primary || '#7c3aed',
       secondary: colorsRecord.secondary || '#f1f5f9',
       accent: colorsRecord.accent || '#10b981',
@@ -163,31 +163,63 @@ export async function getThemeById(themeId: string): Promise<ThemeConfig | null>
     };
 
     // 1. Primeiro coleta como Record
-const emojisRecord: Record<string, string> = {};
-if (emojisResult.data) {
-  emojisResult.data.forEach(row => {
-    emojisRecord[row.emoji_type] = row.emoji_value;
-  });
-}
+    const emojisRecord: Record<string, string> = {};
+    if (emojisResult.data) {
+      emojisResult.data.forEach(row => {
+        emojisRecord[row.emoji_type] = row.emoji_value;
+      });
+    }
 
-// 2. Converte para o tipo esperado por ThemeConfig
-const emojis: {
-  cart: string;
-  success: string;
-  search: string;
-  filter: string;
-  stock: string;
-  category: string;
-} = {
-  cart: emojisRecord.cart || '🛒',
-  success: emojisRecord.success || '✅',
-  search: emojisRecord.search || '🔍',
-  filter: emojisRecord.filter || '🎛️',
-  stock: emojisRecord.stock || '📦',
-  category: emojisRecord.category || '📁'
-};
+    // 2. Converte para o tipo esperado por ThemeConfig
+    const emojis: {
+      cart: string;
+      success: string;
+      search: string;
+      filter: string;
+      stock: string;
+      category: string;
+    } = {
+      cart: emojisRecord.cart || '🛒',
+      success: emojisRecord.success || '✅',
+      search: emojisRecord.search || '🔍',
+      filter: emojisRecord.filter || '🎛️',
+      stock: emojisRecord.stock || '📦',
+      category: emojisRecord.category || '📁'
+    };
 
     const componentStyles = stylesResult.data?.[0]?.styles as ComponentStyles | undefined;
+
+    // 🆕 🆕 🆕 PROCESSAR backgroundImage DA TABELA themes COM FALLBACK SEGURO
+    let backgroundImage = undefined;
+
+    // Verificar se a coluna background_image existe nos dados
+    if ('background_image' in themeData) {
+      try {
+        const bgData = themeData.background_image;
+        
+        if (bgData && typeof bgData === 'object' && bgData !== null) {
+          // Se já é um objeto JSONB
+          backgroundImage = {
+            url: bgData.url || '',
+            overlayColor: bgData.overlayColor,
+            opacity: bgData.opacity
+          };
+        } else if (typeof bgData === 'string' && bgData.trim() !== '') {
+          // Se é string JSON
+          const parsed = JSON.parse(bgData);
+          backgroundImage = {
+            url: parsed.url || '',
+            overlayColor: parsed.overlayColor,
+            opacity: parsed.opacity
+          };
+        }
+      } catch (parseError) {
+        console.error('❌ Erro ao processar background_image:', parseError);
+        console.error('Dados:', themeData.background_image);
+      }
+    } else {
+      console.log('ℹ️  Coluna background_image não encontrada na tabela themes');
+    }
 
     const theme: ThemeConfig = {
       id: themeData.id,
@@ -197,9 +229,11 @@ const emojis: {
       startDate: themeData.start_date,
       endDate: themeData.end_date,
       priority: themeData.priority,
-      colors,  // ⬅️ Agora é ThemeColors, não Record<string, string>
+      colors,
       emojis,
       componentStyles,
+      // 🆕 🆕 🆕 ADICIONAR backgroundImage AO TEMA
+      backgroundImage,
       createdAt: themeData.created_at,
       updatedAt: themeData.updated_at
     };
@@ -207,7 +241,8 @@ const emojis: {
     console.log(`✅ Tema carregado: ${theme.name}`, {
       cores: Object.keys(colors).length,
       emojis: Object.keys(emojis).length,
-      temEstilos: !!componentStyles
+      temEstilos: !!componentStyles,
+      temImagemFundo: !!backgroundImage?.url
     });
 
     return theme;
@@ -233,7 +268,16 @@ export async function saveTheme(theme: ThemeConfig): Promise<boolean> {
     
     console.log('✅ Usuário autenticado:', session.user.email);
     
-    // 1. Salvar tema principal
+    // 🆕 🆕 🆕 PREPARAR backgroundImage PARA SALVAR
+    const backgroundImageData = theme.backgroundImage?.url 
+      ? {
+          url: theme.backgroundImage.url,
+          overlayColor: theme.backgroundImage.overlayColor || null,
+          opacity: theme.backgroundImage.opacity || null
+        }
+      : null;
+
+    // 1. Salvar tema principal COM background_image
     const { error: themeError } = await supabase
       .from('themes')
       .upsert({
@@ -245,6 +289,7 @@ export async function saveTheme(theme: ThemeConfig): Promise<boolean> {
         priority: theme.priority || 1,
         start_date: theme.startDate,
         end_date: theme.endDate,
+        background_image: backgroundImageData, // 🆕 SALVAR backgroundImage
         updated_at: new Date().toISOString()
       }, { 
         onConflict: 'id' 
@@ -379,6 +424,9 @@ export async function saveTheme(theme: ThemeConfig): Promise<boolean> {
         console.log('✅ Estilos de componente salvos');
       }
     }
+
+    // 🆕 🆕 🆕 REMOVIDO: Código de pageBackgrounds (tabela theme_backgrounds)
+    // Agora usamos background_image na tabela themes
 
     console.log(`🎉 Tema "${theme.name}" salvo com sucesso!`);
     return true;
@@ -701,7 +749,7 @@ function getDefaultThemes(): ThemeConfig[] {
       background: '#ffffff',
       text: '#1f2937',
       cardBg: '#ffffff',
-       success: '#10b981',  
+      success: '#10b981',  
       warning: '#f59e0b',   
       error: '#ef4444'
     },
@@ -712,6 +760,12 @@ function getDefaultThemes(): ThemeConfig[] {
       filter: '🎛️',
       stock: '📦',
       category: '📁'
+    },
+    // 🆕 🆕 🆕 backgroundImage PADRÃO
+    backgroundImage: {
+      url: 'https://images.unsplash.com/photo-1607082350899-7e105aa886ae?w=1200&h=400&fit=crop',
+      overlayColor: '#000000',
+      opacity: 0.3
     }
   }];
 }

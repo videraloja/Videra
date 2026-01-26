@@ -109,7 +109,14 @@ function AdminDashboardContent() {
       color: "bg-green-600",
       icon: "📱",
       external: true
-    }
+    },
+    {
+    title: "🎨 Editor de Temas",
+    description: "Personalizar cores e estilos do site",
+    path: "/admin/themes",
+    color: "bg-pink-500",
+    icon: "🎨"
+  }
   ];
 
   return (

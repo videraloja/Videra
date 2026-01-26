@@ -1,4 +1,4 @@
-// components/Header.tsx - VERSÃO CORRIGIDA
+// components/Header.tsx - VERSÃO CORRIGIDA (SEM OVERLAY FIXO)
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -10,11 +10,12 @@ const NICHO_LINKS = [
   { id: 'home', name: 'Início', path: '/', icon: '🏠' },
   { id: 'pokemontcg', name: 'Pokémon TCG', path: '/pokemontcg', icon: '⚡' },
   { id: 'jogosdetabuleiro', name: 'Jogos de Tabuleiro', path: '/jogosdetabuleiro', icon: '🎲' },
-  { id: 'acessorios', name: 'Acessórios', path: '/acessorios', icon: '🎮' },
+  { id: 'acessorios', name: 'Acessórios', path: '/acessorios', icon: '🛡️' },
   { id: 'hotwheels', name: 'Hot Wheels', path: '/hotwheels', icon: '🏎️' }
 ];
 
-const COVER_IMAGES = {
+// 🆕 🆕 🆕 IMAGENS PADRÃO DE FALLBACK
+const DEFAULT_BACKGROUND_IMAGES = {
   'home': 'https://images.unsplash.com/photo-1607082350899-7e105aa886ae?w=1200&h=400&fit=crop',
   'pokemontcg': 'https://images.unsplash.com/photo-1626600183959-d1ee8b293c6a?w=1200&h=400&fit=crop',
   'jogosdetabuleiro': 'https://images.unsplash.com/photo-1532597447997-2e46ad324c49?w=1200&h=400&fit=crop',
@@ -40,7 +41,8 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
     applyThemeStyles, 
     getCategoryConfig,
     themeName,
-    isSpecialTheme 
+    isSpecialTheme,
+    theme // 🆕 TEMA COMPLETO PARA ACESSAR backgroundImage
   } = useThemeColors();
 
   // 🔧 CORREÇÃO: Evitar hydration mismatch
@@ -80,6 +82,28 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
   // 🎨 CONFIGURAÇÃO DA CATEGORIA ATIVA COM TEMA
   const activeCategoryConfig = getCategoryConfig(activeNiche);
 
+  // 🆕 🆕 🆕 FUNÇÃO SIMPLIFICADA PARA OBTER IMAGEM DE FUNDO
+  const getBackgroundImage = (): string => {
+    // 1. Usar imagem do tema atual (backgroundImage.url)
+    if (theme?.backgroundImage?.url) {
+      return theme.backgroundImage.url;
+    }
+    
+    // 2. Fallback para imagem padrão da página
+    return DEFAULT_BACKGROUND_IMAGES[activeNiche as keyof typeof DEFAULT_BACKGROUND_IMAGES] || 
+           DEFAULT_BACKGROUND_IMAGES.home;
+  };
+
+  // 🆕 🆕 🆕 FUNÇÃO SIMPLIFICADA PARA OBTER OVERLAY
+  const getOverlayColor = (): string | undefined => {
+    return theme?.backgroundImage?.overlayColor;
+  };
+
+  // 🆕 🆕 🆕 🔧 CORREÇÃO: OPACIDADE PADRÃO 0 (não 0.3)
+  const getOverlayOpacity = (): number => {
+    return theme?.backgroundImage?.opacity || 0;
+  };
+
   // Detecta scroll para efeitos visuais
   useEffect(() => {
     const handleScroll = () => {
@@ -106,6 +130,11 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
       onSearch('');
     }
   };
+
+  // 🆕 🆕 🆕 OBTER IMAGEM DE FUNDO ATUAL (SIMPLIFICADO)
+  const currentBackgroundImage = getBackgroundImage();
+  const currentOverlayColor = getOverlayColor();
+  const currentOverlayOpacity = getOverlayOpacity();
 
   // 🔧 CORREÇÃO: Renderização condicional para evitar hydration
   if (!isMounted) {
@@ -189,19 +218,16 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
         height: '250px',
         overflow: 'hidden'
       }}>
-        {/* Imagem de Capa */}
+        {/* 🆕 🆕 🆕 Imagem de Capa - AGORA backgroundImage do tema */}
         <div style={{
           position: 'absolute',
           top: 0,
           left: 0,
           width: '100%',
           height: '100%',
-          backgroundImage: `url(${COVER_IMAGES[activeNiche as keyof typeof COVER_IMAGES] || COVER_IMAGES.home})`,
+          backgroundImage: `url(${currentBackgroundImage})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
-          filter: isSpecialTheme ? 'brightness(0.6)' : 'brightness(0.7)',
-          transform: isScrolled ? 'scale(1.05)' : 'scale(1)',
-          transition: 'transform 0.3s ease'
         }} />
         
         {/* Logo Centralizada */}
@@ -235,35 +261,11 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
                   cursor: 'pointer'
                 }}
               />
-              {!isScrolled && (
-                <span style={{
-                  color: 'white',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  textShadow: '0 2px 4px rgba(0,0,0,0.5)',
-                  background: isSpecialTheme ? 'rgba(0,0,0,0.3)' : 'transparent',
-                  padding: isSpecialTheme ? '4px 12px' : '0',
-                  borderRadius: isSpecialTheme ? '12px' : '0',
-                  backdropFilter: isSpecialTheme ? 'blur(10px)' : 'none'
-                }}>
-                  Videra - Colecionáveis {isSpecialTheme && `• ${themeName}`}
-                </span>
-              )}
             </div>
           </Link>
         </div>
 
-        {/* Overlay Temático */}
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          background: isSpecialTheme 
-            ? `linear-gradient(180deg, ${colors.primary}40 0%, ${colors.accent}20 100%)`
-            : 'linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.2) 100%)'
-        }} />
+        
       </header>
 
       {/* Menu de Navegação Horizontal */}

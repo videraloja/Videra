@@ -1,4 +1,4 @@
-// app/types/index.ts - ATUALIZADO COM COMPONENT_STYLES
+// app/types/index.ts - ATUALIZADO COM backgroundImage (ÚNICA IMAGEM POR TEMA)
 export interface Product {
   id: number;
   name: string;
@@ -36,7 +36,7 @@ export interface ProductCardTextStyles {
   color: string;
   fontSize?: string;
   fontWeight?: string;
-    textAlign?: 'left' | 'center' | 'right';
+  textAlign?: 'left' | 'center' | 'right';
   textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
   fontFamily?: string;
 }
@@ -57,9 +57,9 @@ export interface ProductCardButtonStyles {
   hoverBackgroundColor: string;
   disabledBackgroundColor: string;
   borderRadius?: string;
-padding?: string;
-fontSize?: string;
-fontWeight?: string;
+  padding?: string;
+  fontSize?: string;
+  fontWeight?: string;
 }
 
 export interface ProductCardStyles {
@@ -89,7 +89,7 @@ export interface ProductCardStyles {
   
   // 🖼️ ELEMENTOS VISUAIS
   imageOverlay: string;
-    padding?: string;
+  padding?: string;
   boxShadow?: string;
   border?: string;
 }
@@ -116,7 +116,6 @@ export interface ThemeConfig {
     success: string;
     warning: string;
     error: string;
-    
   };
   emojis: {
     cart: string;
@@ -135,12 +134,20 @@ export interface ThemeConfig {
   // 🆕 NOVA PROPRIEDADE PARA EDIÇÃO GRANULAR
   componentStyles?: ComponentStyles;
   
+  // 🆕 🆕 🆕 CORREÇÃO: AGORA É backgroundImage (ÚNICA IMAGEM POR TEMA)
+  backgroundImage?: {
+    url: string;
+    overlayColor?: string;
+    opacity?: number;
+  };
+  
   // METADADOS DO TEMA
   isDefault?: boolean;
   isActive?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
+
 // Adicione estas interfaces
 export interface CarouselConfig {
   id: string;
@@ -183,4 +190,12 @@ export interface CarouselConfig {
 
 export interface CarouselProduct extends Product {
   sales_count?: number;
+}
+
+// 🆕 🆕 🆕 INTERFACE PARA IMAGEM DE FUNDO DO TEMA (MANTIDA PARA COMPATIBILIDADE)
+export interface PageBackground {
+  pageId?: string; // OPCIONAL - para compatibilidade
+  imageUrl: string;
+  overlayColor?: string;
+  opacity?: number;
 }
