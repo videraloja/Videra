@@ -1,10 +1,11 @@
-// components/Header.tsx - VERSÃO CORRIGIDA (SEM OVERLAY FIXO)
+// components/Header.tsx - VERSÃO CORRIGIDA (COM CLASSES CSS PARA RESPONSIVO)
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import './header.css'; // 🔥 Vamos criar este arquivo
 
 const NICHO_LINKS = [
   { id: 'home', name: 'Início', path: '/', icon: '🏠' },
@@ -14,7 +15,6 @@ const NICHO_LINKS = [
   { id: 'hotwheels', name: 'Hot Wheels', path: '/hotwheels', icon: '🏎️' }
 ];
 
-// 🆕 🆕 🆕 IMAGENS PADRÃO DE FALLBACK
 const DEFAULT_BACKGROUND_IMAGES = {
   'home': 'https://images.unsplash.com/photo-1607082350899-7e105aa886ae?w=1200&h=400&fit=crop',
   'pokemontcg': 'https://images.unsplash.com/photo-1626600183959-d1ee8b293c6a?w=1200&h=400&fit=crop',
@@ -34,7 +34,6 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
   const [isMounted, setIsMounted] = useState(false);
   
-  // 🎨 HOOK DE TEMAS
   const { 
     colors, 
     emojis, 
@@ -42,15 +41,13 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
     getCategoryConfig,
     themeName,
     isSpecialTheme,
-    theme // 🆕 TEMA COMPLETO PARA ACESSAR backgroundImage
+    theme
   } = useThemeColors();
 
-  // 🔧 CORREÇÃO: Evitar hydration mismatch
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // Determina o nicho ativo baseado na rota atual
   const getActiveNiche = () => {
     if (pathname === '/') return 'home';
     if (pathname.includes('pokemontcg')) return 'pokemontcg';
@@ -62,7 +59,6 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
 
   const activeNiche = getActiveNiche();
   
-  // 🔧 CORREÇÃO: Placeholder seguro para SSR
   const getSearchPlaceholder = () => {
     if (!isMounted) return "🔍 Buscando...";
     
@@ -79,32 +75,25 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
 
   const searchPlaceholder = getSearchPlaceholder();
 
-  // 🎨 CONFIGURAÇÃO DA CATEGORIA ATIVA COM TEMA
   const activeCategoryConfig = getCategoryConfig(activeNiche);
 
-  // 🆕 🆕 🆕 FUNÇÃO SIMPLIFICADA PARA OBTER IMAGEM DE FUNDO
   const getBackgroundImage = (): string => {
-    // 1. Usar imagem do tema atual (backgroundImage.url)
     if (theme?.backgroundImage?.url) {
       return theme.backgroundImage.url;
     }
     
-    // 2. Fallback para imagem padrão da página
     return DEFAULT_BACKGROUND_IMAGES[activeNiche as keyof typeof DEFAULT_BACKGROUND_IMAGES] || 
            DEFAULT_BACKGROUND_IMAGES.home;
   };
 
-  // 🆕 🆕 🆕 FUNÇÃO SIMPLIFICADA PARA OBTER OVERLAY
   const getOverlayColor = (): string | undefined => {
     return theme?.backgroundImage?.overlayColor;
   };
 
-  // 🆕 🆕 🆕 🔧 CORREÇÃO: OPACIDADE PADRÃO 0 (não 0.3)
   const getOverlayOpacity = (): number => {
     return theme?.backgroundImage?.opacity || 0;
   };
 
-  // Detecta scroll para efeitos visuais
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 50);
@@ -131,16 +120,11 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
     }
   };
 
-  // 🆕 🆕 🆕 OBTER IMAGEM DE FUNDO ATUAL (SIMPLIFICADO)
   const currentBackgroundImage = getBackgroundImage();
-  const currentOverlayColor = getOverlayColor();
-  const currentOverlayOpacity = getOverlayOpacity();
 
-  // 🔧 CORREÇÃO: Renderização condicional para evitar hydration
   if (!isMounted) {
     return (
       <>
-        {/* Header simplificado para SSR */}
         <header style={{
           position: 'relative',
           width: '100%',
@@ -172,21 +156,12 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
           </div>
         </header>
         
-        {/* Menu simplificado */}
         <nav style={{
           background: 'white',
           padding: '16px 0',
           borderBottom: '1px solid #e5e7eb'
         }}>
-          <div style={{
-            maxWidth: '1200px',
-            margin: '0 auto',
-            display: 'flex',
-            justifyContent: 'center',
-            gap: '12px',
-            flexWrap: 'wrap',
-            padding: '0 20px'
-          }}>
+          <div className="nav-buttons-container">
             {NICHO_LINKS.map((niche) => (
               <div
                 key={niche.id}
@@ -218,7 +193,6 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
         height: '250px',
         overflow: 'hidden'
       }}>
-        {/* 🆕 🆕 🆕 Imagem de Capa - AGORA backgroundImage do tema */}
         <div style={{
           position: 'absolute',
           top: 0,
@@ -230,7 +204,6 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
           backgroundPosition: 'center',
         }} />
         
-        {/* Logo Centralizada */}
         <div style={{
           position: 'absolute',
           top: '50%',
@@ -264,11 +237,9 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
             </div>
           </Link>
         </div>
-
-        
       </header>
 
-      {/* Menu de Navegação Horizontal */}
+      {/* 🔥 ATUALIZADO: Menu de Navegação com Classes CSS */}
       <nav style={applyThemeStyles({
         background: colors.background,
         borderBottom: `1px solid ${colors.secondary}`,
@@ -277,15 +248,8 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
         transition: 'all 0.3s ease',
         zIndex: 100
       }, 'header')}>
-        <div style={{
-          maxWidth: '1200px',
-          margin: '0 auto',
-          display: 'flex',
-          justifyContent: 'center',
-          gap: '12px',
-          flexWrap: 'wrap',
-          padding: '0 20px'
-        }}>
+        {/* 🔥 Container com classes CSS para responsividade */}
+        <div className="nav-buttons-container">
           {NICHO_LINKS.map((niche) => {
             const nicheConfig = getCategoryConfig(niche.id);
             const isActive = activeNiche === niche.id;
@@ -294,19 +258,11 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
               <Link
                 key={niche.id}
                 href={niche.path}
+                className={`nav-button ${isActive ? 'nav-button-active' : ''}`}
                 style={applyThemeStyles({
-                  padding: '12px 20px',
                   background: isActive ? nicheConfig.color : 'transparent',
                   color: isActive ? 'white' : colors.text,
                   border: isActive ? 'none' : `1px solid ${colors.secondary}`,
-                  borderRadius: '50px',
-                  fontWeight: '600',
-                  fontSize: '14px',
-                  textDecoration: 'none',
-                  transition: 'all 0.2s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
                 }, isActive ? 'button-primary' : 'button-secondary')}
                 onMouseEnter={(e) => {
                   if (!isActive) {
@@ -321,8 +277,8 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
                   }
                 }}
               >
-                <span style={{ fontSize: '16px' }}>{niche.icon}</span>
-                {niche.name}
+                <span className="nav-button-icon">{niche.icon}</span>
+                <span className="nav-button-text">{niche.name}</span>
               </Link>
             );
           })}
@@ -368,7 +324,6 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
             }}
           />
           
-          {/* Ícone de busca temático */}
           <div style={{
             position: 'absolute',
             left: '16px',

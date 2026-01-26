@@ -1,0 +1,90 @@
+/* app/components/Header.css */
+
+/* 🔥 Container principal dos botões de navegação */
+.nav-buttons-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* 🔥 Estilo base dos botões */
+.nav-button {
+  padding: 12px 20px;
+  border-radius: 50px;
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* 🔥 Ícone dentro do botão */
+.nav-button-icon {
+  font-size: 16px;
+}
+
+/* 🔥 Texto dentro do botão */
+.nav-button-text {
+  /* Mantém o texto em linha única */
+}
+
+/* 🔥 Efeitos de hover (via JS) - mantidos inline */
+
+/* =========================================== */
+/* 🔥 🔥 🔥 RESPONSIVIDADE MOBILE (max-width: 768px) */
+/* =========================================== */
+
+@media (max-width: 768px) {
+  /* Container vira carrossel horizontal */
+  .nav-buttons-container {
+    display: flex;
+    flex-wrap: nowrap; /* 🔥 Impede quebra de linha */
+    justify-content: flex-start; /* 🔥 Alinha à esquerda */
+    overflow-x: auto; /* 🔥 Scroll horizontal nativo */
+    overflow-y: hidden; /* 🔥 Esconde scroll vertical */
+    gap: 8px; /* 🔥 Reduz gap */
+    padding: 8px 20px; /* 🔥 Ajuste de padding */
+    
+    /* 🔥 Esconde scrollbar em todos os navegadores */
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+  
+  /* 🔥 Esconde scrollbar no Chrome/Safari */
+  .nav-buttons-container::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* 🔥 Botões mais compactos no mobile */
+  .nav-button {
+    padding: 10px 16px; /* 🔥 Menor padding */
+    font-size: 13px; /* 🔥 Texto um pouco menor */
+  }
+  
+  /* 🔥 Ícone menor no mobile */
+  .nav-button-icon {
+    font-size: 14px;
+  }
+}
+
+/* =========================================== */
+/* 🔥 🔥 🔥 RESPONSIVIDADE DESKTOP (min-width: 769px) */
+/* =========================================== */
+@media (min-width: 769px) {
+  /* 🔥 Desktop mantém comportamento original */
+  .nav-buttons-container {
+    flex-wrap: wrap;
+    justify-content: center;
+    overflow-x: visible;
+    gap: 12px;
+    padding: 0 20px;
+  }
+}
