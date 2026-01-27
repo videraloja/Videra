@@ -63,11 +63,11 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
     if (!isMounted) return "🔍 Buscando...";
     
     const placeholders = {
-      'home': `${emojis.search} Busca qualquer produto da loja...`,
-      'pokemontcg': `${emojis.search} Busca apenas Pokémon TCG...`,
-      'jogosdetabuleiro': `${emojis.search} Busca apenas Jogos de Tabuleiro...`,
-      'acessorios': `${emojis.search} Busca apenas Acessórios...`,
-      'hotwheels': `${emojis.search} Busca apenas Hot Wheels...`
+      'home': ` Busca qualquer produto da loja...`,
+      'pokemontcg': ` Busca apenas Pokémon TCG...`,
+      'jogosdetabuleiro': ` Busca apenas Jogos de Tabuleiro...`,
+      'acessorios': ` Busca apenas Acessórios...`,
+      'hotwheels': ` Busca apenas Hot Wheels...`
     };
     
     return placeholders[activeNiche as keyof typeof placeholders] || placeholders.home;
@@ -296,6 +296,16 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
           margin: '0 auto',
           position: 'relative'
         }}>
+           {/* 🔥 ADICIONAR FORM COM onSubmit */}
+    <form 
+      onSubmit={(e) => {
+        e.preventDefault(); // 🔥 Impede reload da página
+        // 🔥 Força o teclado a fechar
+        const input = e.currentTarget.querySelector('input');
+        if (input) {
+          input.blur(); // 🔥 Isso fecha o teclado no mobile
+        }}}></form>
+        
           <input
             type="text"
             placeholder={searchPlaceholder}
@@ -322,6 +332,18 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
               e.target.style.background = colors.cardBg;
               e.target.style.boxShadow = `0 2px 10px ${colors.primary}10`;
             }}
+            // 🔥 ADICIONAR onKeyDown para capturar Enter
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            // 🔥 Fecha o teclado
+            e.currentTarget.blur();
+            // 🔥 Executa a busca se houver função
+            if (onSearch) {
+              onSearch(localSearchTerm.trim());
+            }
+          }
+        }}
           />
           
           <div style={{
@@ -336,6 +358,7 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
           
           {localSearchTerm && (
             <button
+             type="button" // 🔥 IMPORTANTE: type="button" para não submitar
               onClick={clearSearch}
               style={applyThemeStyles({
                 position: 'absolute',
