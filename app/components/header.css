@@ -9,6 +9,7 @@
   justify-content: center;
   gap: 12px;
   flex-wrap: wrap;
+   scroll-behavior: smooth;
 }
 
 /* 🔥 Estilo base dos botões */
@@ -56,6 +57,7 @@
     /* 🔥 Esconde scrollbar em todos os navegadores */
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;  /* Firefox */
+    scroll-behavior: smooth;
   }
   
   /* 🔥 Esconde scrollbar no Chrome/Safari */

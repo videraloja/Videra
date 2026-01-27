@@ -1,11 +1,11 @@
-// components/Header.tsx - VERSÃO CORRIGIDA (COM CLASSES CSS PARA RESPONSIVO)
+// components/Header.tsx - VERSÃO ATUALIZADA (COM SESSIONSTORAGE)
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import './header.css'; // 🔥 Vamos criar este arquivo
+import './header.css';
 
 const NICHO_LINKS = [
   { id: 'home', name: 'Início', path: '/', icon: '🏠' },
@@ -34,6 +34,9 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
   const [isMounted, setIsMounted] = useState(false);
   
+  // Ref para o container do carrossel
+  const navContainerRef = useRef<HTMLDivElement>(null);
+  
   const { 
     colors, 
     emojis, 
@@ -46,6 +49,28 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
 
   useEffect(() => {
     setIsMounted(true);
+    
+    // 🔥 RESTAURAR POSIÇÃO DO SCROLL do sessionStorage
+    const timer = setTimeout(() => {
+      const savedScroll = sessionStorage.getItem('navScrollPosition');
+      if (savedScroll && navContainerRef.current) {
+        const scrollPosition = parseInt(savedScroll, 10);
+        navContainerRef.current.scrollLeft = scrollPosition;
+        
+        // 🔥 Ajuste adicional para mobile: se estiver no mobile, scroll suave
+        if (window.innerWidth <= 768) {
+          navContainerRef.current.scrollTo({
+            left: scrollPosition,
+            behavior: 'smooth'
+          });
+        }
+        
+        // Limpar depois de restaurar
+        sessionStorage.removeItem('navScrollPosition');
+      }
+    }, 50);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   const getActiveNiche = () => {
@@ -63,11 +88,11 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
     if (!isMounted) return "🔍 Buscando...";
     
     const placeholders = {
-      'home': ` Busca qualquer produto da loja...`,
-      'pokemontcg': ` Busca apenas Pokémon TCG...`,
-      'jogosdetabuleiro': ` Busca apenas Jogos de Tabuleiro...`,
-      'acessorios': ` Busca apenas Acessórios...`,
-      'hotwheels': ` Busca apenas Hot Wheels...`
+      'home': `Busca qualquer produto da loja...`,
+      'pokemontcg': `Busca apenas Pokémon TCG...`,
+      'jogosdetabuleiro': `Busca apenas Jogos de Tabuleiro...`,
+      'acessorios': `Busca apenas Acessórios...`,
+      'hotwheels': `Busca apenas Hot Wheels...`
     };
     
     return placeholders[activeNiche as keyof typeof placeholders] || placeholders.home;
@@ -75,7 +100,13 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
 
   const searchPlaceholder = getSearchPlaceholder();
 
-  const activeCategoryConfig = getCategoryConfig(activeNiche);
+  // 🔥 FUNÇÃO PARA SALVAR POSIÇÃO DO SCROLL antes da navegação
+  const saveScrollPosition = () => {
+    if (navContainerRef.current && window.innerWidth <= 768) {
+      const scrollPosition = navContainerRef.current.scrollLeft;
+      sessionStorage.setItem('navScrollPosition', scrollPosition.toString());
+    }
+  };
 
   const getBackgroundImage = (): string => {
     if (theme?.backgroundImage?.url) {
@@ -186,7 +217,6 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
 
   return (
     <>
-      {/* Header com Logo e Capa */}
       <header style={{
         position: 'relative',
         width: '100%',
@@ -239,7 +269,6 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
         </div>
       </header>
 
-      {/* 🔥 ATUALIZADO: Menu de Navegação com Classes CSS */}
       <nav style={applyThemeStyles({
         background: colors.background,
         borderBottom: `1px solid ${colors.secondary}`,
@@ -248,8 +277,10 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
         transition: 'all 0.3s ease',
         zIndex: 100
       }, 'header')}>
-        {/* 🔥 Container com classes CSS para responsividade */}
-        <div className="nav-buttons-container">
+        <div 
+          ref={navContainerRef}
+          className="nav-buttons-container"
+        >
           {NICHO_LINKS.map((niche) => {
             const nicheConfig = getCategoryConfig(niche.id);
             const isActive = activeNiche === niche.id;
@@ -264,6 +295,8 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
                   color: isActive ? 'white' : colors.text,
                   border: isActive ? 'none' : `1px solid ${colors.secondary}`,
                 }, isActive ? 'button-primary' : 'button-secondary')}
+                // 🔥 SALVAR POSIÇÃO DO SCROLL antes de navegar
+                onClick={saveScrollPosition}
                 onMouseEnter={(e) => {
                   if (!isActive) {
                     e.currentTarget.style.background = colors.secondary;
@@ -285,7 +318,6 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
         </div>
       </nav>
 
-      {/* Barra de Busca Inteligente */}
       <section style={applyThemeStyles({
         padding: '24px 20px',
         background: colors.background,
@@ -296,91 +328,93 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
           margin: '0 auto',
           position: 'relative'
         }}>
-           {/* 🔥 ADICIONAR FORM COM onSubmit */}
-    <form 
-      onSubmit={(e) => {
-        e.preventDefault(); // 🔥 Impede reload da página
-        // 🔥 Força o teclado a fechar
-        const input = e.currentTarget.querySelector('input');
-        if (input) {
-          input.blur(); // 🔥 Isso fecha o teclado no mobile
-        }}}></form>
-        
-          <input
-            type="text"
-            placeholder={searchPlaceholder}
-            value={localSearchTerm}
-            onChange={handleSearchChange}
-            style={applyThemeStyles({
-              width: '100%',
-              padding: '16px 20px 16px 48px',
-              border: `2px solid ${colors.secondary}`,
-              borderRadius: '50px',
-              fontSize: '16px',
-              background: colors.cardBg,
-              color: colors.text,
-              boxShadow: `0 2px 10px ${colors.primary}10`,
-              transition: 'all 0.2s ease'
-            }, 'filter')}
-            onFocus={(e) => {
-              e.target.style.borderColor = colors.primary;
-              e.target.style.background = colors.background;
-              e.target.style.boxShadow = `0 4px 20px ${colors.primary}20`;
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              const input = e.currentTarget.querySelector('input');
+              if (input) {
+                input.blur();
+              }
+              if (onSearch && localSearchTerm.trim()) {
+                onSearch(localSearchTerm.trim());
+              }
             }}
-            onBlur={(e) => {
-              e.target.style.borderColor = colors.secondary;
-              e.target.style.background = colors.cardBg;
-              e.target.style.boxShadow = `0 2px 10px ${colors.primary}10`;
-            }}
-            // 🔥 ADICIONAR onKeyDown para capturar Enter
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            // 🔥 Fecha o teclado
-            e.currentTarget.blur();
-            // 🔥 Executa a busca se houver função
-            if (onSearch) {
-              onSearch(localSearchTerm.trim());
-            }
-          }
-        }}
-          />
-          
-          <div style={{
-            position: 'absolute',
-            left: '16px',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            fontSize: '20px'
-          }}>
-            {emojis.search}
-          </div>
-          
-          {localSearchTerm && (
-            <button
-             type="button" // 🔥 IMPORTANTE: type="button" para não submitar
-              onClick={clearSearch}
+            style={{ width: '100%' }}
+          >
+            <input
+              type="text"
+              placeholder={searchPlaceholder}
+              value={localSearchTerm}
+              onChange={handleSearchChange}
               style={applyThemeStyles({
-                position: 'absolute',
-                right: '16px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                background: '#ef4444',
-                color: 'white',
-                border: 'none',
-                borderRadius: '50%',
-                width: '28px',
-                height: '28px',
-                cursor: 'pointer',
-                fontSize: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }, 'button-primary')}
-            >
-              ✕
-            </button>
-          )}
+                width: '100%',
+                padding: '16px 20px 16px 48px',
+                border: `2px solid ${colors.secondary}`,
+                borderRadius: '50px',
+                fontSize: '16px',
+                background: colors.cardBg,
+                color: colors.text,
+                boxShadow: `0 2px 10px ${colors.primary}10`,
+                transition: 'all 0.2s ease'
+              }, 'filter')}
+              onFocus={(e) => {
+                e.target.style.borderColor = colors.primary;
+                e.target.style.background = colors.background;
+                e.target.style.boxShadow = `0 4px 20px ${colors.primary}20`;
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = colors.secondary;
+                e.target.style.background = colors.cardBg;
+                e.target.style.boxShadow = `0 2px 10px ${colors.primary}10`;
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                  if (onSearch) {
+                    onSearch(localSearchTerm.trim());
+                  }
+                }
+              }}
+            />
+            
+            <div style={{
+              position: 'absolute',
+              left: '16px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              fontSize: '20px',
+              pointerEvents: 'none'
+            }}>
+              {emojis.search}
+            </div>
+            
+            {localSearchTerm && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                style={applyThemeStyles({
+                  position: 'absolute',
+                  right: '16px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: '#ef4444',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '28px',
+                  height: '28px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }, 'button-primary')}
+              >
+                ✕
+              </button>
+            )}
+          </form>
         </div>
       </section>
     </>
