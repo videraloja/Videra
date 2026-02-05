@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import AuthGuard from "@/app/components/AuthGuard";
 import ThemeToggle from "@/app/components/ThemeToggle";
+import { getPokemonCollectionsForAdmin } from '@/lib/collections';
 
 interface Product {
   id: number;
@@ -634,35 +635,28 @@ function EditProductContent() {
                   </select>
                 </div>
 
-                {/* Collection */}
-                <div>
-                  <label style={{ 
-                    ...labelStyle,
-                    fontSize: '14px'
-                  }}>
-                    Coleção
-                  </label>
-                  <select 
-                    name="collection"
-                    value={formData.collection}
-                    onChange={handleChange}
-                    style={smallInputStyle}
-                  >
-                    <option value="">Selecione a coleção</option>
-                    <option value="scarlet-violet">Scarlet & Violet</option>
-                    <option value="paldea-evolved">Paldea Evolved</option>
-                    <option value="crown-zenith">Crown Zenith</option>
-                    <option value="brilliant-stars">Brilliant Stars</option>
-                    <option value="lost-origin">Lost Origin</option>
-                    <option value="silver-tempest">Silver Tempest</option>
-                    <option value="fusion-strike">Fusion Strike</option>
-                    <option value="chilling-reign">Chilling Reign</option>
-                    <option value="darkness-ablaze">Darkness Ablaze</option>
-                    <option value="evolving-skies">Evolving Skies</option>
-                    <option value="celebrations">Celebrations</option>
-                    <option value="pokemon-go">Pokémon GO</option>
-                  </select>
-                </div>
+ {/* Collection */}
+<div>
+  <label style={{ 
+    ...labelStyle,
+    fontSize: '14px'
+  }}>
+    Coleção
+  </label>
+  <select 
+    name="collection"
+    value={formData.collection}
+    onChange={handleChange}
+    style={smallInputStyle}
+  >
+    <option value="">Selecione a coleção</option>
+    {getPokemonCollectionsForAdmin().map(collection => (
+      <option key={collection.id} value={collection.id}>
+        {collection.name}
+      </option>
+    ))}
+  </select>
+</div>
 
                 {/* Rarity */}
                 <div>
@@ -736,6 +730,107 @@ function EditProductContent() {
               </div>
             </div>
           )}
+
+          {/* 🆕 CAMPOS ESPECÍFICOS PARA JOGOS DE TABULEIRO */}
+{formData.category === 'board-games' && (
+  <div style={sectionStyle}>
+    <h3 style={titleStyle}>
+      🎲 Configurações Jogos de Tabuleiro
+    </h3>
+    
+    {/* Tipo de Jogo */}
+    <div style={{ marginBottom: '16px' }}>
+      <label style={{ 
+        ...labelStyle,
+        fontSize: '14px'
+      }}>
+        Tipo de Jogo *
+      </label>
+      <select 
+        name="product_type"
+        value={formData.product_type}
+        onChange={handleChange}
+        style={inputStyle}
+        required
+      >
+        <option value="">Selecione o tipo</option>
+        <option value="tabuleiro">Tabuleiro</option>
+        <option value="carta">Cartas</option>
+        <option value="baralho">Baralhos</option>
+        <option value="outro">Outro</option>
+      </select>
+      <small style={{ 
+        color: 'var(--text-secondary)', 
+        fontSize: '12px', 
+        display: 'block', 
+        marginTop: '4px' 
+      }}>
+        Este campo define em qual filtro o jogo aparecerá
+      </small>
+    </div>
+
+    {/* Número de Jogadores */}
+    <div style={{ marginBottom: '16px' }}>
+      <label style={{ 
+        ...labelStyle,
+        fontSize: '14px'
+      }}>
+        Número de Jogadores (opcional)
+      </label>
+      <input
+        type="text"
+        name="card_set" // 🎯 REUSANDO CARD_SET PARA INFORMAÇÕES
+        value={formData.card_set}
+        onChange={handleChange}
+        placeholder="Ex: 2-4 jogadores"
+        style={inputStyle}
+      />
+    </div>
+
+    {/* Idade Recomendada */}
+    <div style={{ marginBottom: '16px' }}>
+      <label style={{ 
+        ...labelStyle,
+        fontSize: '14px'
+      }}>
+        Idade Recomendada (opcional)
+      </label>
+      <input
+        type="text"
+        name="rarity" // 🎯 REUSANDO RARITY PARA INFORMAÇÕES
+        value={formData.rarity}
+        onChange={handleChange}
+        placeholder="Ex: 8+ anos"
+        style={inputStyle}
+      />
+    </div>
+
+    {/* Tags para Jogos */}
+    <div>
+      <label style={{ 
+        ...labelStyle,
+        fontSize: '14px'
+      }}>
+        Tags (separadas por vírgula)
+      </label>
+      <input
+        type="text"
+        value={formData.tags.join(', ')}
+        onChange={handleTagsChange}
+        placeholder="Ex: estratégia, família, party, cooperativo, clássico"
+        style={inputStyle}
+      />
+      <small style={{ 
+        color: 'var(--text-secondary)', 
+        fontSize: '12px', 
+        display: 'block', 
+        marginTop: '4px' 
+      }}>
+        Use tags para classificação: estratégia, cartas, tabuleiro, party, etc.
+      </small>
+    </div>
+  </div>
+)}
 
           {/* Estoque */}
           <div>

@@ -1,90 +1,41 @@
-// app/pokemontcg/page.tsx - VERSÃO CORRIGIDA
+// app/pokemontcg/page.tsx - VERSÃO CORRIGIDA (sem declaração duplicada)
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react'; // 🆕 Adicione useMemo
 import Header from '../components/Header';
 import ProductCard from '../components/ProductCard';
 import Carousel from '../components/Carousel';
+import FiltersBar from '../components/FiltersBar';
 import { supabase } from '../../lib/supabaseClient';
 import { carouselService } from '../lib/carouselService';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { Product, CartItem, CarouselConfig } from '../types';
-import { useCart } from '../../hooks/useCart';
-import { useStock } from '../../hooks/useStock';
 import { useCartContext } from '../contexts/CartContext';
+import { useCategoryFilters } from '../../hooks/useCategoryFilters';
 
-interface Filters {
-  productType: string;
-  collection: string;
-  rarity: string;
-  priceRange: string;
-  searchTerm: string;
-  inStock: boolean;
-}
 
 export default function PokemonTCGPage() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [ready, setReady] = useState(false);
-const { 
-  addToCart: addToCartGlobal, 
-  getItemQuantity, 
-  getOriginalStock 
-} = useCartContext();
-  const [filters, setFilters] = useState<Filters>({
-    productType: '',
-    collection: '',
-    rarity: '',
-    priceRange: '',
-    searchTerm: '',
-    inStock: false
-  });
-  const [showFilters, setShowFilters] = useState(false);
+  const [ready, setReady] = useState(false); // 🆕 REMOVIDO: const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const { addToCart: addToCartGlobal } = useCartContext();
 
-  // 🆕 STATES PARA CARROSSÉIS
+  // 🆕 STATES PARA FILTROS
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
+
+  // STATES PARA CARROSSÉIS
   const [carouselConfigs, setCarouselConfigs] = useState<CarouselConfig[]>([]);
   const [bestsellers, setBestsellers] = useState<Product[]>([]);
   const [newArrivals, setNewArrivals] = useState<Product[]>([]);
   const [showAllProducts, setShowAllProducts] = useState(false);
   const [viewAllType, setViewAllType] = useState<'all' | 'bestsellers' | 'new_arrivals'>('all');
   const [carouselsLoading, setCarouselsLoading] = useState(false);
-  
-  // 🛠️ CORREÇÃO: Tipagem correta
   const [currentConfig, setCurrentConfig] = useState<CarouselConfig | null>(null);
 
-  // 🛠️ CORREÇÃO: Função para sincronizar estoque com carrinho
-  const syncProductsWithCart = (products: Product[]): Product[] => {
-    const savedCart = localStorage.getItem('cart');
-    let cartItems: CartItem[] = [];
-    
-    if (savedCart) {
-      try {
-        cartItems = JSON.parse(savedCart) as CartItem[];
-      } catch {
-        cartItems = [];
-      }
-    }
-
-    return products.map(product => {
-      const inCart = cartItems.find(item => item.id === product.id);
-      if (inCart) {
-        return { ...product, stock: Math.max(product.stock - inCart.quantity, 0) };
-      }
-      return product;
-    });
-  };
-
-  const handleCarouselSelect = (type: 'all' | 'bestsellers' | 'new_arrivals') => {
-    const config = carouselConfigs.find(c => c.carousel_type === type);
-    if (config) {
-      setCurrentConfig(config);
-    }
-  };
+  // 🆕 HOOK DE FILTROS
+  const { filterPokemon, getPokemonCollections } = useCategoryFilters();
 
   const productsRef = useRef<HTMLDivElement>(null);
-
-  // HOOKS COMPARTILHADOS
-  const { stockLabel } = useStock();
 
   // HOOK DE TEMAS
   const { 
@@ -99,53 +50,131 @@ const {
   // CONFIGURAÇÃO ESPECÍFICA PARA POKÉMON
   const pokemonConfig = getCategoryConfig('pokemon');
 
-  const scrollCarousel = (direction: 'left' | 'right') => {
-    if (productsRef.current) {
-      const scrollAmount = 320 + 24;
-      productsRef.current.scrollBy({
-        left: direction === 'left' ? -scrollAmount : scrollAmount,
-        behavior: 'smooth'
-      });
+  // 🆕 FUNÇÃO: Sincronizar estoque com carrinho
+  const syncProductsWithCart = (products: Product[]): Product[] => {
+    const savedCart = localStorage.getItem('cart');
+    let cartItems: CartItem[] = [];
+    
+    if (savedCart) {
+      try {
+        cartItems = JSON.parse(savedCart) as CartItem[];
+      } catch {
+        cartItems = [];
+      }
+    }
+
+    return products.map(product => {
+      const inCart = cartItems.find(item => String(item.id) === String(product.id));
+      if (inCart) {
+        return { ...product, stock: Math.max(product.stock - inCart.quantity, 0) };
+      }
+      return product;
+    });
+  };
+
+  // 🆕 FUNÇÃO: Alternar filtros
+  const handleFilterToggle = (filterId: string) => {
+    setActiveFilters(prev => {
+      if (prev.includes(filterId)) {
+        return prev.filter(f => f !== filterId);
+      } else {
+        return [...prev, filterId];
+      }
+    });
+  };
+
+  // 🆕 FUNÇÃO: Selecionar coleção específica (VERSÃO CORRIGIDA)
+const handleCollectionSelect = (collectionName: string) => {
+  console.log('🎯 [FILTRO] Coleção selecionada:', collectionName);
+  
+  // Remove acentos e formata para ID compatível com o banco
+  const collectionId = collectionName
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove acentos: "domínio" → "dominio"
+    .replace(/\s+/g, '-') // Espaços para hífens: "domínio dracônico" → "dominio-draconico"
+    .trim();
+  
+  console.log('🎯 [FILTRO] ID normalizado:', collectionId);
+  
+  const collectionFilterId = `colecao:${collectionId}`;
+  console.log('🎯 [FILTRO] Filtro criado:', collectionFilterId);
+  
+  // Aplica o filtro
+  handleFilterToggle(collectionFilterId);
+  
+  // Debug adicional
+  setTimeout(() => {
+    const produto = products.find(p => {
+      const prodCollection = (p.collection || '').toLowerCase();
+      return prodCollection === collectionId || 
+             prodCollection.normalize('NFD').replace(/[\u0300-\u036f]/g, '') === collectionId;
+    });
+    
+    console.log('🔍 [FILTRO] Produto correspondente:', {
+      filtro: collectionFilterId,
+      produtoEncontrado: !!produto,
+      detalhesProduto: produto ? {
+        id: produto.id,
+        name: produto.name,
+        collection: produto.collection
+      } : null
+    });
+  }, 50);
+};
+
+  // 🆕 PRODUTOS FILTRADOS - useMemo para evitar loops
+  const filteredProducts = useMemo(() => {
+    if (products.length === 0) return [];
+    if (activeFilters.length === 0) return products;
+    
+    return filterPokemon(products, activeFilters);
+  }, [products, activeFilters, filterPokemon]);
+
+  // 🆕 COLEÇÕES POKÉMON - useMemo para evitar loops
+  const pokemonCollections = useMemo(() => {
+    if (products.length === 0) return [];
+    return getPokemonCollections(products);
+  }, [products, getPokemonCollections]);
+
+  const handleCarouselSelect = (type: 'all' | 'bestsellers' | 'new_arrivals') => {
+    const config = carouselConfigs.find(c => c.carousel_type === type);
+    if (config) {
+      setCurrentConfig(config);
     }
   };
 
-// 🛠️ FUNÇÃO handleAddToCart SIMPLIFICADA - Só adiciona ao carrinho
-const handleAddToCart = (product: Product) => {
-  const productId = String(product.id);
-  
-  // 1. Verificar se tem estoque (buscar do estado atual)
-  const findCurrentStock = (): number => {
-    const inProducts = products.find(p => String(p.id) === productId);
-    const inBestsellers = bestsellers.find(p => String(p.id) === productId);
-    const inNewArrivals = newArrivals.find(p => String(p.id) === productId);
+  const handleAddToCart = (product: Product) => {
+    const productId = String(product.id);
     
-    return inProducts?.stock || inBestsellers?.stock || inNewArrivals?.stock || product.stock;
-  };
-  
-  const currentStock = findCurrentStock();
-  
-  if (currentStock <= 0) {
-    console.warn(`❌ ${product.name} sem estoque (${currentStock})`);
-    return;
-  }
-  
-  console.log(`🛒 Adicionando ${product.name} ao carrinho. Estoque atual: ${currentStock}`);
-  
-  // 2. Apenas adicionar ao carrinho global
-  // O ProductCard se encarrega de atualizar o estoque visual
-  addToCartGlobal(product);
-  
-  // 3. Disparar evento para o ProductCard atualizar
-  window.dispatchEvent(new CustomEvent('cartItemAdded', {
-    detail: { 
-      productId,
-      productName: product.name,
-      timestamp: Date.now()
+    const findCurrentStock = (): number => {
+      const inProducts = products.find(p => String(p.id) === productId);
+      const inBestsellers = bestsellers.find(p => String(p.id) === productId);
+      const inNewArrivals = newArrivals.find(p => String(p.id) === productId);
+      
+      return inProducts?.stock || inBestsellers?.stock || inNewArrivals?.stock || product.stock;
+    };
+    
+    const currentStock = findCurrentStock();
+    
+    if (currentStock <= 0) {
+      console.warn(`❌ ${product.name} sem estoque (${currentStock})`);
+      return;
     }
-  }));
-  
-  console.log(`✅ ${product.name} adicionado ao carrinho`);
-};
+    
+    console.log(`🛒 Adicionando ${product.name} ao carrinho. Estoque atual: ${currentStock}`);
+    
+    addToCartGlobal(product);
+    
+    window.dispatchEvent(new CustomEvent('cartItemAdded', {
+      detail: { 
+        productId,
+        productName: product.name,
+        timestamp: Date.now()
+      }
+    }));
+    
+    console.log(`✅ ${product.name} adicionado ao carrinho`);
+  };
 
   // CARREGAR PRODUTOS
   useEffect(() => {
@@ -163,11 +192,8 @@ const handleAddToCart = (product: Product) => {
         }
 
         if (data) {
-          // 🛠️ CORREÇÃO: Usar função de sincronização
           const adjustedProducts = syncProductsWithCart(data as Product[]);
-
           setProducts(adjustedProducts);
-          setFilteredProducts(adjustedProducts);
           localStorage.setItem('products', JSON.stringify(adjustedProducts));
         }
       } catch (err) {
@@ -187,21 +213,17 @@ const handleAddToCart = (product: Product) => {
       
       setCarouselsLoading(true);
       try {
-        // Carregar configurações
         const configs = await carouselService.getCarouselConfigs('pokemontcg');
         setCarouselConfigs(configs);
         
-        // 🛠️ CORREÇÃO: Remover código duplicado
         if (configs.length > 0) {
           setCurrentConfig(configs[0]);
         }
         
-        // 🛠️ CORREÇÃO: Carregar mais vendidos com sincronização
         const best = await carouselService.getBestsellers('pokemon', 10);
         const syncedBest = syncProductsWithCart(best);
         setBestsellers(syncedBest);
         
-        // 🛠️ CORREÇÃO: Carregar lançamentos com sincronização
         const arrivals = await carouselService.getNewArrivals('pokemon', 10);
         const syncedArrivals = syncProductsWithCart(arrivals);
         setNewArrivals(syncedArrivals);
@@ -215,89 +237,69 @@ const handleAddToCart = (product: Product) => {
 
     loadCarousels();
   }, [ready]);
-  
 
-  // APLICAR FILTROS
-  useEffect(() => {
-    let filtered = products;
+  // 🆕 Estado de busca
+  const [searchTerm, setSearchTerm] = useState('');
+  const handleSearch = (term: string) => {
+    setSearchTerm(term);
+  };
 
-    if (filters.searchTerm) {
-      filtered = filtered.filter(product =>
-        product.name.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
-        product.description?.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
-        product.card_set?.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
-        product.tags?.some(tag => tag.toLowerCase().includes(filters.searchTerm.toLowerCase()))
+// Substitua o useEffect de debug por ESTE (mais detalhado ainda):
+useEffect(() => {
+  if (activeFilters.length > 0) {
+    console.log('🔍🔥 DEBUG SUPER DETALHADO:', {
+      // 1. FILTROS ATIVOS (EXATO CONTEÚDO)
+      filtrosAtivos: activeFilters,
+      primeiroFiltro: activeFilters[0],
+      tipoFiltro: activeFilters[0]?.startsWith('colecao:') ? 'colecao' : 'outro',
+      
+      // 2. VALOR EXATO DO FILTRO
+      filtroId: activeFilters[0]?.replace('colecao:', ''),
+      filtroIdLowerCase: activeFilters[0]?.replace('colecao:', '').toLowerCase(),
+      
+      // 3. PRODUTO NO BANCO
+      produtoNoBanco: products.find(p => p.id === 15), // ID do Charizard
+      produtoCollection: products.find(p => p.id === 15)?.collection,
+      produtoCollectionLowerCase: products.find(p => p.id === 15)?.collection?.toLowerCase(),
+      
+      // 4. COMPARAÇÃO DIRETA
+      comparacao: {
+        filtro: activeFilters[0]?.replace('colecao:', '').toLowerCase(),
+        banco: products.find(p => p.id === 15)?.collection?.toLowerCase(),
+        saoIguais: activeFilters[0]?.replace('colecao:', '').toLowerCase() === 
+                  products.find(p => p.id === 15)?.collection?.toLowerCase()
+      },
+      
+      // 5. TODOS OS PRODUTOS PARA VER
+      todosProdutos: products.map(p => ({
+        id: p.id,
+        name: p.name.substring(0, 20) + '...',
+        collection: p.collection,
+        collectionLower: p.collection?.toLowerCase()
+      }))
+    });
+  }
+}, [activeFilters, products]);
+
+  // 🆕 Produtos filtrados por busca E filtros
+  const getFinalFilteredProducts = () => {
+    let result = filteredProducts;
+    
+    // Aplicar busca textual
+    if (searchTerm.trim()) {
+      result = result.filter(product =>
+        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.card_set?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
-
-    if (filters.productType) {
-      filtered = filtered.filter(product => product.product_type === filters.productType);
-    }
-
-    if (filters.collection) {
-      filtered = filtered.filter(product => product.collection === filters.collection);
-    }
-
-    if (filters.rarity) {
-      filtered = filtered.filter(product => product.rarity === filters.rarity);
-    }
-
-    if (filters.priceRange) {
-      switch (filters.priceRange) {
-        case '0-50':
-          filtered = filtered.filter(product => product.price <= 50);
-          break;
-        case '50-100':
-          filtered = filtered.filter(product => product.price > 50 && product.price <= 100);
-          break;
-        case '100-200':
-          filtered = filtered.filter(product => product.price > 100 && product.price <= 200);
-          break;
-        case '200+':
-          filtered = filtered.filter(product => product.price > 200);
-          break;
-      }
-    }
-
-    if (filters.inStock) {
-      filtered = filtered.filter(product => product.stock > 0);
-    }
-
-    setFilteredProducts(filtered);
-  }, [filters, products]);
-
-  const updateFilter = (key: keyof Filters, value: string | boolean) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
+    
+    return result;
   };
 
-  const clearAllFilters = () => {
-    setFilters({
-      productType: '',
-      collection: '',
-      rarity: '',
-      priceRange: '',
-      searchTerm: '',
-      inStock: false
-    });
-  };
-
-  const productTypes = [...new Set(products.map(p => p.product_type).filter(Boolean))];
-  const collections = [...new Set(products.map(p => p.collection).filter(Boolean))];
-  const rarities = [...new Set(products.map(p => p.rarity).filter(Boolean))];
-
-  const pokemonStats = {
-    totalProducts: products.length,
-    inStock: products.filter(p => p.stock > 0).length,
-    lowStock: products.filter(p => p.stock > 0 && p.stock <= 3).length,
-    filteredCount: filteredProducts.length,
-    onSale: products.filter(p => p.on_sale).length
-  };
-
-  const activeFiltersCount = Object.values(filters).filter(value => 
-    value !== '' && value !== false
-  ).length;
-
-  const hasActiveSearch = filters.searchTerm.length > 0 || activeFiltersCount > 0;
+  const finalFilteredProducts = getFinalFilteredProducts();
+  const hasActiveSearch = searchTerm.length > 0 || activeFilters.length > 0;
 
   return (
     <div style={{ 
@@ -306,8 +308,8 @@ const handleAddToCart = (product: Product) => {
       color: colors.text
     }}>
       <Header 
-        onSearch={(term) => updateFilter('searchTerm', term)}
-        searchTerm={filters.searchTerm}
+        onSearch={handleSearch}
+        searchTerm={searchTerm}
       />
 
       <main style={{ 
@@ -337,7 +339,7 @@ const handleAddToCart = (product: Product) => {
 
         {ready && (
           <>
-            {/* Hero Section Pokémon COM TEMAS */}
+            {/* Hero Section Pokémon */}
             {!hasActiveSearch && !showAllProducts && (
               <section style={applyThemeStyles({
                 textAlign: 'center',
@@ -350,7 +352,6 @@ const handleAddToCart = (product: Product) => {
                 position: 'relative',
                 overflow: 'hidden'
               }, 'hero')}>
-                {/* Elementos decorativos Pokémon */}
                 <div style={{
                   position: 'absolute',
                   top: '20px',
@@ -387,264 +388,125 @@ const handleAddToCart = (product: Product) => {
                 }}>
                   Descubra cartas raras, decks completos e acessórios exclusivos do universo Pokémon TCG
                 </p>
-                
-                <button
-                  onClick={() => setShowFilters(true)}
-                  style={applyThemeStyles({
-                    padding: '16px 32px',
-                    background: 'rgba(255,255,255,0.2)',
-                    color: 'white',
-                    border: '2px solid rgba(255,255,255,0.3)',
-                    borderRadius: '12px',
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    backdropFilter: 'blur(10px)',
-                    transition: 'all 0.3s ease'
-                  }, 'button-secondary')}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
-                    e.currentTarget.style.border = '2px solid rgba(255,255,255,0.5)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
-                    e.currentTarget.style.border = '2px solid rgba(255,255,255,0.3)';
-                  }}
-                >
-                  {emojis.search} Explorar Produtos
-                </button>
               </section>
             )}
 
-            {/* Seção de Filtros COM TEMAS (só aparece na busca ou se ativado) */}
-            {(hasActiveSearch || showFilters) && !showAllProducts && (
-              <section style={applyThemeStyles({
-                background: colors.cardBg,
-                borderRadius: '16px',
-                padding: '24px',
-                boxShadow: getShadow('medium'),
-                marginBottom: '40px',
-                border: `1px solid ${colors.secondary}`
-              }, 'filter')}>
+            {/* 🆕 BARRA DE FILTROS */}
+            {!showAllProducts && (
+              <FiltersBar
+                category="pokemon"
+                activeFilters={activeFilters}
+                onFilterToggle={handleFilterToggle}
+                collections={pokemonCollections}
+                onCollectionSelect={handleCollectionSelect}
+                isExpanded={isFiltersExpanded}
+                onToggle={() => setIsFiltersExpanded(!isFiltersExpanded)}
+              />
+            )}
+
+            {/* 🆕 SEÇÃO DE RESULTADOS DOS FILTROS */}
+            {hasActiveSearch && !showAllProducts && (
+              <section style={{
+                marginBottom: '40px'
+              }}>
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  marginBottom: '20px'
+                  marginBottom: '24px',
+                  padding: '0 20px'
                 }}>
                   <h2 style={{
-                    fontSize: '20px',
+                    fontSize: 'clamp(1.5rem, 3vw, 2rem)',
                     fontWeight: '700',
                     color: colors.text,
                     display: 'flex',
                     alignItems: 'center',
                     gap: '12px'
                   }}>
-                    {emojis.filter} Filtros Avançados
-                    {activeFiltersCount > 0 && (
+                    <span style={{ fontSize: '28px' }}>
+                      {emojis.search}
+                    </span>
+                    Resultados
+                    {activeFilters.length > 0 && (
                       <span style={{
                         background: colors.primary,
                         color: 'white',
-                        padding: '2px 8px',
+                        padding: '4px 12px',
                         borderRadius: '12px',
-                        fontSize: '12px',
+                        fontSize: '14px',
                         fontWeight: '600'
                       }}>
-                        {activeFiltersCount}
+                        {activeFilters.length} filtros
                       </span>
                     )}
                   </h2>
                   
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    {activeFiltersCount > 0 && (
-                      <button
-                        onClick={clearAllFilters}
-                        style={applyThemeStyles({
-                          padding: '8px 16px',
-                          background: 'transparent',
-                          color: colors.primary,
-                          border: `1px solid ${colors.primary}`,
-                          borderRadius: '8px',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          cursor: 'pointer'
-                        }, 'button-secondary')}
-                      >
-                        🗑️ Limpar Filtros
-                      </button>
-                    )}
-                    
-                    <button
-                      onClick={() => setShowFilters(!showFilters)}
-                      style={applyThemeStyles({
-                        padding: '8px 16px',
-                        background: colors.primary,
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }, 'button-primary')}
-                    >
-                      {showFilters ? '▲' : '▼'} Filtros
-                    </button>
-                  </div>
+                  {searchTerm && (
+                    <p style={{
+                      color: '#6b7280',
+                      fontSize: '14px'
+                    }}>
+                      Buscando: <strong>"{searchTerm}"</strong>
+                    </p>
+                  )}
                 </div>
 
-                {showFilters && (
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                    gap: '16px',
-                    paddingTop: '20px',
-                    borderTop: `1px solid ${colors.secondary}`
-                  }}>
-                    {/* Filtro por Tipo */}
-                    <div>
-                      <label style={{
-                        display: 'block',
-                        marginBottom: '8px',
-                        fontWeight: '600',
-                        color: colors.text,
-                        fontSize: '14px'
-                      }}>
-                        🎴 Tipo de Produto
-                      </label>
-                      <select
-                        value={filters.productType}
-                        onChange={(e) => updateFilter('productType', e.target.value)}
-                        style={applyThemeStyles({
-                          width: '100%',
-                          padding: '10px',
-                          border: `1px solid ${colors.secondary}`,
-                          borderRadius: '8px',
-                          fontSize: '14px',
-                          background: colors.cardBg
-                        }, 'filter')}
-                      >
-                        <option value="">Todos os tipos</option>
-                        {productTypes.map(type => (
-                          <option key={type} value={type}>{type}</option>
-                        ))}
-                      </select>
-                    </div>
 
-                    {/* Filtro por Coleção */}
-                    <div>
-                      <label style={{
-                        display: 'block',
-                        marginBottom: '8px',
-                        fontWeight: '600',
-                        color: colors.text,
-                        fontSize: '14px'
-                      }}>
-                        📦 Coleção
-                      </label>
-                      <select
-                        value={filters.collection}
-                        onChange={(e) => updateFilter('collection', e.target.value)}
-                        style={applyThemeStyles({
-                          width: '100%',
-                          padding: '10px',
-                          border: `1px solid ${colors.secondary}`,
-                          borderRadius: '8px',
-                          fontSize: '14px',
-                          background: colors.cardBg
-                        }, 'filter')}
-                      >
-                        <option value="">Todas as coleções</option>
-                        {collections.map(collection => (
-                          <option key={collection} value={collection}>{collection}</option>
-                        ))}
-                      </select>
-                    </div>
 
-                    {/* Filtro por Raridade */}
-                    <div>
-                      <label style={{
-                        display: 'block',
-                        marginBottom: '8px',
-                        fontWeight: '600',
-                        color: colors.text,
-                        fontSize: '14px'
-                      }}>
-                        💎 Raridade
-                      </label>
-                      <select
-                        value={filters.rarity}
-                        onChange={(e) => updateFilter('rarity', e.target.value)}
-                        style={applyThemeStyles({
-                          width: '100%',
-                          padding: '10px',
-                          border: `1px solid ${colors.secondary}`,
-                          borderRadius: '8px',
-                          fontSize: '14px',
-                          background: colors.cardBg
-                        }, 'filter')}
-                      >
-                        <option value="">Todas as raridades</option>
-                        {rarities.map(rarity => (
-                          <option key={rarity} value={rarity}>{rarity}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Filtro por Preço */}
-                    <div>
-                      <label style={{
-                        display: 'block',
-                        marginBottom: '8px',
-                        fontWeight: '600',
-                        color: colors.text,
-                        fontSize: '14px'
-                      }}>
-                        💰 Faixa de Preço
-                      </label>
-                      <select
-                        value={filters.priceRange}
-                        onChange={(e) => updateFilter('priceRange', e.target.value)}
-                        style={applyThemeStyles({
-                          width: '100%',
-                          padding: '10px',
-                          border: `1px solid ${colors.secondary}`,
-                          borderRadius: '8px',
-                          fontSize: '14px',
-                          background: colors.cardBg
-                        }, 'filter')}
-                      >
-                        <option value="">Qualquer preço</option>
-                        <option value="0-50">Até R$ 50</option>
-                        <option value="50-100">R$ 50 - R$ 100</option>
-                        <option value="100-200">R$ 100 - R$ 200</option>
-                        <option value="200+">Acima de R$ 200</option>
-                      </select>
-                    </div>
-
-                    {/* Filtro por Estoque */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '28px' }}>
-                      <input
-                        type="checkbox"
-                        id="inStock"
-                        checked={filters.inStock}
-                        onChange={(e) => updateFilter('inStock', e.target.checked)}
-                        style={{
-                          width: '18px',
-                          height: '18px'
+                {/* 🆕 GRID DE PRODUTOS FILTRADOS (2 por linha no mobile) */}
+                {finalFilteredProducts.length > 0 ? (
+                  <div 
+                    className="product-grid-container"
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                      gap: '24px',
+                      padding: '20px 0'
+                    }}
+                  >
+                    {finalFilteredProducts.map((product) => (
+                      <ProductCard 
+                        key={product.id}
+                        product={product}
+                        onAddToCart={handleAddToCart}
+                        categoryConfig={{
+                          color: colors.primary,
+                          icon: '🎴',
+                          badgeText: 'POKÉMON'
                         }}
                       />
-                      <label htmlFor="inStock" style={{
-                        fontWeight: '600',
-                        color: colors.text,
-                        fontSize: '14px',
-                        cursor: 'pointer'
-                      }}>
-                        {emojis.stock} Apenas em estoque
-                      </label>
-                    </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={applyThemeStyles({ 
+                    textAlign: 'center', 
+                    padding: '80px 20px',
+                    background: colors.cardBg,
+                    borderRadius: '20px',
+                    boxShadow: getShadow('medium')
+                  }, 'card')}>
+                    <div style={{ fontSize: '64px', marginBottom: '16px' }}>{emojis.search}</div>
+                    <h3 style={{
+                      fontSize: '20px',
+                      fontWeight: '600',
+                      marginBottom: '8px',
+                      color: colors.text
+                    }}>
+                      Nenhum produto encontrado
+                    </h3>
+                    <p style={{ 
+                      fontSize: '16px', 
+                      color: '#6b7280',
+                      marginBottom: '24px',
+                      maxWidth: '400px',
+                      margin: '0 auto'
+                    }}>
+                      {searchTerm 
+                        ? `Nenhum resultado para "${searchTerm}" com os filtros atuais.`
+                        : 'Nenhum produto corresponde aos filtros selecionados.'
+                      }
+                    </p>
                   </div>
                 )}
               </section>
@@ -653,7 +515,6 @@ const handleAddToCart = (product: Product) => {
 {/* MODOS DE EXIBIÇÃO: Grid ou Carrosséis */}
 {showAllProducts ? (
   <div>
-    {/* HEADER - Título em uma linha + Botão Voltar */}
     <div 
       className="view-all-header"
       style={{
@@ -694,7 +555,6 @@ const handleAddToCart = (product: Product) => {
           {viewAllType === 'bestsellers' && 'Mais Vendidos'}
           {viewAllType === 'new_arrivals' && 'Lançamentos'}
         </span>
-        {/* BADGE REMOVIDO */}
       </h2>
       
       <button
@@ -728,7 +588,6 @@ const handleAddToCart = (product: Product) => {
       </button>
     </div>
     
-    {/* GRID DE PRODUTOS - 2 por linha no mobile */}
     <div 
       className="product-grid-container"
       style={{
@@ -755,123 +614,32 @@ const handleAddToCart = (product: Product) => {
         ))}
     </div>
   </div>
-) : (              // MODO CARROSSÉIS
-              <section>
-                {/* Indicador de carregamento dos carrosséis */}
-                {carouselsLoading && (
-                  <div style={{ 
-                    textAlign: 'center', 
-                    padding: '40px 20px',
-                    marginBottom: '32px'
-                  }}>
+) : (
+              // MODO CARROSSÉIS (quando não há busca ou filtros ativos)
+              !hasActiveSearch && (
+                <section>
+                  {carouselsLoading && (
                     <div style={{ 
-                      fontSize: '48px', 
-                      marginBottom: '16px',
-                      animation: 'pulse 1.5s infinite'
-                    }}>🎠</div>
-                    <p style={{ 
-                      fontSize: '16px', 
-                      color: '#6b7280'
+                      textAlign: 'center', 
+                      padding: '40px 20px',
+                      marginBottom: '32px'
                     }}>
-                      Carregando carrosséis...
-                    </p>
-                  </div>
-                )}
-
-                {/* Se estiver em busca ativa, mostrar apenas produtos filtrados */}
-                {hasActiveSearch ? (
-                  <div>
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: '32px',
-                      padding: '0 20px'
-                    }}>
-                      <h2 style={{
-                        fontSize: 'clamp(1.5rem, 3vw, 2rem)',
-                        fontWeight: '700',
-                        color: colors.text,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px'
+                      <div style={{ 
+                        fontSize: '48px', 
+                        marginBottom: '16px',
+                        animation: 'pulse 1.5s infinite'
+                      }}>🎠</div>
+                      <p style={{ 
+                        fontSize: '16px', 
+                        color: '#6b7280'
                       }}>
-                        <span style={{ fontSize: '28px' }}>
-                          {emojis.search}
-                        </span>
-                        Resultados: {filteredProducts.length} produto(s) encontrado(s)
-                      </h2>
+                        Carregando carrosséis...
+                      </p>
                     </div>
+                  )}
 
-                    {/* Grid de produtos filtrados */}
-                    {filteredProducts.length > 0 ? (
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                        gap: '24px',
-                        padding: '20px 0'
-                      }}>
-                        {filteredProducts.map((product) => (
-                          <ProductCard 
-                            key={product.id}
-                            product={product}
-                            onAddToCart={handleAddToCart}
-                            categoryConfig={{
-                              color: colors.primary,
-                              icon: '🎴',
-                              badgeText: 'POKÉMON'
-                            }}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={applyThemeStyles({ 
-                        textAlign: 'center', 
-                        padding: '80px 20px',
-                        background: colors.cardBg,
-                        borderRadius: '20px',
-                        boxShadow: getShadow('medium')
-                      }, 'card')}>
-                        <div style={{ fontSize: '64px', marginBottom: '16px' }}>{emojis.search}</div>
-                        <h3 style={{
-                          fontSize: '20px',
-                          fontWeight: '600',
-                          marginBottom: '8px',
-                          color: colors.text
-                        }}>
-                          Nenhum produto encontrado
-                        </h3>
-                        <p style={{ 
-                          fontSize: '16px', 
-                          color: '#6b7280',
-                          marginBottom: '24px'
-                        }}>
-                          Tente ajustar os filtros ou limpar para ver todos os produtos.
-                        </p>
-                        {activeFiltersCount > 0 && (
-                          <button
-                            onClick={clearAllFilters}
-                            style={applyThemeStyles({
-                              padding: '12px 24px',
-                              background: colors.primary,
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '12px',
-                              fontSize: '16px',
-                              fontWeight: '600',
-                              cursor: 'pointer'
-                            }, 'button-primary')}
-                          >
-                            🔄 Limpar Filtros
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  // CARROSSÉIS PRINCIPAIS
+                  {/* CARROSSÉIS PRINCIPAIS */}
                   <div>
-                    {/* Carrossel: Todos os Produtos */}
                     <Carousel
                       title="Todos os Produtos"
                       products={products}
@@ -925,7 +693,6 @@ const handleAddToCart = (product: Product) => {
                       onAddToCart={handleAddToCart}
                     />
 
-                    {/* Carrossel: Mais Vendidos */}
                     <Carousel
                       title="Mais Vendidos"
                       products={bestsellers}
@@ -979,7 +746,6 @@ const handleAddToCart = (product: Product) => {
                       onAddToCart={handleAddToCart}
                     />
 
-                    {/* Carrossel: Lançamentos */}
                     <Carousel
                       title="Lançamentos"
                       products={newArrivals}
@@ -1033,11 +799,11 @@ const handleAddToCart = (product: Product) => {
                       onAddToCart={handleAddToCart}
                     />
                   </div>
-                )}
-              </section>
+                </section>
+              )
             )}
 
-            {/* Hero Section Final COM TEMAS */}
+            {/* Hero Section Final */}
             {!hasActiveSearch && !showAllProducts && (
               <section style={applyThemeStyles({
                 textAlign: 'center',
@@ -1119,18 +885,6 @@ const handleAddToCart = (product: Product) => {
       </main>
 
       <style jsx>{`
-        @keyframes bounceX {
-          0%, 20%, 50%, 80%, 100% {
-            transform: translateX(0);
-          }
-          40% {
-            transform: translateX(4px);
-          }
-          60% {
-            transform: translateX(2px);
-          }
-        }
-        
         @keyframes pulse {
           0%, 100% {
             opacity: 1;

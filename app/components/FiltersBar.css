@@ -1,0 +1,85 @@
+/* app/components/FiltersBar.css */
+.filters-bar-container {
+  margin-bottom: 32px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* ÁREA EXPANDIDA COM LARGURA REDUZIDA NO DESKTOP */
+.filters-expanded-area {
+  padding: 20px;
+  background: #ffffff;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  animation: fadeIn 0.3s ease;
+  width: 100%;
+}
+
+/* MEDIA QUERIES PARA DESKTOP */
+@media (min-width: 768px) {
+  .filters-expanded-area {
+    width: 50%; /* 🎯 METADE DA TELA NO DESKTOP */
+    max-width: 600px; /* 🎯 LIMITE MÁXIMO */
+    float: left; /* 🎯 LADO ESQUERDO */
+    clear: left; /* 🎯 GARANTE QUE FIQUE SÓ NO LADO ESQUERDO */
+    margin-right: 24px; /* 🎯 ESPAÇO ENTRE FILTROS E PRODUTOS */
+    position: relative;
+    z-index: 1;
+  }
+  
+  /* Se quiser produtos ao lado direito (opcional) */
+  .products-container {
+    width: calc(50% - 24px);
+    float: right;
+    clear: right;
+  }
+  
+  /* Limpa o float */
+  .clearfix::after {
+    content: "";
+    display: table;
+    clear: both;
+  }
+}
+
+/* ANIMAÇÕES */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* CUSTOM SCROLLBAR */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f8f9fa;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #e5e7eb;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #d1d5db;
+}
