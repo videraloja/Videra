@@ -9,6 +9,7 @@ import { ThemeEditor } from '../../components/ThemeEditor';
 import { supabase } from '@/lib/supabaseClient';
 import CarouselEditor from '../../components/CarouselEditor';
 import AuthGuard from '../../components/AuthGuard'; // 🆕 IMPORT DO AUTHGUARD
+import HeroBannerManager from '../../components/HeroBannerManager';
 
 function ThemesAdminPageContent() {
   const { allThemes, activateSeasonalTheme, deactivateSeasonalTheme, currentThemeConfig, isLoading, createNewTheme, deleteTheme } = useTheme();
@@ -22,7 +23,7 @@ function ThemesAdminPageContent() {
   const [newThemeName, setNewThemeName] = useState('');
   const [baseThemeId, setBaseThemeId] = useState('default');
   const [isCreating, setIsCreating] = useState(false);
-  const [activeSection, setActiveSection] = useState<'themes' | 'editor' | 'carrosséis'>('themes');
+  const [activeSection, setActiveSection] = useState<'themes' | 'editor' | 'carrosséis' | 'hero'>('themes');
   const [isActivating, setIsActivating] = useState<string | null>(null);
 
   const handleActivateTheme = async (themeId: string, themeName: string) => {
@@ -593,6 +594,11 @@ function ThemesAdminPageContent() {
       <CarouselEditor pageSlug="pokemontcg" />
     </div>
   );
+  const renderHeroSection = () => (
+  <div style={{ marginTop: '20px' }}>
+    <HeroBannerManager />
+  </div>
+);
 
   return (
     <div style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}>
@@ -668,6 +674,23 @@ function ThemesAdminPageContent() {
           >
             🎠 Editor de Carrosséis
           </button>
+          <button
+  onClick={() => setActiveSection('hero')}
+  style={{
+    flex: 1,
+    padding: '12px 16px',
+    background: activeSection === 'hero' ? '#7c3aed' : 'transparent',
+    color: activeSection === 'hero' ? 'white' : '#6b7280',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease'
+  }}
+>
+  🖼️ Hero Banners
+</button>
         </div>
       </div>
 
@@ -989,6 +1012,7 @@ function ThemesAdminPageContent() {
       {activeSection === 'themes' && renderThemesSection()}
       {activeSection === 'editor' && renderEditorSection()}
       {activeSection === 'carrosséis' && renderCarouselsSection()}
+      {activeSection === 'hero' && renderHeroSection()}
     </div>
   );
 }

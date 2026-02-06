@@ -10,6 +10,7 @@ import { useThemeColors } from '../hooks/useThemeColors';
 import { Product, CartItem } from './types';
 import { useCart } from '../hooks/useCart';
 import { useStock } from '../hooks/useStock';
+import HeroSectionWrapper from './components/HeroSectionWrapper';
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -154,76 +155,8 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* PÁGINA INICIAL - APENAS DESTAQUES GERAIS */}
-        {ready && (
-          <>
-            {/* Hero Section - AGORA COM GRADIENTE TEMÁTICO */}
-            {!hasActiveSearch && (
-              <section style={applyThemeStyles({
-                textAlign: 'center',
-                padding: '80px 20px',
-                marginBottom: '80px',
-                background: getGradient('hero'),
-                borderRadius: '24px',
-                color: 'white',
-                boxShadow: getShadow('large'),
-                position: 'relative',
-                overflow: 'hidden'
-              }, 'hero')}>
-                <h1 style={{
-                  fontSize: 'clamp(2.5rem, 5vw, 4rem)',
-                  fontWeight: '800',
-                  marginBottom: '24px',
-                  lineHeight: '1.2'
-                }}>
-                  Bem-vindo à <br />
-                  <span style={{
-                    background: 'linear-gradient(45deg, #fbbf24, #f59e0b)',
-                    backgroundClip: 'text',
-                    WebkitBackgroundClip: 'text',
-                    color: 'transparent'
-                  }}>
-                    Videra Colecionáveis
-                  </span>
-                </h1>
-                <p style={{
-                  fontSize: 'clamp(1.125rem, 2vw, 1.25rem)',
-                  marginBottom: '40px',
-                  opacity: '0.9',
-                  maxWidth: '600px',
-                  margin: '0 auto 40px'
-                }}>
-                  {isSpecialTheme 
-                    ? `🎉 ${themeName} - Descubra ofertas especiais!` 
-                    : 'Descubra Pokémon TCG, Jogos de Tabuleiro, Acessórios e Hot Wheels!'
-                  }
-                </p>
-                <button
-                  onClick={() => document.getElementById('destaques')?.scrollIntoView({ behavior: 'smooth' })}
-                  style={applyThemeStyles({
-                    padding: '16px 32px',
-                    background: 'white',
-                    color: colors.primary,
-                    border: 'none',
-                    borderRadius: '50px',
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }, 'button-primary')}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = getShadow('medium');
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                >
-                  {emojis.success} Explorar Destaques
-                </button>
-              </section>
-            )}
+        {/* Hero Section Global */}
+<HeroSectionWrapper />
 
             {/* SEÇÃO DE NOVOS LANÇAMENTOS - CARROSSEL HORIZONTAL COM TEMAS */}
             {!hasActiveSearch && newArrivals.length > 0 && (
@@ -749,75 +682,7 @@ export default function HomePage() {
               )}
             </section>
 
-            {/* CALL-TO-ACTION PARA EXPLORAR CATEGORIAS - ATUALIZADO COM TEMAS */}
-            {!hasActiveSearch && (
-              <section style={applyThemeStyles({
-                textAlign: 'center',
-                padding: '60px 20px',
-                background: getGradient('primary'),
-                borderRadius: '24px',
-                color: 'white',
-                marginBottom: '80px'
-              }, 'hero')}>
-                <h2 style={{
-                  fontSize: 'clamp(1.5rem, 3vw, 2rem)',
-                  fontWeight: '700',
-                  marginBottom: '16px'
-                }}>
-                  Explore Nossas Categorias
-                </h2>
-                <p style={{
-                  fontSize: 'clamp(1rem, 2vw, 1.125rem)',
-                  marginBottom: '32px',
-                  opacity: '0.9'
-                }}>
-                  {isSpecialTheme 
-                    ? '🎁 Ofertas especiais em todas as categorias!' 
-                    : 'Descubra produtos específicos de cada nicho'
-                  }
-                </p>
-                <div style={{
-                  display: 'flex',
-                  gap: '16px',
-                  justifyContent: 'center',
-                  flexWrap: 'wrap'
-                }}>
-                  {['pokemontcg', 'jogosdetabuleiro', 'acessorios', 'hotwheels'].map(category => {
-                    const config = getCategoryConfig(category);
-                    return (
-                      <a 
-                        key={category}
-                        href={`/${category}`}
-                        style={applyThemeStyles({
-                          padding: '12px 24px',
-                          background: 'rgba(255,255,255,0.2)',
-                          color: 'white',
-                          border: '2px solid rgba(255,255,255,0.3)',
-                          borderRadius: '50px',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          textDecoration: 'none',
-                          transition: 'all 0.2s ease',
-                          backdropFilter: 'blur(10px)'
-                        }, 'button-secondary')}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
-                          e.currentTarget.style.border = '2px solid rgba(255,255,255,0.5)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
-                          e.currentTarget.style.border = '2px solid rgba(255,255,255,0.3)';
-                        }}
-                      >
-                        {config.icon} {config.badgeText}
-                      </a>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
-          </>
-        )}
+           
       </main>
 
       {/* Estilos para animação do indicador de scroll */}

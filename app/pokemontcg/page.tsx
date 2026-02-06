@@ -12,6 +12,7 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { Product, CartItem, CarouselConfig } from '../types';
 import { useCartContext } from '../contexts/CartContext';
 import { useCategoryFilters } from '../../hooks/useCategoryFilters';
+import HeroSectionWrapper from '../components/HeroSectionWrapper';
 
 
 export default function PokemonTCGPage() {
@@ -339,57 +340,9 @@ useEffect(() => {
 
         {ready && (
           <>
-            {/* Hero Section Pokémon */}
-            {!hasActiveSearch && !showAllProducts && (
-              <section style={applyThemeStyles({
-                textAlign: 'center',
-                padding: '80px 20px',
-                marginBottom: '40px',
-                background: getGradient('hero'),
-                borderRadius: '24px',
-                color: 'white',
-                boxShadow: getShadow('large'),
-                position: 'relative',
-                overflow: 'hidden'
-              }, 'hero')}>
-                <div style={{
-                  position: 'absolute',
-                  top: '20px',
-                  right: '20px',
-                  fontSize: '80px',
-                  opacity: '0.1',
-                  transform: 'rotate(15deg)'
-                }}>{pokemonConfig.icon}</div>
-                <div style={{
-                  position: 'absolute',
-                  bottom: '20px',
-                  left: '20px',
-                  fontSize: '60px',
-                  opacity: '0.1',
-                  transform: 'rotate(-15deg)'
-                }}>🔥</div>
-                
-                <h1 style={{
-                  fontSize: 'clamp(2rem, 4vw, 3rem)',
-                  fontWeight: '800',
-                  marginBottom: '16px',
-                  lineHeight: '1.2'
-                }}>
-                  <span style={{ fontSize: '48px', marginRight: '12px' }}>{pokemonConfig.icon}</span>
-                  Pokémon TCG
-                </h1>
-
-                <p style={{
-                  fontSize: 'clamp(1rem, 2vw, 1.125rem)',
-                  marginBottom: '32px',
-                  opacity: '0.9',
-                  maxWidth: '500px',
-                  margin: '0 auto'
-                }}>
-                  Descubra cartas raras, decks completos e acessórios exclusivos do universo Pokémon TCG
-                </p>
-              </section>
-            )}
+           <HeroSectionWrapper 
+  showHero={!hasActiveSearch && !showAllProducts}
+/>
 
             {/* 🆕 BARRA DE FILTROS */}
             {!showAllProducts && (
@@ -803,83 +756,7 @@ useEffect(() => {
               )
             )}
 
-            {/* Hero Section Final */}
-            {!hasActiveSearch && !showAllProducts && (
-              <section style={applyThemeStyles({
-                textAlign: 'center',
-                padding: '80px 20px',
-                marginTop: '80px',
-                background: getGradient('secondary'),
-                borderRadius: '24px',
-                color: 'white',
-                boxShadow: getShadow('large'),
-                position: 'relative',
-                overflow: 'hidden'
-              }, 'hero')}>
-                <div style={{
-                  position: 'absolute',
-                  top: '20px',
-                  right: '20px',
-                  fontSize: '80px',
-                  opacity: '0.1',
-                  transform: 'rotate(15deg)'
-                }}>🎴</div>
-                <div style={{
-                  position: 'absolute',
-                  bottom: '20px',
-                  left: '20px',
-                  fontSize: '60px',
-                  opacity: '0.1',
-                  transform: 'rotate(-15deg)'
-                }}>🌟</div>
-                
-                <h2 style={{
-                  fontSize: 'clamp(1.5rem, 3vw, 2.5rem)',
-                  fontWeight: '800',
-                  marginBottom: '16px',
-                  lineHeight: '1.2'
-                }}>
-                  <span style={{ fontSize: '40px', marginRight: '12px' }}>{pokemonConfig.icon}</span>
-                  Não Encontrou o Que Procurava?
-                </h2>
-
-                <p style={{
-                  fontSize: 'clamp(1rem, 2vw, 1.125rem)',
-                  marginBottom: '32px',
-                  opacity: '0.9',
-                  maxWidth: '500px',
-                  margin: '0 auto'
-                }}>
-                  Entre em contato conosco! Podemos ajudar a encontrar produtos especiais para sua coleção.
-                </p>
-                
-                <button
-                  onClick={() => window.open('https://wa.me/5592986446677', '_blank')}
-                  style={applyThemeStyles({
-                    padding: '16px 32px',
-                    background: 'rgba(255,255,255,0.2)',
-                    color: 'white',
-                    border: '2px solid rgba(255,255,255,0.3)',
-                    borderRadius: '12px',
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    backdropFilter: 'blur(10px)',
-                    transition: 'all 0.3s ease'
-                  }, 'button-secondary')}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
-                    e.currentTarget.style.border = '2px solid rgba(255,255,255,0.5)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
-                    e.currentTarget.style.border = '2px solid rgba(255,255,255,0.3)';
-                  }}
-                >
-                  💬 Falar no WhatsApp
-                </button>
-              </section>
-            )}
+           
           </>
         )}
       </main>
