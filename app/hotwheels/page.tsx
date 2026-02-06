@@ -10,6 +10,7 @@ import { carouselService } from '../lib/carouselService';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { Product, CartItem, CarouselConfig } from '../types';
 import { useCartContext } from '../contexts/CartContext';
+import HeroSectionWrapper from '../components/HeroSectionWrapper';
 
 export default function HotWheelsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -226,77 +227,10 @@ export default function HotWheelsPage() {
 
         {ready && (
           <>
-            {/* Hero Section */}
-            {!hasActiveSearch && !showAllProducts && (
-              <section style={applyThemeStyles({
-                textAlign: 'center',
-                padding: '80px 20px',
-                marginBottom: '40px',
-                background: getGradient('hero'),
-                borderRadius: '24px',
-                color: 'white',
-                boxShadow: getShadow('large'),
-                position: 'relative',
-                overflow: 'hidden'
-              }, 'hero')}>
-                <div style={{
-                  position: 'absolute',
-                  top: '20px',
-                  right: '20px',
-                  fontSize: '80px',
-                  opacity: '0.1',
-                  transform: 'rotate(15deg)'
-                }}>{hotWheelsConfig.icon}</div>
-                <div style={{
-                  position: 'absolute',
-                  bottom: '20px',
-                  left: '20px',
-                  fontSize: '60px',
-                  opacity: '0.1',
-                  transform: 'rotate(-15deg)'
-                }}>🏁</div>
-                
-                <h1 style={{
-                  fontSize: 'clamp(2rem, 4vw, 3rem)',
-                  fontWeight: '800',
-                  marginBottom: '16px',
-                  lineHeight: '1.2'
-                }}>
-                  <span style={{ fontSize: '48px', marginRight: '12px' }}>{hotWheelsConfig.icon}</span>
-                  Hot Wheels
-                </h1>
-
-                <p style={{
-                  fontSize: 'clamp(1rem, 2vw, 1.125rem)',
-                  marginBottom: '32px',
-                  opacity: '0.9',
-                  maxWidth: '500px',
-                  margin: '0 auto'
-                }}>
-                  Colecione os carrinhos mais incríveis! Velocidade, estilo e diversão em miniatura
-                </p>
-                
-                {/* 🆕 Botão de "Em breve: Filtros Avançados" */}
-                <button
-                  style={applyThemeStyles({
-                    padding: '16px 32px',
-                    background: 'rgba(255,255,255,0.2)',
-                    color: 'white',
-                    border: '2px solid rgba(255,255,255,0.3)',
-                    borderRadius: '12px',
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    backdropFilter: 'blur(10px)',
-                    transition: 'all 0.3s ease',
-                    opacity: '0.7'
-                  }, 'button-secondary')}
-                  disabled
-                >
-                  🔍 Filtros Avançados (Em Breve)
-                </button>
-              </section>
-            )}
+            {/* Hero Section Global */}
+<HeroSectionWrapper 
+  showHero={!hasActiveSearch && !showAllProducts}
+/>
 
             {/* 🆕 Seção simples de busca ativa */}
             {hasActiveSearch && !showAllProducts && (
@@ -691,84 +625,6 @@ export default function HotWheelsPage() {
                     />
                   </div>
                 )}
-              </section>
-            )}
-
-            {/* Hero Section Final */}
-            {!hasActiveSearch && !showAllProducts && (
-              <section style={applyThemeStyles({
-                textAlign: 'center',
-                padding: '80px 20px',
-                marginTop: '80px',
-                background: getGradient('secondary'),
-                borderRadius: '24px',
-                color: 'white',
-                boxShadow: getShadow('large'),
-                position: 'relative',
-                overflow: 'hidden'
-              }, 'hero')}>
-                <div style={{
-                  position: 'absolute',
-                  top: '20px',
-                  right: '20px',
-                  fontSize: '80px',
-                  opacity: '0.1',
-                  transform: 'rotate(15deg)'
-                }}>🏎️</div>
-                <div style={{
-                  position: 'absolute',
-                  bottom: '20px',
-                  left: '20px',
-                  fontSize: '60px',
-                  opacity: '0.1',
-                  transform: 'rotate(-15deg)'
-                }}>🌟</div>
-                
-                <h2 style={{
-                  fontSize: 'clamp(1.5rem, 3vw, 2.5rem)',
-                  fontWeight: '800',
-                  marginBottom: '16px',
-                  lineHeight: '1.2'
-                }}>
-                  <span style={{ fontSize: '40px', marginRight: '12px' }}>{hotWheelsConfig.icon}</span>
-                  Comece Sua Coleção de Hot Wheels!
-                </h2>
-
-                <p style={{
-                  fontSize: 'clamp(1rem, 2vw, 1.125rem)',
-                  marginBottom: '32px',
-                  opacity: '0.9',
-                  maxWidth: '500px',
-                  margin: '0 auto'
-                }}>
-                  Descubra modelos raros, edições limitadas e os carrinhos mais desejados do mundo!
-                </p>
-                
-                <button
-                  onClick={() => window.open('https://wa.me/5592986446677', '_blank')}
-                  style={applyThemeStyles({
-                    padding: '16px 32px',
-                    background: 'rgba(255,255,255,0.2)',
-                    color: 'white',
-                    border: '2px solid rgba(255,255,255,0.3)',
-                    borderRadius: '12px',
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    backdropFilter: 'blur(10px)',
-                    transition: 'all 0.3s ease'
-                  }, 'button-secondary')}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
-                    e.currentTarget.style.border = '2px solid rgba(255,255,255,0.5)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
-                    e.currentTarget.style.border = '2px solid rgba(255,255,255,0.3)';
-                  }}
-                >
-                  💬 Falar no WhatsApp
-                </button>
               </section>
             )}
           </>

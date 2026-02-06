@@ -156,7 +156,9 @@ export default function HomePage() {
         )}
 
         {/* Hero Section Global */}
-<HeroSectionWrapper />
+<HeroSectionWrapper 
+  showHero={!hasActiveSearch}
+/>
 
             {/* SEÇÃO DE NOVOS LANÇAMENTOS - CARROSSEL HORIZONTAL COM TEMAS */}
             {!hasActiveSearch && newArrivals.length > 0 && (
