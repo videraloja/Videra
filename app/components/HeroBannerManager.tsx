@@ -1,4 +1,3 @@
-// app/admin/themes/components/HeroBannerManager.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -10,12 +9,14 @@ export default function HeroBannerManager() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingBanner, setEditingBanner] = useState<HeroBanner | null>(null);
-  const [uploading, setUploading] = useState(false);
+  const [uploadingDesktop, setUploadingDesktop] = useState(false);
+  const [uploadingMobile, setUploadingMobile] = useState(false);
   const [reordering, setReordering] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
     image_url: '',
+    image_mobile_url: '',
     link_url: '',
     is_active: true,
     transition_time: 5,
@@ -49,95 +50,105 @@ export default function HeroBannerManager() {
     }
   };
 
-  const handleUploadImage = async (file: File) => {
+  const handleUploadImage = async (file: File, type: 'desktop' | 'mobile') => {
     if (!file) return;
     
-    setUploading(true);
+    if (type === 'desktop') setUploadingDesktop(true);
+    else setUploadingMobile(true);
+    
     try {
-      const imageUrl = await heroBannerService.uploadImage(file);
+      const prefix = type === 'desktop' ? 'hero-banner' : 'hero-banner-mobile';
+      const imageUrl = await heroBannerService.uploadImage(file, prefix);
+      
       if (imageUrl) {
-        setFormData(prev => ({ ...prev, image_url: imageUrl }));
-        alert('✅ Imagem enviada com sucesso!');
+        if (type === 'desktop') {
+          setFormData(prev => ({ ...prev, image_url: imageUrl }));
+        } else {
+          setFormData(prev => ({ ...prev, image_mobile_url: imageUrl }));
+        }
+        alert(`✅ Imagem ${type === 'desktop' ? 'desktop' : 'mobile'} enviada com sucesso!`);
       }
     } catch (error) {
       console.error('Erro no upload:', error);
       alert('❌ Erro ao fazer upload da imagem');
     } finally {
-      setUploading(false);
+      if (type === 'desktop') setUploadingDesktop(false);
+      else setUploadingMobile(false);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  
-  if (!formData.image_url) {
-    alert('❌ Por favor, faça upload de uma imagem');
-    return;
-  }
-  
-  if (!formData.link_url) {
-    alert('❌ Por favor, informe a URL de destino');
-    return;
-  }
-  
-  try {
-    // Preparar dados para envio - converter string vazia para undefined
-    const bannerData: Omit<HeroBanner, 'id' | 'created_at'> = {
-      image_url: formData.image_url,
-      link_url: formData.link_url,
-      is_active: formData.is_active,
-      transition_time: formData.transition_time,
-      display_order: editingBanner ? editingBanner.display_order : 0, // Será sobrescrito abaixo
-      start_date: formData.start_date || undefined, // String vazia → undefined
-      end_date: formData.end_date || undefined,     // String vazia → undefined
-    };
+    e.preventDefault();
     
-    if (editingBanner) {
-      await heroBannerService.updateBanner(editingBanner.id, bannerData);
-      alert('✅ Banner atualizado com sucesso!');
-    } else {
-      // Calcular próxima ordem
-      const nextOrder = heroBanners.length > 0 
-        ? Math.max(...heroBanners.map(b => b.display_order)) + 1 
-        : 0;
-      
-      await heroBannerService.createBanner({
-        ...bannerData,
-        display_order: nextOrder
-      });
-      alert('✅ Banner criado com sucesso!');
+    if (!formData.image_url) {
+      alert('❌ Por favor, faça upload da imagem desktop');
+      return;
     }
     
-    setShowForm(false);
-    setEditingBanner(null);
-    setFormData({
-      image_url: '',
-      link_url: '',
-      is_active: true,
-      transition_time: 5,
-      start_date: '',
-      end_date: ''
-    });
+    if (!formData.link_url) {
+      alert('❌ Por favor, informe a URL de destino');
+      return;
+    }
     
-    loadBanners();
-  } catch (error) {
-    console.error('Erro ao salvar banner:', error);
-    alert('❌ Erro ao salvar banner');
-  }
-};
+    try {
+      const bannerData: Omit<HeroBanner, 'id' | 'created_at'> = {
+        image_url: formData.image_url,
+        image_mobile_url: formData.image_mobile_url || null,
+        link_url: formData.link_url,
+        is_active: formData.is_active,
+        transition_time: formData.transition_time,
+        display_order: editingBanner ? editingBanner.display_order : 0,
+        start_date: formData.start_date || undefined,
+        end_date: formData.end_date || undefined,
+      };
+      
+      if (editingBanner) {
+        await heroBannerService.updateBanner(editingBanner.id, bannerData);
+        alert('✅ Banner atualizado com sucesso!');
+      } else {
+        const nextOrder = heroBanners.length > 0 
+          ? Math.max(...heroBanners.map(b => b.display_order)) + 1 
+          : 0;
+        
+        await heroBannerService.createBanner({
+          ...bannerData,
+          display_order: nextOrder
+        });
+        alert('✅ Banner criado com sucesso!');
+      }
+      
+      setShowForm(false);
+      setEditingBanner(null);
+      setFormData({
+        image_url: '',
+        image_mobile_url: '',
+        link_url: '',
+        is_active: true,
+        transition_time: 5,
+        start_date: '',
+        end_date: ''
+      });
+      
+      loadBanners();
+    } catch (error) {
+      console.error('Erro ao salvar banner:', error);
+      alert('❌ Erro ao salvar banner');
+    }
+  };
 
   const handleEdit = (banner: HeroBanner) => {
-  setEditingBanner(banner);
-  setFormData({
-    image_url: banner.image_url,
-    link_url: banner.link_url,
-    is_active: banner.is_active,
-    transition_time: banner.transition_time,
-    start_date: banner.start_date || '', // undefined/null → string vazia
-    end_date: banner.end_date || '',     // undefined/null → string vazia
-  });
-  setShowForm(true);
-};
+    setEditingBanner(banner);
+    setFormData({
+      image_url: banner.image_url,
+      image_mobile_url: banner.image_mobile_url || '',
+      link_url: banner.link_url,
+      is_active: banner.is_active,
+      transition_time: banner.transition_time,
+      start_date: banner.start_date || '',
+      end_date: banner.end_date || '',
+    });
+    setShowForm(true);
+  };
 
   const handleDelete = async (id: string) => {
     if (confirm('⚠️ Tem certeza que deseja excluir este banner?\nEsta ação não pode ser desfeita.')) {
@@ -169,41 +180,15 @@ export default function HeroBannerManager() {
     }
   };
 
-  const handleReorder = async (startIndex: number, endIndex: number) => {
-    const items = Array.from(heroBanners);
-    const [removed] = items.splice(startIndex, 1);
-    items.splice(endIndex, 0, removed);
-    
-    // Atualizar ordem localmente
-    const reorderedItems = items.map((item, index) => ({
-      ...item,
-      display_order: index
-    }));
-    
-    setHeroBanners(reorderedItems);
-    setReordering(true);
-    
+  const formatDate = (dateString?: string | null) => {
+    if (!dateString) return 'Sem data';
     try {
-      await heroBannerService.reorderBanners(reorderedItems.map(item => item.id));
-      alert('✅ Ordem atualizada com sucesso!');
-    } catch (error) {
-      console.error('Erro ao salvar ordem:', error);
-      alert('❌ Erro ao salvar nova ordem');
-      loadBanners(); // Recarregar ordem original
-    } finally {
-      setReordering(false);
+      return new Date(dateString).toLocaleDateString('pt-BR');
+    } catch {
+      return 'Data inválida';
     }
   };
 
-  // Formatação da data
-const formatDate = (dateString?: string | null) => {  // ← ACEITA null também
-  if (!dateString) return 'Sem data';
-  try {
-    return new Date(dateString).toLocaleDateString('pt-BR');
-  } catch {
-    return 'Data inválida';
-  }
-};
   return (
     <div style={{ marginTop: '20px' }}>
       <div style={{
@@ -228,6 +213,7 @@ const formatDate = (dateString?: string | null) => {  // ← ACEITA null também
               setEditingBanner(null);
               setFormData({
                 image_url: '',
+                image_mobile_url: '',
                 link_url: '',
                 is_active: true,
                 transition_time: 5,
@@ -249,14 +235,6 @@ const formatDate = (dateString?: string | null) => {  // ← ACEITA null também
               alignItems: 'center',
               gap: '6px',
               transition: 'all 0.2s ease'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#6d28d9';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#7c3aed';
-              e.currentTarget.style.transform = 'translateY(0)';
             }}
           >
             ➕ Adicionar Banner
@@ -284,7 +262,7 @@ const formatDate = (dateString?: string | null) => {  // ← ACEITA null também
               borderRadius: '12px',
               boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
               width: '100%',
-              maxWidth: '600px',
+              maxWidth: '700px',
               maxHeight: '90vh',
               overflowY: 'auto'
             }}>
@@ -315,7 +293,7 @@ const formatDate = (dateString?: string | null) => {  // ← ACEITA null também
               </div>
               
               <form onSubmit={handleSubmit}>
-                {/* Upload de imagem */}
+                {/* Imagem Desktop */}
                 <div style={{ marginBottom: '20px' }}>
                   <label style={{
                     display: 'block',
@@ -324,55 +302,46 @@ const formatDate = (dateString?: string | null) => {  // ← ACEITA null também
                     color: '#374151',
                     marginBottom: '8px'
                   }}>
-                    Imagem do Banner *
+                    🖥️ Imagem Desktop *
                   </label>
                   
                   {formData.image_url && (
                     <div style={{ marginBottom: '16px' }}>
                       <div style={{
                         width: '100%',
-                        height: '200px',
+                        height: '180px',
                         position: 'relative',
                         borderRadius: '8px',
                         overflow: 'hidden',
                         marginBottom: '12px',
-                        border: '2px solid #e5e7eb'
+                        border: '2px solid #e5e7eb',
+                        background: '#f3f4f6'
                       }}>
                         <img 
                           src={formData.image_url} 
-                          alt="Preview" 
+                          alt="Preview Desktop" 
                           style={{
                             width: '100%',
                             height: '100%',
-                            objectFit: 'cover'
+                            objectFit: 'contain',
+                            background: '#f3f4f6'
                           }}
                         />
-                      </div>
-                      <div style={{
-                        fontSize: '12px',
-                        color: '#6b7280',
-                        wordBreak: 'break-all',
-                        padding: '8px',
-                        background: '#f9fafb',
-                        borderRadius: '4px'
-                      }}>
-                        {formData.image_url}
                       </div>
                     </div>
                   )}
                   
                   <input
                     type="file"
-                    accept="image/jpeg,image/jpg,image/png"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) {
-                        // Verificar tamanho (max 5MB)
                         if (file.size > 5 * 1024 * 1024) {
                           alert('❌ Arquivo muito grande. Máximo: 5MB');
                           return;
                         }
-                        handleUploadImage(file);
+                        handleUploadImage(file, 'desktop');
                       }
                     }}
                     style={{
@@ -381,33 +350,97 @@ const formatDate = (dateString?: string | null) => {  // ← ACEITA null também
                       border: '1px solid #d1d5db',
                       borderRadius: '6px',
                       fontSize: '14px',
-                      background: uploading ? '#f3f4f6' : 'white'
+                      background: uploadingDesktop ? '#f3f4f6' : 'white'
                     }}
-                    disabled={uploading}
+                    disabled={uploadingDesktop}
                   />
                   
-                  {uploading && (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      marginTop: '8px',
-                      fontSize: '14px',
-                      color: '#6b7280'
-                    }}>
-                      <div style={{ 
-                        animation: 'spin 1s linear infinite',
-                        fontSize: '16px'
-                      }}>
-                        🔄
-                      </div>
-                      Fazendo upload...
+                  {uploadingDesktop && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', fontSize: '14px', color: '#6b7280' }}>
+                      <div style={{ animation: 'spin 1s linear infinite' }}>🔄</div>
+                      Enviando imagem desktop...
                     </div>
                   )}
                   
                   <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px', lineHeight: '1.4' }}>
                     <strong>📐 Dimensão recomendada:</strong> 1920x600px (16:5)<br/>
-                    <strong>📦 Formato:</strong> JPG ou PNG<br/>
+                    <strong>📦 Formato:</strong> JPG, PNG ou WebP<br/>
+                    <strong>⚡ Tamanho máximo:</strong> 5MB
+                  </p>
+                </div>
+
+                {/* Imagem Mobile */}
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: '#374151',
+                    marginBottom: '8px'
+                  }}>
+                    📱 Imagem Mobile (opcional)
+                  </label>
+                  
+                  {formData.image_mobile_url && (
+                    <div style={{ marginBottom: '16px' }}>
+                      <div style={{
+                        width: '100%',
+                        height: '180px',
+                        position: 'relative',
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                        marginBottom: '12px',
+                        border: '2px solid #e5e7eb',
+                        background: '#f3f4f6'
+                      }}>
+                        <img 
+                          src={formData.image_mobile_url} 
+                          alt="Preview Mobile" 
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'contain',
+                            background: '#f3f4f6'
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        if (file.size > 5 * 1024 * 1024) {
+                          alert('❌ Arquivo muito grande. Máximo: 5MB');
+                          return;
+                        }
+                        handleUploadImage(file, 'mobile');
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      background: uploadingMobile ? '#f3f4f6' : 'white'
+                    }}
+                    disabled={uploadingMobile}
+                  />
+                  
+                  {uploadingMobile && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', fontSize: '14px', color: '#6b7280' }}>
+                      <div style={{ animation: 'spin 1s linear infinite' }}>🔄</div>
+                      Enviando imagem mobile...
+                    </div>
+                  )}
+                  
+                  <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px', lineHeight: '1.4' }}>
+                    <strong>📐 Dimensão recomendada:</strong> 750x600px (5:4) ou 750x422px (16:9)<br/>
+                    <strong>💡 Dica:</strong> Se não enviar, usará a imagem desktop no mobile<br/>
                     <strong>⚡ Tamanho máximo:</strong> 5MB
                   </p>
                 </div>
@@ -421,7 +454,7 @@ const formatDate = (dateString?: string | null) => {  // ← ACEITA null também
                     color: '#374151',
                     marginBottom: '8px'
                   }}>
-                    URL de Destino *
+                    🔗 URL de Destino *
                   </label>
                   <input
                     type="text"
@@ -437,10 +470,6 @@ const formatDate = (dateString?: string | null) => {  // ← ACEITA null também
                       fontSize: '14px'
                     }}
                   />
-                  <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>
-                    Para páginas internas use: /nome-da-pagina (ex: /pokemontcg)<br/>
-                    Para links externos use: https://exemplo.com
-                  </p>
                 </div>
 
                 {/* Tempo de transição */}
@@ -452,7 +481,7 @@ const formatDate = (dateString?: string | null) => {  // ← ACEITA null também
                     color: '#374151',
                     marginBottom: '8px'
                   }}>
-                    Tempo de Transição (segundos)
+                    ⏱️ Tempo de Transição (segundos)
                   </label>
                   <select
                     value={formData.transition_time}
@@ -472,9 +501,6 @@ const formatDate = (dateString?: string | null) => {  // ← ACEITA null também
                     <option value="7">7 segundos</option>
                     <option value="10">10 segundos</option>
                   </select>
-                  <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>
-                    Quanto tempo cada banner fica visível antes de trocar automaticamente
-                  </p>
                 </div>
 
                 {/* Datas opcionais */}
@@ -492,7 +518,7 @@ const formatDate = (dateString?: string | null) => {  // ← ACEITA null também
                       color: '#374151',
                       marginBottom: '8px'
                     }}>
-                      Data de Início (opcional)
+                      📅 Data de Início (opcional)
                     </label>
                     <input
                       type="datetime-local"
@@ -516,7 +542,7 @@ const formatDate = (dateString?: string | null) => {  // ← ACEITA null também
                       color: '#374151',
                       marginBottom: '8px'
                     }}>
-                      Data de Término (opcional)
+                      📅 Data de Término (opcional)
                     </label>
                     <input
                       type="datetime-local"
@@ -532,9 +558,6 @@ const formatDate = (dateString?: string | null) => {  // ← ACEITA null também
                     />
                   </div>
                 </div>
-                <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '20px' }}>
-                  ⏰ Use datas para banners temporários (promoções sazonais). Deixe em branco para banner permanente.
-                </p>
 
                 {/* Status */}
                 <div style={{ marginBottom: '24px' }}>
@@ -555,7 +578,7 @@ const formatDate = (dateString?: string | null) => {  // ← ACEITA null também
                       }}
                     />
                     <span style={{ fontSize: '14px', color: '#374151' }}>
-                      Banner ativo (visível no site)
+                      ✅ Banner ativo (visível no site)
                     </span>
                   </label>
                 </div>
@@ -575,14 +598,6 @@ const formatDate = (dateString?: string | null) => {  // ← ACEITA null também
                       fontWeight: '600',
                       cursor: 'pointer',
                       transition: 'all 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#059669';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = '#10b981';
-                      e.currentTarget.style.transform = 'translateY(0)';
                     }}
                   >
                     {editingBanner ? '💾 Salvar Alterações' : '✅ Criar Banner'}
@@ -606,14 +621,6 @@ const formatDate = (dateString?: string | null) => {  // ← ACEITA null também
                       cursor: 'pointer',
                       transition: 'all 0.2s ease'
                     }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#4b5563';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = '#6b7280';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                    }}
                   >
                     Cancelar
                   </button>
@@ -626,16 +633,8 @@ const formatDate = (dateString?: string | null) => {  // ← ACEITA null também
         {/* Lista de banners */}
         {loading ? (
           <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-            <div style={{ 
-              fontSize: '48px', 
-              marginBottom: '16px',
-              animation: 'pulse 2s infinite'
-            }}>
-              🖼️
-            </div>
-            <p style={{ color: '#6b7280', fontSize: '16px' }}>
-              Carregando banners...
-            </p>
+            <div style={{ fontSize: '48px', marginBottom: '16px', animation: 'pulse 2s infinite' }}>🖼️</div>
+            <p style={{ color: '#6b7280', fontSize: '16px' }}>Carregando banners...</p>
           </div>
         ) : heroBanners.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px' }}>
@@ -656,46 +655,19 @@ const formatDate = (dateString?: string | null) => {  // ← ACEITA null também
               gap: '12px',
               marginBottom: '24px'
             }}>
-              <div style={{
-                background: '#f0f9ff',
-                padding: '16px',
-                borderRadius: '8px',
-                border: '1px solid #bae6fd'
-              }}>
-                <div style={{ fontSize: '12px', color: '#0369a1', marginBottom: '4px' }}>
-                  Total
-                </div>
-                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#0284c7' }}>
-                  {heroBanners.length}
-                </div>
+              <div style={{ background: '#f0f9ff', padding: '16px', borderRadius: '8px', border: '1px solid #bae6fd' }}>
+                <div style={{ fontSize: '12px', color: '#0369a1', marginBottom: '4px' }}>Total</div>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#0284c7' }}>{heroBanners.length}</div>
               </div>
               
-              <div style={{
-                background: '#f0fdf4',
-                padding: '16px',
-                borderRadius: '8px',
-                border: '1px solid #bbf7d0'
-              }}>
-                <div style={{ fontSize: '12px', color: '#059669', marginBottom: '4px' }}>
-                  Ativos
-                </div>
-                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981' }}>
-                  {heroBanners.filter(b => b.is_active).length}
-                </div>
+              <div style={{ background: '#f0fdf4', padding: '16px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                <div style={{ fontSize: '12px', color: '#059669', marginBottom: '4px' }}>Ativos</div>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981' }}>{heroBanners.filter(b => b.is_active).length}</div>
               </div>
               
-              <div style={{
-                background: '#fef2f2',
-                padding: '16px',
-                borderRadius: '8px',
-                border: '1px solid #fecaca'
-              }}>
-                <div style={{ fontSize: '12px', color: '#dc2626', marginBottom: '4px' }}>
-                  Inativos
-                </div>
-                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ef4444' }}>
-                  {heroBanners.filter(b => !b.is_active).length}
-                </div>
+              <div style={{ background: '#fef2f2', padding: '16px', borderRadius: '8px', border: '1px solid #fecaca' }}>
+                <div style={{ fontSize: '12px', color: '#dc2626', marginBottom: '4px' }}>Inativos</div>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ef4444' }}>{heroBanners.filter(b => !b.is_active).length}</div>
               </div>
             </div>
 
@@ -717,35 +689,26 @@ const formatDate = (dateString?: string | null) => {  // ← ACEITA null também
                     display: 'flex',
                     alignItems: 'center',
                     gap: '16px',
-                    transition: 'all 0.2s ease'
+                    flexWrap: 'wrap'
                   }}
                 >
-                  {/* Ícone de ordem */}
-                  <div style={{
-                    color: '#9ca3af',
-                    fontSize: '16px',
-                    fontWeight: 'bold',
-                    minWidth: '24px'
-                  }}>
+                  <div style={{ color: '#9ca3af', fontSize: '16px', fontWeight: 'bold', minWidth: '24px' }}>
                     {banner.display_order + 1}
                   </div>
                   
-                  {/* Preview da imagem */}
+                  {/* Preview Desktop */}
                   <div style={{
-                    width: '100px',
-                    height: '50px',
+                    width: '80px',
+                    height: '45px',
                     borderRadius: '6px',
                     overflow: 'hidden',
                     flexShrink: 0,
                     border: '1px solid #e5e7eb',
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => window.open(banner.image_url, '_blank')}
-                  title="Clique para ver em tamanho real"
-                  >
+                    background: '#f3f4f6'
+                  }}>
                     <img 
                       src={banner.image_url} 
-                      alt="Banner"
+                      alt="Desktop"
                       style={{
                         width: '100%',
                         height: '100%',
@@ -753,11 +716,35 @@ const formatDate = (dateString?: string | null) => {  // ← ACEITA null também
                       }}
                     />
                   </div>
+
+                  {/* Preview Mobile (se existir) */}
+                  <div style={{
+                    width: '40px',
+                    height: '45px',
+                    borderRadius: '6px',
+                    overflow: 'hidden',
+                    flexShrink: 0,
+                    border: '1px solid #e5e7eb',
+                    background: '#f3f4f6'
+                  }}>
+                    <img 
+                      src={banner.image_mobile_url || banner.image_url} 
+                      alt="Mobile"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover'
+                      }}
+                    />
+                    {!banner.image_mobile_url && (
+                      <div style={{ fontSize: '8px', textAlign: 'center', background: '#fef3c7' }}>usa desktop</div>
+                    )}
+                  </div>
                   
                   {/* Informações */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ flex: 1, minWidth: '150px' }}>
                     <div style={{ 
-                      fontSize: '14px', 
+                      fontSize: '13px', 
                       fontWeight: '500', 
                       marginBottom: '4px',
                       whiteSpace: 'nowrap',
@@ -766,16 +753,9 @@ const formatDate = (dateString?: string | null) => {  // ← ACEITA null também
                     }}>
                       {banner.link_url}
                     </div>
-                    <div style={{ 
-                      fontSize: '12px', 
-                      color: '#6b7280',
-                      display: 'flex',
-                      gap: '12px',
-                      flexWrap: 'wrap'
-                    }}>
+                    <div style={{ fontSize: '11px', color: '#6b7280', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       <span>🕒 {banner.transition_time}s</span>
                       <span>📅 {formatDate(banner.start_date)} → {formatDate(banner.end_date)}</span>
-                      <span>🆔 {banner.id.substring(0, 8)}...</span>
                     </div>
                   </div>
                   
@@ -787,104 +767,28 @@ const formatDate = (dateString?: string | null) => {  // ← ACEITA null também
                     color: banner.is_active ? '#065f46' : '#6b7280',
                     fontSize: '11px',
                     fontWeight: '600',
-                    border: `1px solid ${banner.is_active ? '#a7f3d0' : '#e5e7eb'}`,
                     whiteSpace: 'nowrap'
                   }}>
                     {banner.is_active ? '✅ ATIVO' : '⏸️ INATIVO'}
                   </div>
                   
                   {/* Ações */}
-                  <div style={{ 
-                    display: 'flex', 
-                    gap: '8px',
-                    flexShrink: 0
-                  }}>
-                    <button
-                      onClick={() => handleEdit(banner)}
-                      style={{
-                        background: '#e0e7ff',
-                        color: '#3730a3',
-                        border: '1px solid #c7d2fe',
-                        padding: '6px 12px',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        fontWeight: '500',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        transition: 'all 0.2s ease'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#c7d2fe';
-                        e.currentTarget.style.transform = 'translateY(-1px)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = '#e0e7ff';
-                        e.currentTarget.style.transform = 'translateY(0)';
-                      }}
-                      title="Editar banner"
-                    >
-                      ✏️ Editar
-                    </button>
+                  <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                    <button onClick={() => handleEdit(banner)} style={{
+                      background: '#e0e7ff', color: '#3730a3', border: '1px solid #c7d2fe',
+                      padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer'
+                    }}>✏️</button>
                     
-                    <button
-                      onClick={() => handleToggleActive(banner)}
-                      style={{
-                        background: banner.is_active ? '#fef3c7' : '#d1fae5',
-                        color: banner.is_active ? '#92400e' : '#065f46',
-                        border: `1px solid ${banner.is_active ? '#fde68a' : '#a7f3d0'}`,
-                        padding: '6px 12px',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        fontWeight: '500',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        transition: 'all 0.2s ease'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = banner.is_active ? '#fde68a' : '#a7f3d0';
-                        e.currentTarget.style.transform = 'translateY(-1px)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = banner.is_active ? '#fef3c7' : '#d1fae5';
-                        e.currentTarget.style.transform = 'translateY(0)';
-                      }}
-                      title={banner.is_active ? 'Desativar banner' : 'Ativar banner'}
-                    >
-                      {banner.is_active ? '⏸️ Desativar' : '▶️ Ativar'}
-                    </button>
+                    <button onClick={() => handleToggleActive(banner)} style={{
+                      background: banner.is_active ? '#fef3c7' : '#d1fae5',
+                      color: banner.is_active ? '#92400e' : '#065f46',
+                      padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer'
+                    }}>{banner.is_active ? '⏸️' : '▶️'}</button>
                     
-                    <button
-                      onClick={() => handleDelete(banner.id)}
-                      style={{
-                        background: '#fee2e2',
-                        color: '#dc2626',
-                        border: '1px solid #fecaca',
-                        padding: '6px 12px',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        fontWeight: '500',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        transition: 'all 0.2s ease'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#fecaca';
-                        e.currentTarget.style.transform = 'translateY(-1px)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = '#fee2e2';
-                        e.currentTarget.style.transform = 'translateY(0)';
-                      }}
-                      title="Excluir banner permanentemente"
-                    >
-                      🗑️ Excluir
-                    </button>
+                    <button onClick={() => handleDelete(banner.id)} style={{
+                      background: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca',
+                      padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer'
+                    }}>🗑️</button>
                   </div>
                 </div>
               ))}
@@ -898,16 +802,14 @@ const formatDate = (dateString?: string | null) => {  // ← ACEITA null também
               borderRadius: '12px',
               color: 'white'
             }}>
-              <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                💡 Como usar os Hero Banners
+              <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>
+                💡 Dicas para imagens responsivas
               </h4>
-              <ul style={{ fontSize: '14px', paddingLeft: '20px', lineHeight: '1.6', opacity: '0.9' }}>
-                <li>Os banners aparecem como carrossel automático em <strong>todas as páginas do site</strong></li>
-                <li>Clique em "Adicionar Banner" para criar novos banners promocionais</li>
-                <li>Use a <strong>ordem numérica</strong> para controlar a sequência de exibição</li>
-                <li>Banners <strong>inativos não são exibidos</strong> no site</li>
-                <li>Use <strong>datas</strong> para banners temporários (promoções sazonais)</li>
-                <li><strong>Dimensão ideal:</strong> 1920x600px • <strong>Formato:</strong> JPG ou PNG</li>
+              <ul style={{ fontSize: '14px', paddingLeft: '20px', lineHeight: '1.6' }}>
+                <li><strong>Desktop:</strong> 1920x600px (16:5) - imagem horizontal completa</li>
+                <li><strong>Mobile:</strong> 750x600px (5:4) ou 750x422px (16:9) - imagem mais alta</li>
+                <li><strong>Dica:</strong> No mobile, centralize o texto e use letras maiores</li>
+                <li><strong>Se não enviar imagem mobile</strong>, usará a imagem desktop redimensionada</li>
               </ul>
             </div>
           </div>
@@ -918,7 +820,6 @@ const formatDate = (dateString?: string | null) => {  // ← ACEITA null também
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
           }
-          
           @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }

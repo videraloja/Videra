@@ -1,14 +1,14 @@
-// lib/heroBannerService.ts
 import { supabase } from './supabaseClient';
 
 export interface HeroBanner {
   id: string;
   image_url: string;
+  image_mobile_url?: string | null; // NOVO: imagem específica para mobile
   link_url: string;
   is_active: boolean;
   display_order: number;
-  transition_time: number; // 3-5 segundos
-   start_date?: string | null; // ← ACEITA string OU null
+  transition_time: number;
+  start_date?: string | null;
   end_date?: string | null;
   created_at: string;
 }
@@ -25,6 +25,13 @@ const sanitizeDates = (data: any): any => {
   if (sanitized.end_date === '') {
     sanitized.end_date = null;
   }
+  
+  // Remover campos undefined
+  Object.keys(sanitized).forEach(key => {
+    if (sanitized[key] === undefined) {
+      delete sanitized[key];
+    }
+  });
   
   return sanitized;
 };
@@ -51,8 +58,8 @@ export const heroBannerService = {
   },
 
   // Upload de imagem
-  async uploadImage(file: File): Promise<string | null> {
-    const fileName = `hero-banner-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+  async uploadImage(file: File, prefix: string = 'hero-banner'): Promise<string | null> {
+    const fileName = `${prefix}-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
     const filePath = `hero-banners/${fileName}`;
     
     const { data, error } = await supabase.storage
@@ -60,7 +67,7 @@ export const heroBannerService = {
       .upload(filePath, file, {
         cacheControl: '3600',
         upsert: false,
-        contentType: 'image/jpeg'
+        contentType: file.type
       });
     
     if (error) {

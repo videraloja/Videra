@@ -23,6 +23,17 @@ export default function HeroSection({
   const [error, setError] = useState<string | null>(null);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detectar mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Carregar banners
   useEffect(() => {
@@ -104,6 +115,12 @@ export default function HeroSection({
   }
 
   const currentBanner = banners[currentIndex];
+  
+  // Escolhe a imagem certa para o dispositivo
+  // Se for mobile E tiver imagem mobile específica, usa ela. Senão, usa a desktop
+  const imageUrl = isMobile && currentBanner.image_mobile_url 
+    ? currentBanner.image_mobile_url 
+    : currentBanner.image_url;
 
   return (
     <section 
@@ -121,7 +138,7 @@ export default function HeroSection({
       >
         <div className="hero-image-wrapper">
           <Image
-            src={currentBanner.image_url}
+            src={imageUrl}
             alt="Banner promocional"
             fill
             className="hero-image"
@@ -203,9 +220,8 @@ export default function HeroSection({
         }
 
         .hero-image {
-          object-fit: contain;
+          object-fit: cover;
           object-position: center;
-          background-color: #0a0a2a;
         }
 
         /* Desktop (>= 1200px) */
@@ -226,17 +242,25 @@ export default function HeroSection({
         /* Mobile (<= 767px) */
         @media (max-width: 767px) {
           .hero-section {
-            height: auto;
+            height: 400px;
             border-radius: 16px;
             margin-bottom: 24px;
           }
+        }
 
-          .hero-image-wrapper {
-            aspect-ratio: 16 / 5;
+        /* Mobile pequeno (<= 480px) */
+        @media (max-width: 480px) {
+          .hero-section {
+            height: 350px;
+            border-radius: 12px;
+            margin-bottom: 20px;
           }
+        }
 
-          .hero-image {
-            object-fit: contain;
+        /* Mobile muito pequeno (<= 380px) */
+        @media (max-width: 380px) {
+          .hero-section {
+            height: 300px;
           }
         }
 
