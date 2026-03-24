@@ -183,16 +183,7 @@ export default function HomePage() {
                   </h2>
                   
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <div style={applyThemeStyles({
-                      padding: '8px 16px',
-                      background: colors.primary + '20',
-                      color: colors.primary,
-                      borderRadius: '20px',
-                      fontSize: '14px',
-                      fontWeight: '600'
-                    }, 'card')}>
-                      ✨ {newArrivals.length} novos
-                    </div>
+                    
                     
                     {/* Botões de navegação do carrossel COM TEMAS */}
                     <div style={{ display: 'flex', gap: '8px' }}>
@@ -344,16 +335,7 @@ export default function HomePage() {
                   </h2>
                   
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <div style={applyThemeStyles({
-                      padding: '8px 16px',
-                      background: colors.accent + '20',
-                      color: colors.accent,
-                      borderRadius: '20px',
-                      fontSize: '14px',
-                      fontWeight: '600'
-                    }, 'card')}>
-                      🎯 {bestSellers.length} populares
-                    </div>
+                    
                     
                     {/* Botões de navegação do carrossel COM TEMAS */}
                     <div style={{ display: 'flex', gap: '8px' }}>
@@ -507,16 +489,8 @@ export default function HomePage() {
                 
                 {!hasActiveSearch && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <div style={applyThemeStyles({
-                      padding: '8px 16px',
-                      background: colors.secondary,
-                      color: colors.text,
-                      borderRadius: '20px',
-                      fontSize: '14px',
-                      fontWeight: '600'
-                    }, 'card')}>
-                      {featuredProducts.length} produtos
-                    </div>
+                    
+              
                     
                     {/* Botões de navegação do carrossel COM TEMAS */}
                     {!hasActiveSearch && featuredProducts.length > 4 && (
