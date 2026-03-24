@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabaseClient';
 import CarouselEditor from '../../components/CarouselEditor';
 import AuthGuard from '../../components/AuthGuard'; // 🆕 IMPORT DO AUTHGUARD
 import HeroBannerManager from '../../components/HeroBannerManager';
+import PromotionalPageManager from '../../components/PromotionalPageManager';
 
 function ThemesAdminPageContent() {
   const { allThemes, activateSeasonalTheme, deactivateSeasonalTheme, currentThemeConfig, isLoading, createNewTheme, deleteTheme } = useTheme();
@@ -23,7 +24,7 @@ function ThemesAdminPageContent() {
   const [newThemeName, setNewThemeName] = useState('');
   const [baseThemeId, setBaseThemeId] = useState('default');
   const [isCreating, setIsCreating] = useState(false);
-  const [activeSection, setActiveSection] = useState<'themes' | 'editor' | 'carrosséis' | 'hero'>('themes');
+  const [activeSection, setActiveSection] = useState<'themes' | 'editor' | 'carrosséis' | 'hero' | 'promo'>('themes');
   const [isActivating, setIsActivating] = useState<string | null>(null);
 
   const handleActivateTheme = async (themeId: string, themeName: string) => {
@@ -600,6 +601,7 @@ function ThemesAdminPageContent() {
   </div>
 );
 
+
   return (
     <div style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}>
       <div style={{ marginBottom: '30px' }}>
@@ -691,6 +693,24 @@ function ThemesAdminPageContent() {
 >
   🖼️ Hero Banners
 </button>
+{/* 🆕 ADICIONE ESTE BOTÃO DEPOIS DO BOTÃO "HERO BANNERS": */}
+<button
+  onClick={() => setActiveSection('promo')}
+  style={{
+    flex: 1,
+    padding: '12px 16px',
+    background: activeSection === 'promo' ? '#7c3aed' : 'transparent',
+    color: activeSection === 'promo' ? 'white' : '#6b7280',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease'
+  }}
+>
+  🔥 Promoções
+</button>
         </div>
       </div>
 
@@ -758,6 +778,7 @@ function ThemesAdminPageContent() {
                 );
               })}
             </div>
+          
 
             <button
               onClick={() => setShowPageModal(false)}
@@ -1013,10 +1034,15 @@ function ThemesAdminPageContent() {
       {activeSection === 'editor' && renderEditorSection()}
       {activeSection === 'carrosséis' && renderCarouselsSection()}
       {activeSection === 'hero' && renderHeroSection()}
-    </div>
+      {activeSection === 'promo' && (
+  <div style={{ marginTop: '20px' }}>
+    <PromotionalPageManager />
+   </div>
+      )}
+      
+    </div> 
   );
 }
-
 // 🆕 ENVOLVA O CONTEÚDO COM AUTHGUARD
 export default function ThemesAdminPage() {
   return (

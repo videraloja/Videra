@@ -26,9 +26,10 @@ const DEFAULT_BACKGROUND_IMAGES = {
 interface HeaderProps {
   onSearch?: (searchTerm: string) => void;
   searchTerm?: string;
+ hideSearch?: boolean; // 🆕 ADICIONE ESTA LINHA
 }
 
-export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
+export default function Header({ onSearch, searchTerm = '', hideSearch = false }: HeaderProps) {
   const pathname = usePathname();
   const [isScrolled, setIsScrolled] = useState(false);
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
@@ -318,6 +319,7 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
         </div>
       </nav>
 
+      {!hideSearch && (
       <section style={applyThemeStyles({
         padding: '24px 20px',
         background: colors.background,
@@ -417,6 +419,7 @@ export default function Header({ onSearch, searchTerm = '' }: HeaderProps) {
           </form>
         </div>
       </section>
+        )}
     </>
   );
 }
