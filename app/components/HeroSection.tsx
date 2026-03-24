@@ -203,7 +203,7 @@ export default function HeroSection({
         }
 
         .hero-image {
-          object-fit: contain;
+          object-fit: cover;
           object-position: center;
           background-color: #f3f4f6;
         }
@@ -223,34 +223,42 @@ export default function HeroSection({
           }
         }
 
-        /* Mobile médio (480px - 767px) */
+        /* Mobile (<= 767px) */
         @media (max-width: 767px) {
           .hero-section {
-            height: auto;
-            min-height: 280px;
-            max-height: 380px;
+            height: 320px;
             border-radius: 16px;
             margin-bottom: 24px;
           }
 
           .hero-image {
             object-fit: cover;
-            object-position: center 30%;
+            object-position: center 40%;
           }
         }
 
-        /* Mobile pequeno (< 480px) */
+        /* Mobile pequeno (<= 480px) */
         @media (max-width: 480px) {
           .hero-section {
-            min-height: 220px;
-            max-height: 320px;
+            height: 280px;
             border-radius: 12px;
             margin-bottom: 20px;
           }
 
           .hero-image {
             object-fit: cover;
-            object-position: center 35%;
+            object-position: center 45%;
+          }
+        }
+
+        /* Mobile muito pequeno (<= 380px) */
+        @media (max-width: 380px) {
+          .hero-section {
+            height: 240px;
+          }
+
+          .hero-image {
+            object-position: center 50%;
           }
         }
 
