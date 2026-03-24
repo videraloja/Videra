@@ -108,15 +108,6 @@ export default function HeroSection({
   return (
     <section 
       className="hero-section"
-      style={{
-        position: 'relative',
-        borderRadius: '24px',
-        marginBottom: '40px',
-        overflow: 'hidden',
-        height: '400px',
-        width: '100%',
-        cursor: 'grab'
-      }}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
       onTouchStart={handleTouchStart}
@@ -126,25 +117,18 @@ export default function HeroSection({
       {/* Banner atual */}
       <Link 
         href={currentBanner.link_url}
-        style={{
-          display: 'block',
-          width: '100%',
-          height: '100%',
-          position: 'relative',
-          textDecoration: 'none'
-        }}
+        className="hero-link"
       >
-        <Image
-          src={currentBanner.image_url}
-          alt="Banner promocional"
-          fill
-          style={{
-            objectFit: 'cover',
-            objectPosition: 'center'
-          }}
-          sizes="100vw"
-          priority={currentIndex === 0}
-        />
+        <div className="hero-image-wrapper">
+          <Image
+            src={currentBanner.image_url}
+            alt="Banner promocional"
+            fill
+            className="hero-image"
+            sizes="100vw"
+            priority={currentIndex === 0}
+          />
+        </div>
       </Link>
 
       {/* Setas - apenas desktop */}
@@ -156,25 +140,7 @@ export default function HeroSection({
               e.stopPropagation();
               prevSlide();
             }}
-            style={{
-              position: 'absolute',
-              left: '20px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              background: 'rgba(0, 0, 0, 0.5)',
-              color: 'white',
-              border: 'none',
-              width: '48px',
-              height: '48px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              fontSize: '24px',
-              zIndex: 10,
-              transition: 'all 0.3s ease'
-            }}
+            className="arrow-button arrow-left"
             aria-label="Banner anterior"
           >
             ◀
@@ -186,25 +152,7 @@ export default function HeroSection({
               e.stopPropagation();
               nextSlide();
             }}
-            style={{
-              position: 'absolute',
-              right: '20px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              background: 'rgba(0, 0, 0, 0.5)',
-              color: 'white',
-              border: 'none',
-              width: '48px',
-              height: '48px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              fontSize: '24px',
-              zIndex: 10,
-              transition: 'all 0.3s ease'
-            }}
+            className="arrow-button arrow-right"
             aria-label="Próximo banner"
           >
             ▶
@@ -214,16 +162,7 @@ export default function HeroSection({
 
       {/* Indicadores (dots) */}
       {showDots && banners.length > 1 && (
-        <div style={{
-          position: 'absolute',
-          bottom: '20px',
-          left: '0',
-          right: '0',
-          display: 'flex',
-          justifyContent: 'center',
-          gap: '8px',
-          zIndex: 10
-        }}>
+        <div className="dots-container">
           {banners.map((_, index) => (
             <button
               key={index}
@@ -232,16 +171,7 @@ export default function HeroSection({
                 e.stopPropagation();
                 goToSlide(index);
               }}
-              style={{
-                width: '12px',
-                height: '12px',
-                borderRadius: '50%',
-                border: 'none',
-                background: index === currentIndex ? 'white' : 'rgba(255, 255, 255, 0.5)',
-                cursor: 'pointer',
-                padding: 0,
-                transition: 'all 0.3s ease'
-              }}
+              className={`dot ${index === currentIndex ? 'dot-active' : 'dot-inactive'}`}
               aria-label={`Ir para banner ${index + 1}`}
             />
           ))}
@@ -249,28 +179,185 @@ export default function HeroSection({
       )}
 
       <style jsx>{`
-        @media (max-width: 768px) {
+        .hero-section {
+          position: relative;
+          width: 100%;
+          margin-bottom: 40px;
+          overflow: hidden;
+          cursor: grab;
+          border-radius: 24px;
+        }
+
+        .hero-link {
+          display: block;
+          width: 100%;
+          height: 100%;
+          text-decoration: none;
+        }
+
+        .hero-image-wrapper {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          overflow: hidden;
+        }
+
+        .hero-image {
+          object-fit: contain;
+          object-position: center;
+          background-color: #f3f4f6;
+        }
+
+        /* Desktop (>= 1200px) */
+        .hero-section {
+          height: 500px;
+          border-radius: 24px;
+        }
+
+        /* Tablet (768px - 1199px) */
+        @media (max-width: 1199px) {
           .hero-section {
-            height: 300px !important;
-            border-radius: 16px !important;
-            margin-bottom: 30px !important;
+            height: 400px;
+            border-radius: 20px;
+            margin-bottom: 32px;
+          }
+        }
+
+        /* Mobile médio (480px - 767px) */
+        @media (max-width: 767px) {
+          .hero-section {
+            height: auto;
+            min-height: 280px;
+            max-height: 380px;
+            border-radius: 16px;
+            margin-bottom: 24px;
           }
 
+          .hero-image {
+            object-fit: cover;
+            object-position: center 30%;
+          }
+        }
+
+        /* Mobile pequeno (< 480px) */
+        @media (max-width: 480px) {
+          .hero-section {
+            min-height: 220px;
+            max-height: 320px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+          }
+
+          .hero-image {
+            object-fit: cover;
+            object-position: center 35%;
+          }
+        }
+
+        /* Setas */
+        .desktop-arrows {
+          display: block;
+        }
+
+        .arrow-button {
+          position: absolute;
+          top: 50%;
+          transform: translateY(-50%);
+          background: rgba(0, 0, 0, 0.5);
+          color: white;
+          border: none;
+          width: 48px;
+          height: 48px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          font-size: 24px;
+          z-index: 10;
+          transition: all 0.3s ease;
+        }
+
+        .arrow-button:hover {
+          background: rgba(0, 0, 0, 0.8);
+          transform: translateY(-50%) scale(1.05);
+        }
+
+        .arrow-left {
+          left: 20px;
+        }
+
+        .arrow-right {
+          right: 20px;
+        }
+
+        @media (max-width: 768px) {
           .desktop-arrows {
-            display: none !important;
+            display: none;
+          }
+        }
+
+        /* Dots (indicadores) */
+        .dots-container {
+          position: absolute;
+          bottom: 20px;
+          left: 0;
+          right: 0;
+          display: flex;
+          justify-content: center;
+          gap: 8px;
+          z-index: 10;
+        }
+
+        .dot {
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+          border: none;
+          cursor: pointer;
+          padding: 0;
+          transition: all 0.3s ease;
+        }
+
+        .dot-active {
+          background: white;
+          transform: scale(1.2);
+        }
+
+        .dot-inactive {
+          background: rgba(255, 255, 255, 0.5);
+        }
+
+        .dot-inactive:hover {
+          background: rgba(255, 255, 255, 0.8);
+          transform: scale(1.1);
+        }
+
+        @media (max-width: 768px) {
+          .dots-container {
+            bottom: 16px;
+            gap: 10px;
           }
 
-          button[aria-label^="Ir para banner"] {
-            width: 16px !important;
-            height: 16px !important;
+          .dot {
+            width: 10px;
+            height: 10px;
+          }
+
+          .dot-active {
+            transform: scale(1.1);
           }
         }
 
         @media (max-width: 480px) {
-          .hero-section {
-            height: 250px !important;
-            border-radius: 12px !important;
-            margin-bottom: 20px !important;
+          .dots-container {
+            bottom: 12px;
+            gap: 8px;
+          }
+
+          .dot {
+            width: 8px;
+            height: 8px;
           }
         }
       `}</style>
