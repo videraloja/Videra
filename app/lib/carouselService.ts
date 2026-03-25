@@ -125,8 +125,113 @@ export const carouselService = {
       // DETERMINAR QUAIS CONFIGURAÇÕES USAR BASEADO NA PÁGINA
       let defaultConfigs: any[] = [];
       
+      // 🆕 CONFIGURAÇÕES PARA PÁGINA INICIAL (HOME)
+      if (pageSlug === 'home') {
+        defaultConfigs = [
+          {
+            page_slug: pageSlug,
+            carousel_type: 'all',
+            title_text_color: '#1f2937',
+            title_font_size: 24,
+            title_font_weight: '700',
+            badge_bg_color: '#10b981',
+            badge_text_color: '#ffffff',
+            arrow_bg_color: '#10b981',
+            arrow_text_color: '#ffffff',
+            arrow_hover_bg_color: '#059669',
+            arrow_hover_text_color: '#ffffff',
+            show_arrows: true,
+            show_badges: true,
+            items_per_view: 4,
+            auto_scroll: false,
+            auto_scroll_interval: 5000,
+            view_all_title_color: '#1f2937',
+            view_all_title_font_size: 28,
+            view_all_title_font_weight: '700',
+            view_all_badge_bg_color: '#10b981',
+            view_all_badge_text_color: '#ffffff',
+            view_all_button_bg_color: 'transparent',
+            view_all_button_text_color: '#10b981',
+            view_all_button_border_color: '#10b981',
+            view_all_button_hover_bg_color: '#10b981',
+            view_all_button_hover_text_color: '#ffffff',
+            view_all_button_hover_border_color: '#10b981',
+            view_all_back_button_bg_color: 'transparent',
+            view_all_back_button_text_color: '#10b981',
+            view_all_back_button_hover_bg_color: '#10b981',
+            view_all_back_button_hover_text_color: '#ffffff'
+          },
+          {
+            page_slug: pageSlug,
+            carousel_type: 'bestsellers',
+            title_text_color: '#1f2937',
+            title_font_size: 24,
+            title_font_weight: '700',
+            badge_bg_color: '#f59e0b',
+            badge_text_color: '#ffffff',
+            arrow_bg_color: '#f59e0b',
+            arrow_text_color: '#ffffff',
+            arrow_hover_bg_color: '#d97706',
+            arrow_hover_text_color: '#ffffff',
+            show_arrows: true,
+            show_badges: true,
+            items_per_view: 4,
+            auto_scroll: false,
+            auto_scroll_interval: 5000,
+            view_all_title_color: '#1f2937',
+            view_all_title_font_size: 28,
+            view_all_title_font_weight: '700',
+            view_all_badge_bg_color: '#f59e0b',
+            view_all_badge_text_color: '#ffffff',
+            view_all_button_bg_color: 'transparent',
+            view_all_button_text_color: '#f59e0b',
+            view_all_button_border_color: '#f59e0b',
+            view_all_button_hover_bg_color: '#f59e0b',
+            view_all_button_hover_text_color: '#ffffff',
+            view_all_button_hover_border_color: '#f59e0b',
+            view_all_back_button_bg_color: 'transparent',
+            view_all_back_button_text_color: '#f59e0b',
+            view_all_back_button_hover_bg_color: '#f59e0b',
+            view_all_back_button_hover_text_color: '#ffffff'
+          },
+          {
+            page_slug: pageSlug,
+            carousel_type: 'new_arrivals',
+            title_text_color: '#1f2937',
+            title_font_size: 24,
+            title_font_weight: '700',
+            badge_bg_color: '#8b5cf6',
+            badge_text_color: '#ffffff',
+            arrow_bg_color: '#8b5cf6',
+            arrow_text_color: '#ffffff',
+            arrow_hover_bg_color: '#7c3aed',
+            arrow_hover_text_color: '#ffffff',
+            show_arrows: true,
+            show_badges: true,
+            items_per_view: 4,
+            auto_scroll: false,
+            auto_scroll_interval: 5000,
+            view_all_title_color: '#1f2937',
+            view_all_title_font_size: 28,
+            view_all_title_font_weight: '700',
+            view_all_badge_bg_color: '#8b5cf6',
+            view_all_badge_text_color: '#ffffff',
+            view_all_button_bg_color: 'transparent',
+            view_all_button_text_color: '#8b5cf6',
+            view_all_button_border_color: '#8b5cf6',
+            view_all_button_hover_bg_color: '#8b5cf6',
+            view_all_button_hover_text_color: '#ffffff',
+            view_all_button_hover_border_color: '#8b5cf6',
+            view_all_back_button_bg_color: 'transparent',
+            view_all_back_button_text_color: '#8b5cf6',
+            view_all_back_button_hover_bg_color: '#8b5cf6',
+            view_all_back_button_hover_text_color: '#ffffff'
+          }
+        ];
+      }
+      
       // CONFIGURAÇÕES PARA POKÉMON TCG
-      if (pageSlug === 'pokemontcg') {
+      else if (pageSlug === 'pokemontcg') {
         defaultConfigs = [
           {
             page_slug: pageSlug,
@@ -150,13 +255,13 @@ export const carouselService = {
             view_all_title_font_weight: '700',
             view_all_badge_bg_color: '#ef4444',
             view_all_badge_text_color: '#ffffff',
-            view_all_button_bg_color: '#ffffff', // BRANCO em vez de 'transparent'
+            view_all_button_bg_color: '#ffffff',
             view_all_button_text_color: '#ef4444',
             view_all_button_border_color: '#ef4444',
             view_all_button_hover_bg_color: '#ef4444',
             view_all_button_hover_text_color: '#ffffff',
             view_all_button_hover_border_color: '#ef4444',
-            view_all_back_button_bg_color: '#ffffff', // BRANCO em vez de 'transparent'
+            view_all_back_button_bg_color: '#ffffff',
             view_all_back_button_text_color: '#ef4444',
             view_all_back_button_hover_bg_color: '#ef4444',
             view_all_back_button_hover_text_color: '#ffffff'

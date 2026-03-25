@@ -10,7 +10,8 @@ interface CarouselEditorProps {
   onClose?: () => void;
 }
 
-const PAGE_OPTIONS = [
+ const PAGE_OPTIONS = [
+  { value: 'home', label: 'Página Inicial', icon: '🏠' },
   { value: 'pokemontcg', label: 'Pokémon TCG', icon: '🎴' },
   { value: 'jogosdetabuleiro', label: 'Jogos de Tabuleiro', icon: '🎲' },
   { value: 'acessorios', label: 'Acessórios', icon: '🎒' },
