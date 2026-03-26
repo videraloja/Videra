@@ -470,7 +470,7 @@ ${lines.join("\n")}
             <textarea
               value={observations}
               onChange={(e) => setObservations(e.target.value)}
-              placeholder="Ex: Prefiro troco em notas pequenas, horário para retirada, etc..."
+              placeholder="Ex: Horário para retirada, informações adicionais, etc..."
               className="observations-input"
               rows={3}
             />
@@ -546,7 +546,7 @@ ${lines.join("\n")}
                 <li>✓ Entra em contato com o motorista caso precise resolver algo</li>
               </ul>
               <p className="modal-note">
-                Após a confirmação do pedido, você poderá solicitar a retirada.
+                Após a confirmação do pedido, lhe será enviado nosso endereço e você poderá solicitar a retirada.
               </p>
             </div>
             <div className="modal-footer">
