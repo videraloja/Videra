@@ -430,77 +430,99 @@ export default function HomePage() {
               </div>
             ) : (
               // Modo "Ver todos" - Grid completo
-              <div>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '32px',
-                  padding: '0 20px'
-                }}>
-                  <h2 style={{
-                    fontSize: currentConfig?.view_all_title_font_size || 28,
-                    fontWeight: currentConfig?.view_all_title_font_weight || '700',
-                    color: currentConfig?.view_all_title_color || colors.text,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    margin: 0
-                  }}>
-                    <span>
-                      {viewAllType === 'all' && '📦'}
-                      {viewAllType === 'bestsellers' && '🔥'}
-                      {viewAllType === 'new_arrivals' && '🆕'}
-                    </span>
-                    {viewAllType === 'all' && 'Todos os Produtos'}
-                    {viewAllType === 'bestsellers' && 'Mais Vendidos'}
-                    {viewAllType === 'new_arrivals' && 'Lançamentos'}
-                  </h2>
-                  
-                  <button
-                    onClick={() => setShowAllProducts(false)}
-                    style={applyThemeStyles({
-                      padding: '8px 16px',
-                      background: currentConfig?.view_all_back_button_bg_color || 'transparent',
-                      color: currentConfig?.view_all_back_button_text_color || colors.primary,
-                      border: `1px solid ${currentConfig?.view_all_back_button_bg_color || colors.primary}`,
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
-                    }, 'button-secondary')}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = currentConfig?.view_all_back_button_hover_bg_color || colors.primary;
-                      e.currentTarget.style.color = currentConfig?.view_all_back_button_hover_text_color || 'white';
-                      e.currentTarget.style.borderColor = currentConfig?.view_all_back_button_hover_bg_color || colors.primary;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = currentConfig?.view_all_back_button_bg_color || 'transparent';
-                      e.currentTarget.style.color = currentConfig?.view_all_back_button_text_color || colors.primary;
-                      e.currentTarget.style.borderColor = currentConfig?.view_all_back_button_bg_color || colors.primary;
-                    }}
-                  >
-                    ↩ Voltar
-                  </button>
-                </div>
-                
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                  gap: '24px',
-                  padding: '20px'
-                }}>
-                  {viewAllProductsList.map((product) => (
-                    <ProductCard 
-                      key={product.id}
-                      product={product}
-                      onAddToCart={handleAddToCart}
-                      categoryConfig={getCategoryConfig(product.category || 'default')}
-                    />
-                  ))}
-                </div>
-              </div>
+<div>
+  <div 
+    className="view-all-header"
+    style={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '32px',
+      padding: '0 20px'
+    }}
+  >
+    <h2 
+      className="view-all-title"
+      style={{
+        fontSize: currentConfig?.view_all_title_font_size || 28,
+        fontWeight: currentConfig?.view_all_title_font_weight || '700',
+        color: currentConfig?.view_all_title_color || colors.text,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        margin: 0,
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        maxWidth: '70%'
+      }}
+    >
+      <span style={{ flexShrink: 0 }}>
+        {viewAllType === 'all' && '📦'}
+        {viewAllType === 'bestsellers' && '🔥'}
+        {viewAllType === 'new_arrivals' && '🆕'}
+      </span>
+      <span style={{
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap'
+      }}>
+        {viewAllType === 'all' && 'Todos os Produtos'}
+        {viewAllType === 'bestsellers' && 'Mais Vendidos'}
+        {viewAllType === 'new_arrivals' && 'Lançamentos'}
+      </span>
+    </h2>
+    
+    <button
+      className="view-all-back-btn"
+      onClick={() => setShowAllProducts(false)}
+      style={{
+        padding: '8px 16px',
+        background: currentConfig?.view_all_back_button_bg_color || 'transparent',
+        color: currentConfig?.view_all_back_button_text_color || colors.primary,
+        border: `1px solid ${currentConfig?.view_all_back_button_bg_color || colors.primary}`,
+        borderRadius: '8px',
+        fontSize: '14px',
+        fontWeight: '600',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+        whiteSpace: 'nowrap',
+        flexShrink: 0
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = currentConfig?.view_all_back_button_hover_bg_color || colors.primary;
+        e.currentTarget.style.color = currentConfig?.view_all_back_button_hover_text_color || 'white';
+        e.currentTarget.style.borderColor = currentConfig?.view_all_back_button_hover_bg_color || colors.primary;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = currentConfig?.view_all_back_button_bg_color || 'transparent';
+        e.currentTarget.style.color = currentConfig?.view_all_back_button_text_color || colors.primary;
+        e.currentTarget.style.borderColor = currentConfig?.view_all_back_button_bg_color || colors.primary;
+      }}
+    >
+      ↩ Voltar
+    </button>
+  </div>
+  
+  <div 
+    className="product-grid-container"
+    style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+      gap: '24px',
+      padding: '20px'
+    }}
+  >
+    {viewAllProductsList.map((product) => (
+      <ProductCard 
+        key={product.id}
+        product={product}
+        onAddToCart={handleAddToCart}
+        categoryConfig={getCategoryConfig(product.category || 'default')}
+      />
+    ))}
+  </div>
+</div>
             )}
           </>
         )}
