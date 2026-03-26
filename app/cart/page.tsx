@@ -17,10 +17,30 @@ interface CartItem extends Product {
   quantity: number;
 }
 
+// Função para gerar código único do pedido
+const generateOrderCode = () => {
+  const prefix = 'VID';
+  const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+  const timestamp = Date.now().toString().slice(-2);
+  return `${prefix}-${random}${timestamp}`;
+};
+
 export default function CartPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [ready, setReady] = useState(false);
+  
+  // Estados para opções
+  const [paymentMethod, setPaymentMethod] = useState<string>('pix');
+  const [pickupOption, setPickupOption] = useState<string>('buscar');
+  const [observations, setObservations] = useState<string>('');
+  
+  // Estados para modais
+  const [showCreditModal, setShowCreditModal] = useState(false);
+  const [showPickupModal, setShowPickupModal] = useState(false);
+  
+  // Estado para controlar se está processando
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const persistState = (nextCart: CartItem[], nextProducts: Product[]) => {
     setCart(nextCart);
@@ -169,28 +189,49 @@ export default function CartPage() {
     }, 100);
   };
 
-  const sendToWhatsApp = async () => {
+  // Mapeamento das formas de pagamento para exibição
+  const paymentMethodLabels: Record<string, string> = {
+    pix: 'Pix (à vista)',
+    credito: 'Cartão de Crédito',
+    dinheiro: 'Dinheiro (na retirada)'
+  };
+
+  // Mapeamento das opções de retirada
+  const pickupOptionLabels: Record<string, string> = {
+    buscar: 'Vou buscar',
+    mandar: 'Vou mandar buscar'
+  };
+
+  // Função para lidar com clique na opção de crédito
+  const handleCreditClick = () => {
+    setPaymentMethod('credito');
+    setShowCreditModal(true);
+  };
+
+  // Função para lidar com clique na opção "Vou mandar buscar"
+  const handlePickupClick = () => {
+    setPickupOption('mandar');
+    setShowPickupModal(true);
+  };
+
+  // Função para processar o pedido
+  const processOrder = async () => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+
     const phone = '5592986446677';
+    const orderCode = generateOrderCode();
 
-    if (!cart || cart.length === 0) {
-      alert('Seu carrinho está vazio!');
-      return;
-    }
-
-    const client_name = prompt("Qual o nome do cliente?");
-    const client_whatsapp = prompt("Qual o número de WhatsApp do cliente?");
-    if (!client_name || !client_whatsapp) {
-      alert("Por favor, informe o nome e o número do cliente.");
-      return;
-    }
-
+    // Criar pedido no Supabase
     const { data: order, error: orderError } = await supabase
       .from("orders")
       .insert([
         {
-          client_name,
-          client_whatsapp,
+          order_code: orderCode,
           status: "pendente",
+          payment_method: paymentMethodLabels[paymentMethod],
+          pickup_option: pickupOptionLabels[pickupOption],
+          observations: observations || null,
         },
       ])
       .select()
@@ -199,6 +240,7 @@ export default function CartPage() {
     if (orderError || !order) {
       console.error("Erro ao salvar pedido no Supabase:", orderError);
       alert("Erro ao registrar o pedido. Tente novamente.");
+      setIsProcessing(false);
       return;
     }
 
@@ -210,8 +252,6 @@ export default function CartPage() {
       price: item.price,
     }));
 
-    console.log("DEBUG itemsPayload:", itemsPayload);
-
     const { error: itemsError } = await supabase
       .from("order_items")
       .insert(itemsPayload);
@@ -219,6 +259,7 @@ export default function CartPage() {
     if (itemsError) {
       console.error("Erro ao salvar itens:", itemsError);
       alert("Erro ao salvar itens do pedido.");
+      setIsProcessing(false);
       return;
     }
 
@@ -237,17 +278,23 @@ export default function CartPage() {
     const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
 
     const message = `
-📦 *Pedido Videra #${order.id.slice(0, 8)}*
+📦 *PEDIDO ${orderCode}*
 
-👤 *Cliente:* ${client_name}
-📱 *WhatsApp:* ${client_whatsapp}
+💰 *Pagamento:* ${paymentMethodLabels[paymentMethod]}
+🛵 *Retirada:* ${pickupOptionLabels[pickupOption]}
+${observations ? `📝 *Observações:* ${observations}` : ''}
 
-🛒 *Itens:*
+🛒 *ITENS:*
 ${lines.join("\n")}
 
-💰 *Total:* R$ ${total.toFixed(2).replace(".", ",")}
+💰 *TOTAL:* R$ ${total.toFixed(2).replace(".", ",")}
 
-✅ Obrigado por comprar com a Videra!
+✅ *Como finalizar:*
+1. Confira os itens acima
+2. Me envie este pedido
+3. Aguarde meu contato para confirmar
+
+*Obrigado por comprar com a Videra!*
 `.trim();
 
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
@@ -255,7 +302,18 @@ ${lines.join("\n")}
 
     clearCart();
 
-    alert("Pedido registrado com sucesso!");
+    alert(`Pedido ${orderCode} registrado com sucesso!`);
+    setIsProcessing(false);
+  };
+
+  // Função principal para enviar pedido
+  const handleSendOrder = async () => {
+    if (!cart || cart.length === 0) {
+      alert('Seu carrinho está vazio!');
+      return;
+    }
+
+    await processOrder();
   };
 
   const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
@@ -296,18 +354,19 @@ ${lines.join("\n")}
     <div className="cart-page">
       <div className="cart-container">
         {/* Header */}
-<div className="cart-header">
-  <Link href="/" className="back-link">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M19 12H5M12 19l-7-7 7-7"/>
-    </svg>
-    Voltar à loja
-  </Link>
-  <div className="header-title">
-    <h1>Seu Carrinho</h1>
-    <span className="cart-icon">🛒</span>
-  </div>
-</div>
+        <div className="cart-header">
+          <Link href="/" className="back-link">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M19 12H5M12 19l-7-7 7-7"/>
+            </svg>
+            Voltar à loja
+          </Link>
+          <div className="header-title">
+            <span className="cart-icon">🛒</span>
+            <h1>Seu Carrinho</h1>
+          </div>
+        </div>
+
         {/* Cart Items */}
         <div className="cart-items">
           {cart.map((item) => (
@@ -352,7 +411,7 @@ ${lines.join("\n")}
           ))}
         </div>
 
-        {/* Footer */}
+        {/* Footer com opções adicionais */}
         <div className="cart-footer">
           <div className="footer-info">
             <div className="total-section">
@@ -360,19 +419,144 @@ ${lines.join("\n")}
               <span className="total-value">R$ {total.toFixed(2)}</span>
             </div>
           </div>
+
+          {/* Forma de Pagamento */}
+          <div className="options-section">
+            <label className="section-label">💰 Forma de Pagamento</label>
+            <div className="options-group">
+              <button
+                onClick={() => setPaymentMethod('pix')}
+                className={`option-btn ${paymentMethod === 'pix' ? 'active' : ''}`}
+              >
+                Pix (à vista)
+              </button>
+              <button
+                onClick={handleCreditClick}
+                className={`option-btn ${paymentMethod === 'credito' ? 'active' : ''}`}
+              >
+                Cartão de Crédito
+              </button>
+              <button
+                onClick={() => setPaymentMethod('dinheiro')}
+                className={`option-btn ${paymentMethod === 'dinheiro' ? 'active' : ''}`}
+              >
+                Dinheiro (na retirada)
+              </button>
+            </div>
+          </div>
+
+          {/* Opção de Retirada */}
+          <div className="options-section">
+            <label className="section-label">🛵 Como vai receber?</label>
+            <div className="options-group">
+              <button
+                onClick={() => setPickupOption('buscar')}
+                className={`option-btn ${pickupOption === 'buscar' ? 'active' : ''}`}
+              >
+                Vou buscar
+              </button>
+              <button
+                onClick={handlePickupClick}
+                className={`option-btn ${pickupOption === 'mandar' ? 'active' : ''}`}
+              >
+                Vou mandar buscar
+              </button>
+            </div>
+          </div>
+
+          {/* Observações */}
+          <div className="options-section">
+            <label className="section-label">✏️ Observações (opcional)</label>
+            <textarea
+              value={observations}
+              onChange={(e) => setObservations(e.target.value)}
+              placeholder="Ex: Prefiro troco em notas pequenas, horário para retirada, etc..."
+              className="observations-input"
+              rows={3}
+            />
+          </div>
+
           <div className="footer-actions">
             <button onClick={clearCart} className="btn-secondary">
               Esvaziar Carrinho
             </button>
-            <button onClick={sendToWhatsApp} className="btn-primary">
+            <button 
+              onClick={handleSendOrder} 
+              className="btn-primary"
+              disabled={isProcessing}
+            >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
               </svg>
-              Finalizar Pedido
+              {isProcessing ? 'Enviando...' : 'Enviar Pedido no WhatsApp'}
             </button>
           </div>
         </div>
       </div>
+
+      {/* Modal para Crédito */}
+      {showCreditModal && (
+        <div className="modal-overlay" onClick={() => setShowCreditModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-icon">💳</span>
+              <h3>Pagamento com Cartão de Crédito</h3>
+            </div>
+            <div className="modal-body">
+              <p>
+                Para pagar no crédito, utilizamos um <strong>Link de Pagamento</strong> que será enviado após a confirmação do pedido.
+              </p>
+              <p>
+                Você pode parcelar em até <strong>12x</strong> e pagar diretamente pelo aplicativo do seu banco.
+              </p>
+              <div className="alert-message">
+                <span className="alert-icon">⚠️</span>
+                <span>
+                  <strong>Atenção:</strong> O valor total sofre um acréscimo devido às taxas do banco.
+                </span>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button onClick={() => setShowCreditModal(false)} className="modal-btn-primary">
+                Entendi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para "Vou mandar buscar" */}
+      {showPickupModal && (
+        <div className="modal-overlay" onClick={() => setShowPickupModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-icon">🛵</span>
+              <h3>Você escolheu "Vou mandar buscar"</h3>
+            </div>
+            <div className="modal-body">
+              <p>
+                Nessa modalidade, você precisa solicitar um motorista de aplicativo (Uber, 99, etc.) para retirar o item em nossa loja.
+              </p>
+              <p>
+                <strong>Não solicitamos o envio.</strong> Fazemos dessa forma para sua melhor comodidade:
+              </p>
+              <ul className="modal-list">
+                <li>✓ Você acompanha a corrida em tempo real</li>
+                <li>✓ Realiza o pagamento da corrida diretamente no app</li>
+                <li>✓ Entra em contato com o motorista caso precise resolver algo</li>
+              </ul>
+              <p className="modal-note">
+                Após a confirmação do pedido, você poderá solicitar a retirada.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button onClick={() => setShowPickupModal(false)} className="modal-btn-primary">
+                Entendi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Styles */}
       <style jsx>{`
@@ -391,7 +575,6 @@ ${lines.join("\n")}
           overflow: hidden;
         }
 
-        /* Header */
         .cart-header {
           padding: 1.5rem 2rem;
           border-bottom: 1px solid #e9ecef;
@@ -417,6 +600,16 @@ ${lines.join("\n")}
           color: #dc2626;
         }
 
+        .header-title {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+        }
+
+        .cart-icon {
+          font-size: 1.75rem;
+        }
+
         .cart-header h1 {
           font-size: 1.75rem;
           font-weight: 600;
@@ -427,15 +620,6 @@ ${lines.join("\n")}
           background-clip: text;
         }
 
-        .cart-count {
-          background: #f3f4f6;
-          padding: 0.25rem 0.75rem;
-          border-radius: 20px;
-          font-size: 0.875rem;
-          color: #4b5563;
-        }
-
-        /* Cart Items */
         .cart-items {
           padding: 1rem 2rem;
         }
@@ -565,22 +749,20 @@ ${lines.join("\n")}
           color: #1f2937;
         }
 
-        /* Footer */
         .cart-footer {
           padding: 1.5rem 2rem;
           background: #f9fafb;
           border-top: 1px solid #e9ecef;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          flex-wrap: wrap;
-          gap: 1.5rem;
         }
 
         .total-section {
           display: flex;
           align-items: baseline;
           gap: 1rem;
+          justify-content: flex-end;
+          margin-bottom: 1.5rem;
+          padding-bottom: 1rem;
+          border-bottom: 1px dashed #e5e7eb;
         }
 
         .total-label {
@@ -595,15 +777,71 @@ ${lines.join("\n")}
           color: #dc2626;
         }
 
-        .payment-info {
-          font-size: 0.75rem;
-          color: #9ca3af;
-          margin: 0.5rem 0 0 0;
+        .options-section {
+          margin-bottom: 1.5rem;
+        }
+
+        .section-label {
+          display: block;
+          font-size: 0.9rem;
+          font-weight: 600;
+          color: #374151;
+          margin-bottom: 0.75rem;
+        }
+
+        .options-group {
+          display: flex;
+          gap: 0.75rem;
+          flex-wrap: wrap;
+        }
+
+        .option-btn {
+          padding: 0.6rem 1.25rem;
+          background: white;
+          border: 1px solid #e5e7eb;
+          border-radius: 40px;
+          font-size: 0.875rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s;
+          color: #4b5563;
+        }
+
+        .option-btn:hover {
+          border-color: #dc2626;
+          color: #dc2626;
+        }
+
+        .option-btn.active {
+          background: #dc2626;
+          border-color: #dc2626;
+          color: white;
+        }
+
+        .observations-input {
+          width: 100%;
+          padding: 0.75rem;
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          font-size: 0.875rem;
+          font-family: inherit;
+          resize: vertical;
+          transition: border-color 0.2s;
+        }
+
+        .observations-input:focus {
+          outline: none;
+          border-color: #dc2626;
+          box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
         }
 
         .footer-actions {
           display: flex;
+          justify-content: flex-end;
           gap: 1rem;
+          margin-top: 1.5rem;
+          padding-top: 1rem;
+          border-top: 1px solid #e5e7eb;
         }
 
         .btn-secondary {
@@ -640,12 +878,16 @@ ${lines.join("\n")}
           box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
         }
 
-        .btn-primary:hover {
+        .btn-primary:hover:not(:disabled) {
           transform: translateY(-2px);
           box-shadow: 0 6px 16px rgba(220, 38, 38, 0.4);
         }
 
-        /* Empty State */
+        .btn-primary:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
+        }
+
         .cart-empty {
           text-align: center;
           padding: 4rem 2rem;
@@ -684,7 +926,6 @@ ${lines.join("\n")}
           box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
         }
 
-        /* Loading State */
         .cart-loading {
           text-align: center;
           padding: 4rem 2rem;
@@ -704,7 +945,129 @@ ${lines.join("\n")}
           to { transform: rotate(360deg); }
         }
 
-        /* Responsive */
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.6);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          backdrop-filter: blur(4px);
+        }
+
+        .modal-content {
+          background: white;
+          border-radius: 24px;
+          max-width: 500px;
+          width: 90%;
+          margin: 1rem;
+          overflow: hidden;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+          animation: modalSlideIn 0.3s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .modal-header {
+          padding: 1.5rem;
+          background: linear-gradient(135deg, #fef2f2, #fff);
+          border-bottom: 1px solid #fee2e2;
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+        }
+
+        .modal-icon {
+          font-size: 1.75rem;
+        }
+
+        .modal-header h3 {
+          margin: 0;
+          font-size: 1.25rem;
+          font-weight: 600;
+          color: #dc2626;
+        }
+
+        .modal-body {
+          padding: 1.5rem;
+          color: #374151;
+          line-height: 1.5;
+        }
+
+        .modal-body p {
+          margin: 0 0 1rem 0;
+        }
+
+        .alert-message {
+          background: #fef3c7;
+          border-left: 4px solid #f59e0b;
+          padding: 0.75rem;
+          border-radius: 8px;
+          display: flex;
+          align-items: flex-start;
+          gap: 0.5rem;
+          margin-top: 1rem;
+        }
+
+        .alert-icon {
+          font-size: 1.25rem;
+        }
+
+        .modal-list {
+          margin: 0.75rem 0;
+          padding-left: 1.5rem;
+          list-style: none;
+        }
+
+        .modal-list li {
+          margin: 0.5rem 0;
+          color: #4b5563;
+        }
+
+        .modal-note {
+          font-size: 0.875rem;
+          color: #6b7280;
+          margin-top: 1rem;
+          padding-top: 0.75rem;
+          border-top: 1px solid #e5e7eb;
+        }
+
+        .modal-footer {
+          padding: 1rem 1.5rem 1.5rem;
+          display: flex;
+          justify-content: flex-end;
+        }
+
+        .modal-btn-primary {
+          padding: 0.75rem 1.5rem;
+          background: linear-gradient(135deg, #dc2626, #b91c1c);
+          border: none;
+          border-radius: 40px;
+          font-size: 0.875rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+          color: white;
+        }
+
+        .modal-btn-primary:hover {
+          transform: scale(1.02);
+          box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+        }
+
         @media (max-width: 768px) {
           .cart-page {
             padding: 1rem;
@@ -716,6 +1079,10 @@ ${lines.join("\n")}
 
           .cart-header h1 {
             font-size: 1.25rem;
+          }
+
+          .cart-icon {
+            font-size: 1.5rem;
           }
 
           .cart-items {
@@ -743,9 +1110,20 @@ ${lines.join("\n")}
           }
 
           .cart-footer {
-            flex-direction: column;
-            align-items: stretch;
             padding: 1rem;
+          }
+
+          .total-section {
+            justify-content: space-between;
+          }
+
+          .options-group {
+            flex-direction: column;
+          }
+
+          .option-btn {
+            width: 100%;
+            text-align: center;
           }
 
           .footer-actions {
@@ -757,19 +1135,18 @@ ${lines.join("\n")}
             justify-content: center;
           }
 
-          .total-section {
-            justify-content: space-between;
+          .modal-content {
+            width: 95%;
+            margin: 0.5rem;
           }
-            /* Header title com ícone */
-.header-title {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
 
-.cart-icon {
-  font-size: 1.75rem;
-}
+          .modal-header {
+            padding: 1rem;
+          }
+
+          .modal-body {
+            padding: 1rem;
+          }
         }
       `}</style>
     </div>
