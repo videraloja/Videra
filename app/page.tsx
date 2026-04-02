@@ -12,11 +12,13 @@ import { useCart } from '../hooks/useCart';
 import { useStock } from '../hooks/useStock';
 import HeroSectionWrapper from './components/HeroSectionWrapper';
 import { carouselService } from './lib/carouselService'; // NOVO
+import { useCartContext } from './contexts/CartContext';
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [ready, setReady] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const { addToCart: addToCartGlobal } = useCartContext();
   
   // NOVO: Estados para carrosséis editáveis
   const [carouselConfigs, setCarouselConfigs] = useState<CarouselConfig[]>([]);
@@ -134,10 +136,38 @@ export default function HomePage() {
   }, [ready]);
 
   // 🆕 FUNÇÃO addToCart ATUALIZADA
-  const handleAddToCart = (product: Product) => {
-    if (product.stock <= 0) return;
-    addToCart(product, products, setProducts);
-  };
+    const handleAddToCart = (product: Product) => {
+      const productId = String(product.id);
+      
+      const findCurrentStock = (): number => {
+        const inProducts = products.find(p => String(p.id) === productId);
+        const inBestsellers = bestsellers.find(p => String(p.id) === productId);
+        const inNewArrivals = newArrivals.find(p => String(p.id) === productId);
+        
+        return inProducts?.stock || inBestsellers?.stock || inNewArrivals?.stock || product.stock;
+      };
+      
+      const currentStock = findCurrentStock();
+      
+      if (currentStock <= 0) {
+        console.warn(`❌ ${product.name} sem estoque (${currentStock})`);
+        return;
+      }
+      
+      console.log(`🛒 Adicionando ${product.name} ao carrinho. Estoque atual: ${currentStock}`);
+      
+      addToCartGlobal(product);
+      
+      window.dispatchEvent(new CustomEvent('cartItemAdded', {
+        detail: { 
+          productId,
+          productName: product.name,
+          timestamp: Date.now()
+        }
+      }));
+      
+      console.log(`✅ ${product.name} adicionado ao carrinho`);
+    };
 
   // Funções para scroll dos carrosséis (mantido)
   const scrollCarousel = (ref: React.RefObject<HTMLDivElement | null>, direction: 'left' | 'right') => {

@@ -8,6 +8,9 @@ interface Product {
   id: number;
   name: string;
   price: number;
+  original_price?: number | null;
+  sale_price?: number | null;
+  on_sale?: boolean | null;
   image_url: string;
   category?: string;
   stock: number;
@@ -25,21 +28,45 @@ const generateOrderCode = () => {
   return `${prefix}-${random}${timestamp}`;
 };
 
+// Funções de promoção
+const getCurrentPrice = (product: Product) => {
+  if (product.on_sale && product.sale_price && product.sale_price > 0) {
+    return product.sale_price;
+  }
+  if (product.sale_price && product.sale_price > 0 && product.sale_price < product.price) {
+    return product.sale_price;
+  }
+  return product.price;
+};
+
+const hasPromotion = (product: Product) => {
+  if (product.on_sale && product.sale_price && product.sale_price > 0) {
+    return true;
+  }
+  if (product.sale_price && product.sale_price > 0 && product.sale_price < product.price) {
+    return true;
+  }
+  return false;
+};
+
+const getOriginalPrice = (product: Product) => {
+  if (product.original_price && product.original_price > 0) {
+    return product.original_price;
+  }
+  return product.price;
+};
+
 export default function CartPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [ready, setReady] = useState(false);
   
-  // Estados para opções
   const [paymentMethod, setPaymentMethod] = useState<string>('pix');
   const [pickupOption, setPickupOption] = useState<string>('buscar');
   const [observations, setObservations] = useState<string>('');
-  
-  // Estados para modais
   const [showCreditModal, setShowCreditModal] = useState(false);
   const [showPickupModal, setShowPickupModal] = useState(false);
-  
-  // Estado para controlar se está processando
+  const [showCashModal, setShowCashModal] = useState(false); // NOVO modal para dinheiro
   const [isProcessing, setIsProcessing] = useState(false);
 
   const persistState = (nextCart: CartItem[], nextProducts: Product[]) => {
@@ -56,28 +83,48 @@ export default function CartPage() {
 
   useEffect(() => {
     const load = async () => {
+      const { data: freshProducts, error } = await supabase
+        .from('products')
+        .select('*');
+      
+      if (error) {
+        console.error('Erro ao buscar produtos:', error);
+      }
+      
+      const updatedProducts = (freshProducts as Product[]) || [];
+      
+      localStorage.setItem('products', JSON.stringify(updatedProducts));
+      setProducts(updatedProducts);
+      
       const savedCart = localStorage.getItem('cart');
+      let currentCart: CartItem[] = [];
+      
       if (savedCart) {
         try {
-          setCart(JSON.parse(savedCart));
+          currentCart = JSON.parse(savedCart);
+          
+          currentCart = currentCart.map(cartItem => {
+            const freshProduct = updatedProducts.find(p => p.id === cartItem.id);
+            if (freshProduct) {
+              return {
+                ...cartItem,
+                price: freshProduct.price,
+                original_price: freshProduct.original_price,
+                sale_price: freshProduct.sale_price,
+                on_sale: freshProduct.on_sale,
+                stock: freshProduct.stock,
+                name: freshProduct.name,
+                image_url: freshProduct.image_url,
+              };
+            }
+            return cartItem;
+          });
+          
+          setCart(currentCart);
+          localStorage.setItem('cart', JSON.stringify(currentCart));
         } catch {
           setCart([]);
         }
-      }
-
-      const savedProducts = localStorage.getItem('products');
-      if (savedProducts) {
-        try {
-          setProducts(JSON.parse(savedProducts));
-        } catch {
-          const { data } = await supabase.from('products').select('*');
-          setProducts((data as Product[]) || []);
-          localStorage.setItem('products', JSON.stringify(data || []));
-        }
-      } else {
-        const { data } = await supabase.from('products').select('*');
-        setProducts((data as Product[]) || []);
-        localStorage.setItem('products', JSON.stringify(data || []));
       }
 
       setReady(true);
@@ -189,32 +236,41 @@ export default function CartPage() {
     }, 100);
   };
 
-  // Mapeamento das formas de pagamento para exibição
   const paymentMethodLabels: Record<string, string> = {
-    pix: 'Pix (à vista)',
+    pix: 'Pix',
     credito: 'Cartão de Crédito',
-    dinheiro: 'Dinheiro (na retirada)'
+    dinheiro: 'Dinheiro'
   };
 
-  // Mapeamento das opções de retirada
   const pickupOptionLabels: Record<string, string> = {
     buscar: 'Vou buscar',
     mandar: 'Vou mandar buscar'
   };
 
-  // Função para lidar com clique na opção de crédito
   const handleCreditClick = () => {
     setPaymentMethod('credito');
     setShowCreditModal(true);
   };
 
-  // Função para lidar com clique na opção "Vou mandar buscar"
+  const handleCashClick = () => {
+    setPaymentMethod('dinheiro');
+    // Se estiver com "Vou mandar buscar" selecionado, muda para "Vou buscar"
+    if (pickupOption === 'mandar') {
+      setPickupOption('buscar');
+    }
+    setShowCashModal(true);
+  };
+
   const handlePickupClick = () => {
+    // Verifica se pagamento é dinheiro
+    if (paymentMethod === 'dinheiro') {
+      alert('Indisponível devido à opção de pagamento em dinheiro. Para pagar em dinheiro, você precisa retirar pessoalmente.');
+      return;
+    }
     setPickupOption('mandar');
     setShowPickupModal(true);
   };
 
-  // Função para processar o pedido
   const processOrder = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
@@ -222,7 +278,6 @@ export default function CartPage() {
     const phone = '5592986446677';
     const orderCode = generateOrderCode();
 
-    // Criar pedido no Supabase
     const { data: order, error: orderError } = await supabase
       .from("orders")
       .insert([
@@ -249,7 +304,7 @@ export default function CartPage() {
       product_id: item.id,
       name: item.name,
       quantity: item.quantity,
-      price: item.price,
+      price: getCurrentPrice(item),
     }));
 
     const { error: itemsError } = await supabase
@@ -272,29 +327,31 @@ export default function CartPage() {
       if (error) console.error("Erro ao atualizar estoque:", error);
     }
 
-    const lines = cart.map(
-      (i) => `• ${i.name} — R$ ${i.price.toFixed(2).replace(".", ",")} × ${i.quantity}`
-    );
-    const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+    const total = cart.reduce((s, i) => s + getCurrentPrice(i) * i.quantity, 0);
+
+    const lines = cart.map((i) => {
+      const price = getCurrentPrice(i);
+      const hasPromo = hasPromotion(i);
+      const priceFormatted = `R$ ${price.toFixed(2).replace(".", ",")}`;
+      const quantityText = `${i.quantity} ${i.quantity === 1 ? 'uni' : 'uni'}`;
+      
+      if (hasPromo) {
+        const originalPriceFormatted = `R$ ${getOriginalPrice(i).toFixed(2).replace(".", ",")}`;
+        return `• ${i.name} — ${originalPriceFormatted} por ${priceFormatted}\n  ${quantityText}`;
+      }
+      return `• ${i.name} — ${priceFormatted}\n  ${quantityText}`;
+    });
 
     const message = `
-📦 *PEDIDO ${orderCode}*
+*PEDIDO:* ${orderCode} - ${paymentMethodLabels[paymentMethod]} - ${pickupOptionLabels[pickupOption]}
 
-💰 *Pagamento:* ${paymentMethodLabels[paymentMethod]}
-🛵 *Retirada:* ${pickupOptionLabels[pickupOption]}
-${observations ? `📝 *Observações:* ${observations}` : ''}
+${lines.join("\n\n")}
 
-🛒 *ITENS:*
-${lines.join("\n")}
+*TOTAL: R$ ${total.toFixed(2).replace(".", ",")}*
+${observations ? `\n*Observações:* ${observations}` : ''}
 
-💰 *TOTAL:* R$ ${total.toFixed(2).replace(".", ",")}
-
-✅ *Como finalizar:*
-1. Confira os itens acima
-2. Me envie este pedido
-3. Aguarde meu contato para confirmar
-
-*Obrigado por comprar com a Videra!*
+___/___/___/___/___
+Aguarde enquanto processamos seu pedido : )
 `.trim();
 
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
@@ -306,7 +363,6 @@ ${lines.join("\n")}
     setIsProcessing(false);
   };
 
-  // Função principal para enviar pedido
   const handleSendOrder = async () => {
     if (!cart || cart.length === 0) {
       alert('Seu carrinho está vazio!');
@@ -316,7 +372,7 @@ ${lines.join("\n")}
     await processOrder();
   };
 
-  const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+  const total = cart.reduce((s, i) => s + getCurrentPrice(i) * i.quantity, 0);
 
   // Loading state
   if (!ready) {
@@ -335,13 +391,34 @@ ${lines.join("\n")}
   // Empty cart state
   if (cart.length === 0) {
     return (
-      <div className="cart-page">
-        <div className="cart-container">
-          <div className="cart-empty">
-            <div className="empty-icon">🛒</div>
-            <h2>Seu carrinho está vazio</h2>
-            <p>Que tal dar uma olhada nos nossos produtos?</p>
-            <Link href="/" className="btn-shop">
+      <div className="cart-page" style={{ minHeight: '100vh', padding: '2rem 1rem' }}>
+        <div className="cart-container" style={{ maxWidth: '1200px', margin: '0 auto', background: 'white', borderRadius: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+          <div style={{ textAlign: 'center', padding: '4rem 2rem' }}>
+            <div style={{ fontSize: '5rem', marginBottom: '1rem' }}>🛍️</div>
+            <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem', color: '#1f2937' }}>Seu carrinho está vazio</h2>
+            <p style={{ color: '#6b7280', marginBottom: '0.5rem' }}>Parece que você ainda não escolheu seus produtos favoritos.</p>
+            <p style={{ color: '#9ca3af', fontSize: '0.875rem', marginBottom: '2rem' }}>Que tal dar uma olhada nas nossas coleções?</p>
+            
+            <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '2rem' }}>
+              <Link href="/pokemontcg" style={{ display: 'inline-block', padding: '0.5rem 1.25rem', background: 'white', border: '1px solid #e5e7eb', borderRadius: '40px', color: '#4b5563', textDecoration: 'none', fontSize: '0.875rem' }}>
+                🎴 Pokémon TCG
+              </Link>
+              <Link href="/jogosdetabuleiro" style={{ display: 'inline-block', padding: '0.5rem 1.25rem', background: 'white', border: '1px solid #e5e7eb', borderRadius: '40px', color: '#4b5563', textDecoration: 'none', fontSize: '0.875rem' }}>
+                🎲 Jogos de Tabuleiro
+              </Link>
+              <Link href="/acessorios" style={{ display: 'inline-block', padding: '0.5rem 1.25rem', background: 'white', border: '1px solid #e5e7eb', borderRadius: '40px', color: '#4b5563', textDecoration: 'none', fontSize: '0.875rem' }}>
+                🎒 Acessórios
+              </Link>
+              <Link href="/hotwheels" style={{ display: 'inline-block', padding: '0.5rem 1.25rem', background: 'white', border: '1px solid #e5e7eb', borderRadius: '40px', color: '#4b5563', textDecoration: 'none', fontSize: '0.875rem' }}>
+                🏎️ Hot Wheels
+              </Link>
+            </div>
+            
+            <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 2rem', background: 'linear-gradient(135deg, #dc2626, #b91c1c)', color: 'white', textDecoration: 'none', borderRadius: '40px', fontWeight: '600' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 9L12 3L21 9L12 15L3 9Z" />
+                <path d="M5 12V18L12 21L19 18V12" />
+              </svg>
               Continuar Comprando
             </Link>
           </div>
@@ -355,12 +432,16 @@ ${lines.join("\n")}
       <div className="cart-container">
         {/* Header */}
         <div className="cart-header">
-          <Link href="/" className="back-link">
+          <button 
+            onClick={() => window.history.back()} 
+            className="back-link"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: '#666' }}
+          >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M19 12H5M12 19l-7-7 7-7"/>
             </svg>
-            Voltar à loja
-          </Link>
+            Voltar
+          </button>
           <div className="header-title">
             <span className="cart-icon">🛒</span>
             <h1>Seu Carrinho</h1>
@@ -369,46 +450,59 @@ ${lines.join("\n")}
 
         {/* Cart Items */}
         <div className="cart-items">
-          {cart.map((item) => (
-            <div key={item.id} className="cart-item">
-              <div className="item-image">
-                <img src={item.image_url} alt={item.name} />
-              </div>
-              <div className="item-details">
-                <h3>{item.name}</h3>
-                <p className="item-price">R$ {item.price.toFixed(2)}</p>
-                <div className="item-controls">
-                  <div className="quantity-controls">
+          {cart.map((item) => {
+            const promotionActive = hasPromotion(item);
+            const currentPrice = getCurrentPrice(item);
+            const originalPrice = getOriginalPrice(item);
+            
+            return (
+              <div key={item.id} className="cart-item">
+                <div className="item-image">
+                  <img src={item.image_url} alt={item.name} />
+                </div>
+                <div className="item-details">
+                  <h3>{item.name}</h3>
+                  <p className="item-price">
+                    {promotionActive ? (
+                      <>
+                        <span className="original-price-small">R$ {originalPrice.toFixed(2)}</span>
+                        <span className="promotional-price-small">R$ {currentPrice.toFixed(2)}</span>
+                      </>
+                    ) : (
+                      <span className="current-price-text">R$ {item.price.toFixed(2)}</span>
+                    )}
+                  </p>
+                  <div className="item-controls">
+                    <div className="quantity-controls">
+                      <button 
+                        onClick={() => decreaseQuantity(item.id)}
+                        className="qty-btn"
+                      >
+                        -
+                      </button>
+                      <span className="quantity">{item.quantity}</span>
+                      <button 
+                        onClick={() => increaseQuantity(item.id)}
+                        className="qty-btn"
+                      >
+                        +
+                      </button>
+                    </div>
                     <button 
-                      onClick={() => decreaseQuantity(item.id)}
-                      className="qty-btn"
-                      aria-label="Diminuir quantidade"
+                      onClick={() => removeFromCart(item.id)}
+                      className="remove-btn"
                     >
-                      -
-                    </button>
-                    <span className="quantity">{item.quantity}</span>
-                    <button 
-                      onClick={() => increaseQuantity(item.id)}
-                      className="qty-btn"
-                      aria-label="Aumentar quantidade"
-                    >
-                      +
+                      Remover
                     </button>
                   </div>
-                  <button 
-                    onClick={() => removeFromCart(item.id)}
-                    className="remove-btn"
-                  >
-                    Remover
-                  </button>
+                </div>
+                <div className="item-subtotal">
+                  <span className="subtotal-label">Subtotal</span>
+                  <span className="subtotal-value">R$ {(currentPrice * item.quantity).toFixed(2)}</span>
                 </div>
               </div>
-              <div className="item-subtotal">
-                <span className="subtotal-label">Subtotal</span>
-                <span className="subtotal-value">R$ {(item.price * item.quantity).toFixed(2)}</span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Footer com opções adicionais */}
@@ -422,13 +516,13 @@ ${lines.join("\n")}
 
           {/* Forma de Pagamento */}
           <div className="options-section">
-            <label className="section-label">💰 Forma de Pagamento</label>
+            <label className="section-label"> Forma de Pagamento</label>
             <div className="options-group">
               <button
                 onClick={() => setPaymentMethod('pix')}
                 className={`option-btn ${paymentMethod === 'pix' ? 'active' : ''}`}
               >
-                Pix (à vista)
+                Pix
               </button>
               <button
                 onClick={handleCreditClick}
@@ -437,17 +531,17 @@ ${lines.join("\n")}
                 Cartão de Crédito
               </button>
               <button
-                onClick={() => setPaymentMethod('dinheiro')}
+                onClick={handleCashClick}
                 className={`option-btn ${paymentMethod === 'dinheiro' ? 'active' : ''}`}
               >
-                Dinheiro (na retirada)
+                Dinheiro
               </button>
             </div>
           </div>
 
           {/* Opção de Retirada */}
           <div className="options-section">
-            <label className="section-label">🛵 Como vai receber?</label>
+            <label className="section-label"> Retirada</label>
             <div className="options-group">
               <button
                 onClick={() => setPickupOption('buscar')}
@@ -457,11 +551,18 @@ ${lines.join("\n")}
               </button>
               <button
                 onClick={handlePickupClick}
-                className={`option-btn ${pickupOption === 'mandar' ? 'active' : ''}`}
+                className={`option-btn ${pickupOption === 'mandar' ? 'active' : ''} ${paymentMethod === 'dinheiro' ? 'disabled-option' : ''}`}
+                style={paymentMethod === 'dinheiro' ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                disabled={paymentMethod === 'dinheiro'}
               >
                 Vou mandar buscar
               </button>
             </div>
+            {paymentMethod === 'dinheiro' && (
+              <p className="disabled-warning" style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.5rem' }}>
+                ⚠️ Opção indisponível para pagamento em dinheiro
+              </p>
+            )}
           </div>
 
           {/* Observações */}
@@ -503,23 +604,15 @@ ${lines.join("\n")}
               <h3>Pagamento com Cartão de Crédito</h3>
             </div>
             <div className="modal-body">
-              <p>
-                Para pagar no crédito, utilizamos um <strong>Link de Pagamento</strong> que será enviado após a confirmação do pedido.
-              </p>
-              <p>
-                Você pode parcelar em até <strong>12x</strong> e pagar diretamente pelo aplicativo do seu banco.
-              </p>
+              <p>Para pagar no crédito, utilizamos um <strong>Link de Pagamento</strong> que será enviado após a confirmação do pedido.</p>
+              <p>Você pode parcelar em até <strong>12x</strong> e pagar diretamente pelo aplicativo do seu banco.</p>
               <div className="alert-message">
-                <span className="alert-icon">⚠️</span>
-                <span>
-                  <strong>Atenção:</strong> O valor total sofre um acréscimo devido às taxas do banco.
-                </span>
+                <span>⚠️</span>
+                <span><strong>Atenção:</strong> O valor total sofre um acréscimo devido às taxas do banco.</span>
               </div>
             </div>
             <div className="modal-footer">
-              <button onClick={() => setShowCreditModal(false)} className="modal-btn-primary">
-                Entendi
-              </button>
+              <button onClick={() => setShowCreditModal(false)} className="modal-btn-primary">Entendi</button>
             </div>
           </div>
         </div>
@@ -534,31 +627,45 @@ ${lines.join("\n")}
               <h3>Você escolheu "Vou mandar buscar"</h3>
             </div>
             <div className="modal-body">
-              <p>
-                Nessa modalidade, você precisa solicitar um motorista de aplicativo (Uber, 99, etc.) para retirar o item em nossa loja.
-              </p>
-              <p>
-                <strong>Não solicitamos o envio.</strong> Fazemos dessa forma para sua melhor comodidade:
-              </p>
+              <p>Nessa modalidade, você precisa solicitar um motorista de aplicativo (Uber, 99, etc.) para retirar o item em nossa loja.</p>
+              <p><strong>Não solicitamos o envio.</strong> Fazemos dessa forma para sua melhor comodidade:</p>
               <ul className="modal-list">
                 <li>✓ Você acompanha a corrida em tempo real</li>
                 <li>✓ Realiza o pagamento da corrida diretamente no app</li>
                 <li>✓ Entra em contato com o motorista caso precise resolver algo</li>
               </ul>
-              <p className="modal-note">
-                Após a confirmação do pedido, lhe será enviado nosso endereço e você poderá solicitar a retirada.
-              </p>
+              <p className="modal-note">Após a confirmação do pedido, lhe será enviado nosso endereço e você poderá solicitar a retirada.</p>
             </div>
             <div className="modal-footer">
-              <button onClick={() => setShowPickupModal(false)} className="modal-btn-primary">
-                Entendi
-              </button>
+              <button onClick={() => setShowPickupModal(false)} className="modal-btn-primary">Entendi</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Styles */}
+      {/* Modal para Dinheiro */}
+      {showCashModal && (
+        <div className="modal-overlay" onClick={() => setShowCashModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-icon">💵</span>
+              <h3>Pagamento em Dinheiro</h3>
+            </div>
+            <div className="modal-body">
+              <p>Para pagar em dinheiro, você precisa retirar o produto pessoalmente em nossa loja.</p>
+              <p>Por favor, informe se precisará de troco ao retirar o pedido.</p>
+              <div className="alert-message" style={{ background: '#e6f7e6', borderLeftColor: '#22c55e' }}>
+                <span>ℹ️</span>
+                <span><strong>Importante:</strong> Esta modalidade não permite envio por motoboy. A retirada deve ser feita presencialmente.</span>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button onClick={() => setShowCashModal(false)} className="modal-btn-primary">Entendi</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style jsx>{`
         .cart-page {
           min-height: 100vh;
@@ -669,8 +776,24 @@ ${lines.join("\n")}
         .item-price {
           font-size: 1rem;
           font-weight: 500;
-          color: #dc2626;
           margin: 0 0 1rem 0;
+        }
+
+        .current-price-text {
+          color: #dc2626;
+        }
+
+        .original-price-small {
+          text-decoration: line-through;
+          color: #9ca3af;
+          font-size: 0.75rem;
+          margin-right: 6px;
+        }
+
+        .promotional-price-small {
+          color: #dc2626;
+          font-size: 1rem;
+          font-weight: 600;
         }
 
         .item-controls {
@@ -777,8 +900,11 @@ ${lines.join("\n")}
           color: #dc2626;
         }
 
-        .options-section {
+          .options-section {
           margin-bottom: 1.5rem;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
         }
 
         .section-label {
@@ -787,13 +913,18 @@ ${lines.join("\n")}
           font-weight: 600;
           color: #374151;
           margin-bottom: 0.75rem;
+          width: 100%;
+          text-align: left;
         }
 
         .options-group {
           display: flex;
           gap: 0.75rem;
           flex-wrap: wrap;
+          justify-content: flex-end;
+          width: 100%;
         }
+
 
         .option-btn {
           padding: 0.6rem 1.25rem;
@@ -807,7 +938,7 @@ ${lines.join("\n")}
           color: #4b5563;
         }
 
-        .option-btn:hover {
+        .option-btn:hover:not(:disabled) {
           border-color: #dc2626;
           color: #dc2626;
         }
@@ -816,6 +947,11 @@ ${lines.join("\n")}
           background: #dc2626;
           border-color: #dc2626;
           color: white;
+        }
+
+        .disabled-option {
+          opacity: 0.5;
+          cursor: not-allowed;
         }
 
         .observations-input {
@@ -886,44 +1022,6 @@ ${lines.join("\n")}
         .btn-primary:disabled {
           opacity: 0.7;
           cursor: not-allowed;
-        }
-
-        .cart-empty {
-          text-align: center;
-          padding: 4rem 2rem;
-        }
-
-        .empty-icon {
-          font-size: 5rem;
-          margin-bottom: 1rem;
-          opacity: 0.5;
-        }
-
-        .cart-empty h2 {
-          font-size: 1.5rem;
-          margin: 0 0 0.5rem 0;
-          color: #1f2937;
-        }
-
-        .cart-empty p {
-          color: #6b7280;
-          margin-bottom: 2rem;
-        }
-
-        .btn-shop {
-          display: inline-block;
-          padding: 0.75rem 2rem;
-          background: linear-gradient(135deg, #dc2626, #b91c1c);
-          color: white;
-          text-decoration: none;
-          border-radius: 12px;
-          font-weight: 500;
-          transition: all 0.2s;
-        }
-
-        .btn-shop:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
         }
 
         .cart-loading {
@@ -1020,10 +1118,6 @@ ${lines.join("\n")}
           align-items: flex-start;
           gap: 0.5rem;
           margin-top: 1rem;
-        }
-
-        .alert-icon {
-          font-size: 1.25rem;
         }
 
         .modal-list {
