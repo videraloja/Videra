@@ -10,6 +10,7 @@ import { Product } from '../../types';
 import { useCartContext } from '../../contexts/CartContext';
 import { supabase } from '../../../lib/supabaseClient';
 import Link from 'next/link';
+import { getProductsWithAvailableStock, ProductWithAvailableStock } from '../../../lib/productService';
 
 export default function PromotionalPage() {
   const params = useParams();
@@ -37,105 +38,130 @@ export default function PromotionalPage() {
     }
   }, [slug, params]);
 
-  // 🛒 Sincronizar estoque com carrinho
-  const syncProductsWithCart = useCallback((products: Product[]): Product[] => {
-    const savedCart = localStorage.getItem('cart');
-    let cartItems: any[] = [];
-    
-    if (savedCart) {
-      try {
-        cartItems = JSON.parse(savedCart);
-      } catch {
-        cartItems = [];
-      }
+ // 🛒 Sincronizar estoque com carrinho (usando available_stock)
+// 🛒 Sincronizar estoque com carrinho (convertendo para Product)
+const syncProductsWithCart = useCallback((products: ProductWithAvailableStock[]): Product[] => {
+  const savedCart = localStorage.getItem('cart');
+  let cartItems: any[] = [];
+  
+  if (savedCart) {
+    try {
+      cartItems = JSON.parse(savedCart);
+    } catch {
+      cartItems = [];
     }
+  }
 
-    return products.map(product => {
-      const inCart = cartItems.find((item: any) => String(item.id) === String(product.id));
-      if (inCart) {
-        return { ...product, stock: Math.max(product.stock - inCart.quantity, 0) };
-      }
-      return product;
-    });
-  }, []);
+  return products.map(product => {
+    // Calcular estoque disponível (reservas - itens no carrinho)
+    let availableStock = product.available_stock;
+    
+    const inCart = cartItems.find((item: any) => String(item.id) === String(product.id));
+    if (inCart) {
+      availableStock = Math.max(availableStock - inCart.quantity, 0);
+    }
+    
+    // ✅ Converter ProductWithAvailableStock para Product
+    return {
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      original_price: product.original_price === null ? undefined : product.original_price,
+      sale_price: product.sale_price === null ? undefined : product.sale_price,
+      on_sale: product.on_sale ?? false,
+      image_url: product.image_url,
+      category: product.category,
+      stock: availableStock,
+      collection: (product as any).collection,
+      rarity: (product as any).rarity,
+      year: (product as any).year,
+      condition: (product as any).condition,
+      language: (product as any).language,
+      description: (product as any).description,
+    };
+  });
+}, []);
 
   // 🎯 Carregar página e produtos
-  useEffect(() => {
-    const loadPage = async () => {
-      // 🛡️ NÃO EXECUTAR SE SLUG FOR INVÁLIDO
-      if (!slug || slug === 'undefined' || slug.length < 2) {
-        return;
-      }
-
-      try {
-        setLoading(true);
-        setError(null);
-        
-        console.log('🔍 Carregando página promocional:', slug);
-        
-        const pageData = await promotionalPagesService.getPageBySlug(slug);
-        
-        if (!pageData) {
-          setError('Página não encontrada ou expirada');
-          setLoading(false);
-          return;
-        }
-        
-        console.log('🎨 TEMA CARREGADO:', pageData.theme ? {
-          nome: pageData.theme.name,
-          cores: pageData.theme.colors,
-          emojis: pageData.theme.emojis
-        } : 'Sem tema');
-        
-        setPage(pageData);
-        
-        const pageProducts = await promotionalPagesService.getPageProducts(pageData);
-        const syncedProducts = syncProductsWithCart(pageProducts);
-        setProducts(syncedProducts);
-        
-        console.log(`✅ Página carregada: ${pageData.title} (${syncedProducts.length} produtos)`);
-        
-      } catch (err) {
-        console.error('❌ Erro ao carregar página:', err);
-        setError('Erro ao carregar página promocional');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadPage();
-  }, [slug, syncProductsWithCart]);
-
-  // 🛒 Adicionar ao carrinho
-  const handleAddToCart = (product: Product) => {
-    const productId = String(product.id);
-    const currentStock = product.stock;
-    
-    if (currentStock <= 0) {
-      console.warn(`❌ ${product.name} sem estoque (${currentStock})`);
+useEffect(() => {
+  const loadPage = async () => {
+    if (!slug || slug === 'undefined' || slug.length < 2) {
       return;
     }
-    
-    console.log(`🛒 Adicionando ${product.name} ao carrinho. Estoque atual: ${currentStock}`);
-    
-    addToCartGlobal(product);
-    
-    setProducts(prev => prev.map(p => 
-      String(p.id) === productId 
-        ? { ...p, stock: Math.max(p.stock - 1, 0) }
-        : p
-    ));
-    
-    window.dispatchEvent(new CustomEvent('cartItemAdded', {
-      detail: { 
-        productId,
-        productName: product.name,
-        timestamp: Date.now()
+
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('🔍 Carregando página promocional:', slug);
+      
+      const pageData = await promotionalPagesService.getPageBySlug(slug);
+      
+      if (!pageData) {
+        setError('Página não encontrada ou expirada');
+        setLoading(false);
+        return;
       }
-    }));
-    
-    console.log(`✅ ${product.name} adicionado ao carrinho`);
+      
+      console.log('🎨 TEMA CARREGADO:', pageData.theme ? {
+        nome: pageData.theme.name,
+        cores: pageData.theme.colors,
+        emojis: pageData.theme.emojis
+      } : 'Sem tema');
+      
+      setPage(pageData);
+      
+      // ✅ USAR NOVA FUNÇÃO COM ESTOQUE DISPONÍVEL
+      const pageProducts = await promotionalPagesService.getPageProducts(pageData);
+      
+      // Buscar estoque disponível (considerando reservas)
+      const allProductsWithStock = await getProductsWithAvailableStock();
+      
+      // Mapear estoque disponível para os produtos da página
+      const productsWithAvailableStock = pageProducts.map(product => {
+        const stockInfo = allProductsWithStock.find(p => p.id === product.id);
+        return {
+          ...product,
+          available_stock: stockInfo?.available_stock ?? product.stock
+        } as ProductWithAvailableStock;
+      });
+      
+      const syncedProducts = syncProductsWithCart(productsWithAvailableStock);
+      setProducts(syncedProducts);
+      
+      console.log(`✅ Página carregada: ${pageData.title} (${syncedProducts.length} produtos)`);
+      
+    } catch (err) {
+      console.error('❌ Erro ao carregar página:', err);
+      setError('Erro ao carregar página promocional');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  loadPage();
+}, [slug, syncProductsWithCart]);
+
+  // 🛒 Adicionar ao carrinho - CORRIGIDO
+const handleAddToCart = (product: Product) => {
+  const productId = String(product.id);
+  
+  console.log(`🛒 Adicionando ${product.name} ao carrinho`);
+  
+  // Apenas adicionar ao carrinho global
+  addToCartGlobal(product);
+  
+  // Disparar evento para sincronizar outros componentes
+  window.dispatchEvent(new CustomEvent('cartItemAdded', {
+    detail: { 
+      productId,
+      productName: product.name,
+      timestamp: Date.now()
+    }
+  }));
+  
+  console.log(`✅ ${product.name} adicionado ao carrinho`);
+};
 
   // 🎨 Estilos dinâmicos baseados no TEMA DA PÁGINA
   const getPageStyles = () => {

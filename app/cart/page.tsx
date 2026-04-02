@@ -271,6 +271,25 @@ export default function CartPage() {
     setShowPickupModal(true);
   };
 
+  // Criar reserva para cada produto no carrinho
+const createReservations = async (orderId: string, cartItems: CartItem[]) => {
+  const reservations = cartItems.map(item => ({
+    order_id: orderId,
+    product_id: item.id,
+    quantity: item.quantity,
+    expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 minutos
+  }));
+  
+  const { error } = await supabase.from('reservations').insert(reservations);
+  
+  if (error) {
+    console.error('Erro ao criar reservas:', error);
+    throw error;
+  }
+  
+  console.log(`✅ Reservas criadas para ${cartItems.length} produtos`);
+};
+
   const processOrder = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
@@ -299,6 +318,18 @@ export default function CartPage() {
       return;
     }
 
+    // ✅ NOVO: Criar reservas antes de enviar para WhatsApp
+  try {
+    await createReservations(order.id, cart);
+  } catch (err) {
+    console.error('Erro ao criar reservas, pedido será cancelado:', err);
+    // Deletar o pedido se falhar a reserva
+    await supabase.from('orders').delete().eq('id', order.id);
+    alert('Erro ao processar pedido. Tente novamente.');
+    setIsProcessing(false);
+    return;
+  }
+
     const itemsPayload = cart.map((item) => ({
       order_id: order.id,
       product_id: item.id,
@@ -318,14 +349,7 @@ export default function CartPage() {
       return;
     }
 
-    for (const item of cart) {
-      const newStock = item.stock;
-      const { error } = await supabase
-        .from("products")
-        .update({ stock: newStock })
-        .eq("id", item.id);
-      if (error) console.error("Erro ao atualizar estoque:", error);
-    }
+   
 
     const total = cart.reduce((s, i) => s + getCurrentPrice(i) * i.quantity, 0);
 
