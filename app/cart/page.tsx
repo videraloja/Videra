@@ -294,6 +294,89 @@ const createReservations = async (orderId: string, cartItems: CartItem[]) => {
     if (isProcessing) return;
     setIsProcessing(true);
 
+    // ✅ 1. VERIFICAR ESTOQUE DISPONÍVEL ANTES DE RESERVAR
+  const { data: currentProducts, error: stockError } = await supabase
+    .from('products')
+    .select('id, stock')
+    .in('id', cart.map(i => i.id));
+
+  if (stockError) {
+    console.error('Erro ao verificar estoque:', stockError);
+    alert('Erro ao verificar disponibilidade. Tente novamente.');
+    setIsProcessing(false);
+    return;
+  }
+
+  const productStockMap = new Map();
+  currentProducts?.forEach(p => productStockMap.set(p.id, p.stock));
+
+  // Buscar reservas ativas para estes produtos
+  const { data: activeReservations } = await supabase
+    .from('reservations')
+    .select('product_id, quantity')
+    .in('product_id', cart.map(i => i.id))
+    .gte('expires_at', new Date().toISOString());
+
+  const reservedMap = new Map();
+  activeReservations?.forEach(r => {
+    reservedMap.set(r.product_id, (reservedMap.get(r.product_id) || 0) + r.quantity);
+  });
+
+  // Verificar cada item do carrinho
+  const unavailableItems: { name: string; available: number; requested: number }[] = [];
+
+  for (const item of cart) {
+    const realStock = productStockMap.get(item.id) || 0;
+    const reserved = reservedMap.get(item.id) || 0;
+    const availableStock = realStock - reserved;
+
+    if (availableStock < item.quantity) {
+      unavailableItems.push({
+        name: item.name,
+        available: availableStock,
+        requested: item.quantity
+      });
+    }
+  }
+
+  // Se houver itens indisponíveis
+  if (unavailableItems.length > 0) {
+    const productNames = unavailableItems.map(i => {
+      const falta = i.requested - i.available;
+      return `• ${i.name} (disponível: ${i.available}, você pediu: ${i.requested})`;
+    }).join('\n');
+    
+    const message = `❌ OS SEGUINTES PRODUTOS ESTÃO INDISPONÍVEIS:\n\n${productNames}\n\nSeu carrinho será atualizado. Remova os itens indisponíveis para continuar.`;
+    alert(message);
+    
+    // Remover itens indisponíveis do carrinho
+    const updatedCart = cart.filter(item => {
+      const realStock = productStockMap.get(item.id) || 0;
+      const reserved = reservedMap.get(item.id) || 0;
+      const availableStock = realStock - reserved;
+      return availableStock >= item.quantity;
+    });
+    
+    // Atualizar produtos (devolver estoque visual dos itens removidos)
+    const removedItems = cart.filter(item => {
+      const realStock = productStockMap.get(item.id) || 0;
+      const reserved = reservedMap.get(item.id) || 0;
+      const availableStock = realStock - reserved;
+      return availableStock < item.quantity;
+    });
+    
+    let updatedProducts = [...products];
+    for (const removed of removedItems) {
+      updatedProducts = updatedProducts.map(p =>
+        p.id === removed.id ? { ...p, stock: p.stock + removed.quantity } : p
+      );
+    }
+    
+    persistState(updatedCart, updatedProducts);
+    setIsProcessing(false);
+    return;
+  }
+
     const phone = '5592986446677';
     const orderCode = generateOrderCode();
 
