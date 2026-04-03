@@ -13,12 +13,15 @@ import { useStock } from '../hooks/useStock';
 import HeroSectionWrapper from './components/HeroSectionWrapper';
 import { carouselService } from './lib/carouselService'; // NOVO
 import { useCartContext } from './contexts/CartContext';
+import { useAvailableStock } from '@/hooks/useAvailableStock';
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [ready, setReady] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const { addToCart: addToCartGlobal } = useCartContext();
+  const { syncedProducts } = useAvailableStock(products);
+  
   
   // NOVO: Estados para carrosséis editáveis
   const [carouselConfigs, setCarouselConfigs] = useState<CarouselConfig[]>([]);
@@ -29,6 +32,38 @@ export default function HomePage() {
   const [viewAllType, setViewAllType] = useState<'all' | 'bestsellers' | 'new_arrivals'>('all');
   const [carouselsLoading, setCarouselsLoading] = useState(false);
   const [currentConfig, setCurrentConfig] = useState<CarouselConfig | null>(null);
+
+  // ✅ Sincronizar allProducts, bestsellers e newArrivals com o estoque disponível
+useEffect(() => {
+  if (syncedProducts.length > 0) {
+    // Atualizar allProducts
+    setAllProducts(prevAll => {
+      const updated = prevAll.map(product => {
+        const synced = syncedProducts.find(p => p.id === product.id);
+        return synced ? { ...product, stock: synced.stock } : product;
+      });
+      return updated;
+    });
+    
+    // Atualizar bestsellers
+    setBestsellers(prev => {
+      const updated = prev.map(product => {
+        const synced = syncedProducts.find(p => p.id === product.id);
+        return synced ? { ...product, stock: synced.stock } : product;
+      });
+      return updated;
+    });
+    
+    // Atualizar newArrivals
+    setNewArrivals(prev => {
+      const updated = prev.map(product => {
+        const synced = syncedProducts.find(p => p.id === product.id);
+        return synced ? { ...product, stock: synced.stock } : product;
+      });
+      return updated;
+    });
+  }
+}, [syncedProducts]);
 
   // 🆕 HOOKS COMPARTILHADOS
   const { cart, addToCart } = useCart();
@@ -181,7 +216,7 @@ export default function HomePage() {
   };
 
   // BUSCA GLOBAL
-  const filteredProducts = products.filter(product => 
+  const filteredProducts = syncedProducts.filter(product => 
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     product.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     product.description?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -313,7 +348,7 @@ export default function HomePage() {
               <div>
                 <Carousel
                   title="Todos os Produtos"
-                  products={allProducts.length > 0 ? allProducts : featuredProducts}
+                  products={syncedProducts.length > 0 ? allProducts : featuredProducts}
                   config={carouselConfigs.find(c => c.carousel_type === 'all') || {
                     page_slug: 'home',
                     carousel_type: 'all',
