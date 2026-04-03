@@ -38,49 +38,26 @@ export default function PromotionalPage() {
     }
   }, [slug, params]);
 
- // 🛒 Sincronizar estoque com carrinho (usando available_stock)
-// 🛒 Sincronizar estoque com carrinho (convertendo para Product)
+// 🛒 Sincronizar produtos - APENAS CONVERSÃO DE TIPO (SEM DESCONTO)
 const syncProductsWithCart = useCallback((products: ProductWithAvailableStock[]): Product[] => {
-  const savedCart = localStorage.getItem('cart');
-  let cartItems: any[] = [];
-  
-  if (savedCart) {
-    try {
-      cartItems = JSON.parse(savedCart);
-    } catch {
-      cartItems = [];
-    }
-  }
-
-  return products.map(product => {
-    // Calcular estoque disponível (reservas - itens no carrinho)
-    let availableStock = product.available_stock;
-    
-    const inCart = cartItems.find((item: any) => String(item.id) === String(product.id));
-    if (inCart) {
-      availableStock = Math.max(availableStock - inCart.quantity, 0);
-    }
-    
-    // ✅ Converter ProductWithAvailableStock para Product
-    return {
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      original_price: product.original_price === null ? undefined : product.original_price,
-      sale_price: product.sale_price === null ? undefined : product.sale_price,
-      on_sale: product.on_sale ?? false,
-      image_url: product.image_url,
-      category: product.category,
-      stock: availableStock,
-      collection: (product as any).collection,
-      rarity: (product as any).rarity,
-      year: (product as any).year,
-      condition: (product as any).condition,
-      language: (product as any).language,
-      description: (product as any).description,
-    };
-  });
-}, []);
+  return products.map(product => ({
+    id: product.id,
+    name: product.name,
+    price: product.price,
+    original_price: product.original_price === null ? undefined : product.original_price,
+    sale_price: product.sale_price === null ? undefined : product.sale_price,
+    on_sale: product.on_sale ?? false,
+    image_url: product.image_url,
+    category: product.category,
+    stock: product.available_stock,  // ← available_stock já está correto
+    collection: (product as any).collection,
+    rarity: (product as any).rarity,
+    year: (product as any).year,
+    condition: (product as any).condition,
+    language: (product as any).language,
+    description: (product as any).description,
+  }));
+}, []);  // ← Sem dependências
 
   // 🎯 Carregar página e produtos
 useEffect(() => {
