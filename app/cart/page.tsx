@@ -81,6 +81,11 @@ export default function CartPage() {
     window.dispatchEvent(new Event('cart-updated'));
   };
 
+   useEffect(() => {
+    // Marcar que o usuário está/esteve no carrinho
+    sessionStorage.setItem('wasInCart', 'true');
+  }, []);
+
   useEffect(() => {
     const load = async () => {
       const { data: freshProducts, error } = await supabase

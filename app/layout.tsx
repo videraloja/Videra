@@ -8,6 +8,7 @@ import { ThemeEffects } from "./components/ThemeEffects";
 import { ThemeEditorProvider } from "./contexts/ThemeEditorContext";
 import { PageThemeProvider } from "./contexts/PageThemeContext";
 import { CartProvider } from "./contexts/CartContext"; // 🆕 IMPORT DO CART PROVIDER
+import CartExitHandler from './components/CartExitHandler';
 
 export const metadata = {
   title: "Videra",
@@ -49,6 +50,7 @@ export default function RootLayout({
                     <p style={{ margin: 0 }}>© {new Date().getFullYear()} Videra. Todos os direitos reservados.</p>
                   </footer>
                 </PageThemeProvider>
+                <CartExitHandler /> 
               </CartProvider>
             </ThemeEditorProvider>
           </AuthProvider>
