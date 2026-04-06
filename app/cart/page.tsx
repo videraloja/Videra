@@ -576,16 +576,22 @@ Aguarde enquanto processamos seu pedido : )
       <div className="cart-container">
         {/* Header */}
         <div className="cart-header">
-          <button 
-            onClick={() => window.history.back()} 
-            className="back-link"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: '#666' }}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M19 12H5M12 19l-7-7 7-7"/>
-            </svg>
-            Voltar
-          </button>
+         <button 
+  onClick={() => {
+    // Forçar sincronização antes de voltar
+    window.dispatchEvent(new Event('cart-updated'));
+    window.dispatchEvent(new Event('storage'));
+    window.dispatchEvent(new CustomEvent('cartStateChanged'));
+    window.history.back();
+  }} 
+  className="back-link"
+  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: '#666' }}
+>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M19 12H5M12 19l-7-7 7-7"/>
+  </svg>
+  Voltar
+</button>
           <div className="header-title">
             <span className="cart-icon">🛒</span>
             <h1>Seu Carrinho</h1>
