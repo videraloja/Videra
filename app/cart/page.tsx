@@ -291,10 +291,10 @@ const createReservations = async (orderId: string, cartItems: CartItem[]) => {
 };
 
   const processOrder = async () => {
-    if (isProcessing) return;
-    setIsProcessing(true);
+  if (isProcessing) return;
+  setIsProcessing(true);
 
-    // ✅ 1. VERIFICAR ESTOQUE DISPONÍVEL ANTES DE RESERVAR
+  // ✅ 1. VERIFICAR ESTOQUE DISPONÍVEL (igual ao ANTIGO + AJUSTE)
   const { data: currentProducts, error: stockError } = await supabase
     .from('products')
     .select('id, stock')
@@ -310,7 +310,6 @@ const createReservations = async (orderId: string, cartItems: CartItem[]) => {
   const productStockMap = new Map();
   currentProducts?.forEach(p => productStockMap.set(p.id, p.stock));
 
-  // Buscar reservas ativas para estes produtos
   const { data: activeReservations } = await supabase
     .from('reservations')
     .select('product_id, quantity')
@@ -322,8 +321,9 @@ const createReservations = async (orderId: string, cartItems: CartItem[]) => {
     reservedMap.set(r.product_id, (reservedMap.get(r.product_id) || 0) + r.quantity);
   });
 
-  // Verificar cada item do carrinho
+  // ✅ AJUSTE DE QUANTIDADE (NOVO)
   const unavailableItems: { name: string; available: number; requested: number }[] = [];
+  const adjustedItems: { name: string; oldQty: number; newQty: number }[] = [];
 
   for (const item of cart) {
     const realStock = productStockMap.get(item.id) || 0;
@@ -331,125 +331,156 @@ const createReservations = async (orderId: string, cartItems: CartItem[]) => {
     const availableStock = realStock - reserved;
 
     if (availableStock < item.quantity) {
-      unavailableItems.push({
-        name: item.name,
-        available: availableStock,
-        requested: item.quantity
-      });
+      if (availableStock > 0) {
+        adjustedItems.push({
+          name: item.name,
+          oldQty: item.quantity,
+          newQty: availableStock
+        });
+      } else {
+        unavailableItems.push({
+          name: item.name,
+          available: availableStock,
+          requested: item.quantity
+        });
+      }
     }
   }
 
-  // Se houver itens indisponíveis
-  if (unavailableItems.length > 0) {
-    const productNames = unavailableItems.map(i => {
-      const falta = i.requested - i.available;
-      return `• ${i.name} (disponível: ${i.available}, você pediu: ${i.requested})`;
-    }).join('\n');
+  // ✅ MENSAGEM COMBINADA (NOVO)
+  if (adjustedItems.length > 0 || unavailableItems.length > 0) {
+    let message = '';
     
-    const message = `❌ OS SEGUINTES PRODUTOS ESTÃO INDISPONÍVEIS:\n\n${productNames}\n\nSeu carrinho será atualizado. Remova os itens indisponíveis para continuar.`;
+    if (adjustedItems.length > 0) {
+      message += '⚠️ QUANTIDADES AJUSTADAS:\n';
+      adjustedItems.forEach(i => {
+        message += `• ${i.name}: ${i.oldQty} → ${i.newQty} unidades\n`;
+      });
+      message += '\n';
+    }
+    
+    if (unavailableItems.length > 0) {
+      message += '❌ PRODUTOS REMOVIDOS (ESGOTADOS):\n';
+      unavailableItems.forEach(i => {
+        message += `• ${i.name}\n`;
+      });
+      message += '\n';
+    }
+    
+    message += 'Seu carrinho foi atualizado automaticamente.';
     alert(message);
     
-    // Remover itens indisponíveis do carrinho
-    const updatedCart = cart.filter(item => {
+    // ✅ CARRINHO AJUSTADO (NOVO)
+    const updatedCart = cart.map(item => {
       const realStock = productStockMap.get(item.id) || 0;
       const reserved = reservedMap.get(item.id) || 0;
       const availableStock = realStock - reserved;
-      return availableStock >= item.quantity;
-    });
-    
-    // Atualizar produtos (devolver estoque visual dos itens removidos)
-    const removedItems = cart.filter(item => {
-      const realStock = productStockMap.get(item.id) || 0;
-      const reserved = reservedMap.get(item.id) || 0;
-      const availableStock = realStock - reserved;
-      return availableStock < item.quantity;
-    });
+      
+      if (availableStock < item.quantity) {
+        if (availableStock > 0) {
+          return { ...item, quantity: availableStock };
+        }
+        return null;
+      }
+      return item;
+    }).filter(item => item !== null) as CartItem[];
     
     let updatedProducts = [...products];
-    for (const removed of removedItems) {
-      updatedProducts = updatedProducts.map(p =>
-        p.id === removed.id ? { ...p, stock: p.stock + removed.quantity } : p
-      );
+    for (const item of cart) {
+      const realStock = productStockMap.get(item.id) || 0;
+      const reserved = reservedMap.get(item.id) || 0;
+      const availableStock = realStock - reserved;
+      
+      if (availableStock < item.quantity) {
+        const diff = item.quantity - Math.max(availableStock, 0);
+        updatedProducts = updatedProducts.map(p =>
+          p.id === item.id ? { ...p, stock: p.stock + diff } : p
+        );
+      }
     }
     
     persistState(updatedCart, updatedProducts);
+    
+    // ✅ FORÇAR SINCRONIZAÇÃO (NOVO)
+    window.dispatchEvent(new Event('cart-updated'));
+    window.dispatchEvent(new Event('storage'));
+    window.dispatchEvent(new CustomEvent('cartStateChanged'));
+    
     setIsProcessing(false);
     return;
   }
 
-    const phone = '5592986446677';
-    const orderCode = generateOrderCode();
+  // ✅ 2. RESERVAR E ENVIAR (MANTIDO DO ANTIGO - usa createReservations separada)
+  const phone = '5592986446677';
+  const orderCode = generateOrderCode();
 
-    const { data: order, error: orderError } = await supabase
-      .from("orders")
-      .insert([
-        {
-          order_code: orderCode,
-          status: "pendente",
-          payment_method: paymentMethodLabels[paymentMethod],
-          pickup_option: pickupOptionLabels[pickupOption],
-          observations: observations || null,
-        },
-      ])
-      .select()
-      .single();
+  const { data: order, error: orderError } = await supabase
+    .from("orders")
+    .insert([
+      {
+        order_code: orderCode,
+        status: "pendente",
+        payment_method: paymentMethodLabels[paymentMethod],
+        pickup_option: pickupOptionLabels[pickupOption],
+        observations: observations || null,
+      },
+    ])
+    .select()
+    .single();
 
-    if (orderError || !order) {
-      console.error("Erro ao salvar pedido no Supabase:", orderError);
-      alert("Erro ao registrar o pedido. Tente novamente.");
-      setIsProcessing(false);
-      return;
-    }
+  if (orderError || !order) {
+    console.error("Erro ao salvar pedido no Supabase:", orderError);
+    alert("Erro ao registrar o pedido. Tente novamente.");
+    setIsProcessing(false);
+    return;
+  }
 
-    // ✅ NOVO: Criar reservas antes de enviar para WhatsApp
+  // ✅ Usa a função createReservations separada (como no ANTIGO)
   try {
     await createReservations(order.id, cart);
   } catch (err) {
     console.error('Erro ao criar reservas, pedido será cancelado:', err);
-    // Deletar o pedido se falhar a reserva
     await supabase.from('orders').delete().eq('id', order.id);
     alert('Erro ao processar pedido. Tente novamente.');
     setIsProcessing(false);
     return;
   }
 
-    const itemsPayload = cart.map((item) => ({
-      order_id: order.id,
-      product_id: item.id,
-      name: item.name,
-      quantity: item.quantity,
-      price: getCurrentPrice(item),
-    }));
+  const itemsPayload = cart.map((item) => ({
+    order_id: order.id,
+    product_id: item.id,
+    name: item.name,
+    quantity: item.quantity,
+    price: getCurrentPrice(item),
+  }));
 
-    const { error: itemsError } = await supabase
-      .from("order_items")
-      .insert(itemsPayload);
+  const { error: itemsError } = await supabase
+    .from("order_items")
+    .insert(itemsPayload);
 
-    if (itemsError) {
-      console.error("Erro ao salvar itens:", itemsError);
-      alert("Erro ao salvar itens do pedido.");
-      setIsProcessing(false);
-      return;
+  if (itemsError) {
+    console.error("Erro ao salvar itens:", itemsError);
+    alert("Erro ao salvar itens do pedido.");
+    setIsProcessing(false);
+    return;
+  }
+
+  const total = cart.reduce((s, i) => s + getCurrentPrice(i) * i.quantity, 0);
+
+  const lines = cart.map((i) => {
+    const price = getCurrentPrice(i);
+    const hasPromo = hasPromotion(i);
+    const priceFormatted = `R$ ${price.toFixed(2).replace(".", ",")}`;
+    const quantityText = `${i.quantity} ${i.quantity === 1 ? 'uni' : 'uni'}`;
+    
+    if (hasPromo) {
+      const originalPriceFormatted = `R$ ${getOriginalPrice(i).toFixed(2).replace(".", ",")}`;
+      return `• ${i.name} — ${originalPriceFormatted} por ${priceFormatted}\n  ${quantityText}`;
     }
+    return `• ${i.name} — ${priceFormatted}\n  ${quantityText}`;
+  });
 
-   
-
-    const total = cart.reduce((s, i) => s + getCurrentPrice(i) * i.quantity, 0);
-
-    const lines = cart.map((i) => {
-      const price = getCurrentPrice(i);
-      const hasPromo = hasPromotion(i);
-      const priceFormatted = `R$ ${price.toFixed(2).replace(".", ",")}`;
-      const quantityText = `${i.quantity} ${i.quantity === 1 ? 'uni' : 'uni'}`;
-      
-      if (hasPromo) {
-        const originalPriceFormatted = `R$ ${getOriginalPrice(i).toFixed(2).replace(".", ",")}`;
-        return `• ${i.name} — ${originalPriceFormatted} por ${priceFormatted}\n  ${quantityText}`;
-      }
-      return `• ${i.name} — ${priceFormatted}\n  ${quantityText}`;
-    });
-
-    const message = `
+  const message = `
 *PEDIDO:* ${orderCode} - ${paymentMethodLabels[paymentMethod]} - ${pickupOptionLabels[pickupOption]}
 
 ${lines.join("\n\n")}
@@ -461,14 +492,20 @@ ___/___/___/___/___
 Aguarde enquanto processamos seu pedido : )
 `.trim();
 
-    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-    window.open(url, "_blank");
+  const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+  window.open(url, "_blank");
 
-    clearCart();
+  clearCart();
+  
+  // ✅ FORÇAR SINCRONIZAÇÃO (NOVO)
+  window.dispatchEvent(new Event('cart-updated'));
+  window.dispatchEvent(new Event('storage'));
+  window.dispatchEvent(new CustomEvent('cartStateChanged'));
 
-    alert(`Pedido ${orderCode} registrado com sucesso!`);
-    setIsProcessing(false);
-  };
+  // ✅ MENSAGEM MELHORADA (NOVO)
+  alert(`✅ Pedido ${orderCode} registrado com sucesso! Produtos reservados por 30 minutos.`);
+  setIsProcessing(false);
+};
 
   const handleSendOrder = async () => {
     if (!cart || cart.length === 0) {
