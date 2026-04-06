@@ -13,11 +13,13 @@ import { useCategoryFilters } from '@/hooks/useCategoryFilters';
 import { Product, CartItem, CarouselConfig } from '../types';
 import { useCartContext } from '../contexts/CartContext';
 import HeroSectionWrapper from '../components/HeroSectionWrapper';
+import { useAvailableStock } from '@/hooks/useAvailableStock';
 
 export default function JogosTabuleiroPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [ready, setReady] = useState(false);
   const { addToCart: addToCartGlobal } = useCartContext();
+  const { syncedProducts } = useAvailableStock(products);
 
   // 🆕 STATES PARA CARROSSÉIS
   const [carouselConfigs, setCarouselConfigs] = useState<CarouselConfig[]>([]);
@@ -38,6 +40,28 @@ export default function JogosTabuleiroPage() {
   const { filterBoardGames } = useCategoryFilters();
 
   const productsRef = useRef<HTMLDivElement>(null);
+
+// ✅ Sincronizar bestsellers e newArrivals com o estoque disponível
+useEffect(() => {
+  if (syncedProducts.length > 0) {
+    setBestsellers(prev => {
+      const updated = prev.map(product => {
+        const synced = syncedProducts.find(p => p.id === product.id);
+        return synced ? { ...product, stock: synced.stock } : product;
+      });
+      return updated;
+    });
+    
+    setNewArrivals(prev => {
+      const updated = prev.map(product => {
+        const synced = syncedProducts.find(p => p.id === product.id);
+        return synced ? { ...product, stock: synced.stock } : product;
+      });
+      return updated;
+    });
+  }
+}, [syncedProducts]);
+
 
 // 🆕 FUNÇÃO PARA BUSCA (adicione aqui)
 const handleSearchChange = useCallback((term: string) => {
@@ -217,37 +241,51 @@ const handleSearchChange = useCallback((term: string) => {
     load();
   }, [syncProductsWithCart]);
 
-  // CARREGAR CARROSSÉIS
-  useEffect(() => {
-    const loadCarousels = async () => {
-      if (!ready) return;
+// CARREGAR CARROSSÉIS (APENAS COM RESERVAS, SEM DESCONTO DO CARRINHO)
+useEffect(() => {
+  const loadCarousels = async () => {
+    if (!ready) return;
+    
+    setCarouselsLoading(true);
+    try {
+      const configs = await carouselService.getCarouselConfigs('jogosdetabuleiro');
+      setCarouselConfigs(configs);
       
-      setCarouselsLoading(true);
-      try {
-        const configs = await carouselService.getCarouselConfigs('jogosdetabuleiro');
-        setCarouselConfigs(configs);
-        
-        if (configs.length > 0) {
-          setCurrentConfig(configs[0]);
-        }
-        
-        const best = await carouselService.getBestsellers('board-games', 10);
-        const syncedBest = syncProductsWithCart(best);
-        setBestsellers(syncedBest);
-        
-        const arrivals = await carouselService.getNewArrivals('board-games', 10);
-        const syncedArrivals = syncProductsWithCart(arrivals);
-        setNewArrivals(syncedArrivals);
-        
-      } catch (error) {
-        console.error('Erro ao carregar carrosséis:', error);
-      } finally {
-        setCarouselsLoading(false);
+      if (configs.length > 0) {
+        setCurrentConfig(configs[0]);
       }
-    };
+      
+      // ✅ Buscar produtos com available_stock (considerando reservas APENAS)
+      const { getProductsWithAvailableStock } = await import('@/lib/productService');
+      const productsWithStock = await getProductsWithAvailableStock();
+      
+      // ✅ Buscar bestsellers e aplicar APENAS available_stock
+      const best = await carouselService.getBestsellers('board-games', 10);
+      const syncedBest = best.map(product => {
+        const stockInfo = productsWithStock.find(p => p.id === product.id);
+        const availableStock = stockInfo?.available_stock ?? product.stock;
+        return { ...product, stock: availableStock };
+      });
+      setBestsellers(syncedBest);
+      
+      // ✅ Buscar new arrivals e aplicar APENAS available_stock
+      const arrivals = await carouselService.getNewArrivals('board-games', 10);
+      const syncedArrivals = arrivals.map(product => {
+        const stockInfo = productsWithStock.find(p => p.id === product.id);
+        const availableStock = stockInfo?.available_stock ?? product.stock;
+        return { ...product, stock: availableStock };
+      });
+      setNewArrivals(syncedArrivals);
+      
+    } catch (error) {
+      console.error('Erro ao carregar carrosséis:', error);
+    } finally {
+      setCarouselsLoading(false);
+    }
+  };
 
-    loadCarousels();
-  }, [ready, syncProductsWithCart]);
+  loadCarousels();
+}, [ready]);
 
   const handleCarouselSelect = (type: 'all' | 'bestsellers' | 'new_arrivals') => {
     const config = carouselConfigs.find(c => c.carousel_type === type);
@@ -406,14 +444,18 @@ const handleSearchChange = useCallback((term: string) => {
         padding: '20px'
       }}
     >
-      {(viewAllType === 'all' ? filteredProducts : 
-        viewAllType === 'bestsellers' ? bestsellers.filter(p => 
-          filteredProducts.some(fp => fp.id === p.id)
-        ) : newArrivals.filter(p => 
-          filteredProducts.some(fp => fp.id === p.id)
-        ))
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map((product) => (
+      {(viewAllType === 'all' ? syncedProducts : 
+  viewAllType === 'bestsellers' ? bestsellers : 
+  newArrivals)
+  .filter(product => {
+    // Se houver busca/filtros, mostrar apenas os que correspondem
+    if (hasActiveSearch || hasActiveFilters) {
+      return filteredProducts.some(fp => fp.id === product.id);
+    }
+    return true;
+  })
+  .sort((a, b) => a.name.localeCompare(b.name))
+  .map((product) => (
           <ProductCard 
             key={product.id}
             product={product}
@@ -585,7 +627,7 @@ const handleSearchChange = useCallback((term: string) => {
                   <div>
                     <Carousel
                       title="Todos os Jogos"
-                      products={products}
+                      products={syncedProducts}
                       config={carouselConfigs.find(c => c.carousel_type === 'all') || {
                         page_slug: 'jogosdetabuleiro',
                         carousel_type: 'all',

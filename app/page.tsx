@@ -138,37 +138,53 @@ useEffect(() => {
     load();
   }, []);
 
-  // NOVO: Carregar carrosséis do banco
-  useEffect(() => {
-    const loadCarousels = async () => {
-      if (!ready) return;
+// CARREGAR CARROSSÉIS (APENAS COM RESERVAS, SEM DESCONTO DO CARRINHO)
+useEffect(() => {
+  const loadCarousels = async () => {
+    if (!ready) return;
+    
+    setCarouselsLoading(true);
+    try {
+      const configs = await carouselService.getCarouselConfigs('pokemontcg');
+      setCarouselConfigs(configs);
       
-      setCarouselsLoading(true);
-      try {
-        const configs = await carouselService.getCarouselConfigs('home');
-        setCarouselConfigs(configs);
-        
-        if (configs.length > 0) {
-          setCurrentConfig(configs[0]);
-        }
-        
-        const best = await carouselService.getBestsellers('all', 10);
-        const syncedBest = syncProductsWithCart(best);
-        setBestsellers(syncedBest);
-        
-        const arrivals = await carouselService.getNewArrivals('all', 10);
-        const syncedArrivals = syncProductsWithCart(arrivals);
-        setNewArrivals(syncedArrivals);
-        
-      } catch (error) {
-        console.error('Erro ao carregar carrosséis:', error);
-      } finally {
-        setCarouselsLoading(false);
+      if (configs.length > 0) {
+        setCurrentConfig(configs[0]);
       }
-    };
+      
+      // ✅ Buscar produtos com available_stock (considerando reservas APENAS)
+      const { getProductsWithAvailableStock } = await import('@/lib/productService');
+      const productsWithStock = await getProductsWithAvailableStock();
+      
+      // ✅ Buscar bestsellers e aplicar APENAS available_stock (sem desconto do carrinho)
+      const best = await carouselService.getBestsellers('pokemon', 10);
+      const syncedBest = best.map(product => {
+        const stockInfo = productsWithStock.find(p => p.id === product.id);
+        const availableStock = stockInfo?.available_stock ?? product.stock;
+        // ⚠️ NÃO descontar o carrinho aqui! O useEffect de sincronização fará isso.
+        return { ...product, stock: availableStock };
+      });
+      setBestsellers(syncedBest);
+      
+      // ✅ Buscar new arrivals e aplicar APENAS available_stock
+      const arrivals = await carouselService.getNewArrivals('pokemon', 10);
+      const syncedArrivals = arrivals.map(product => {
+        const stockInfo = productsWithStock.find(p => p.id === product.id);
+        const availableStock = stockInfo?.available_stock ?? product.stock;
+        // ⚠️ NÃO descontar o carrinho aqui!
+        return { ...product, stock: availableStock };
+      });
+      setNewArrivals(syncedArrivals);
+      
+    } catch (error) {
+      console.error('Erro ao carregar carrosséis:', error);
+    } finally {
+      setCarouselsLoading(false);
+    }
+  };
 
-    loadCarousels();
-  }, [ready]);
+  loadCarousels();
+}, [ready]);
 
   // 🆕 FUNÇÃO addToCart ATUALIZADA
     const handleAddToCart = (product: Product) => {

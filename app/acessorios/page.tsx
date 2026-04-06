@@ -11,11 +11,13 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { Product, CartItem, CarouselConfig } from '../types';
 import { useCartContext } from '../contexts/CartContext';
 import HeroSectionWrapper from '../components/HeroSectionWrapper';
+import { useAvailableStock } from '@/hooks/useAvailableStock';
 
 export default function AcessoriosPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [ready, setReady] = useState(false);
   const { addToCart: addToCartGlobal } = useCartContext();
+const { syncedProducts } = useAvailableStock(products);
 
   // 🆕 STATES PARA CARROSSÉIS
   const [carouselConfigs, setCarouselConfigs] = useState<CarouselConfig[]>([]);
@@ -25,6 +27,27 @@ export default function AcessoriosPage() {
   const [viewAllType, setViewAllType] = useState<'all' | 'bestsellers' | 'new_arrivals'>('all');
   const [carouselsLoading, setCarouselsLoading] = useState(false);
   const [currentConfig, setCurrentConfig] = useState<CarouselConfig | null>(null);
+
+  // ✅ Sincronizar bestsellers e newArrivals com o estoque disponível
+useEffect(() => {
+  if (syncedProducts.length > 0) {
+    setBestsellers(prev => {
+      const updated = prev.map(product => {
+        const synced = syncedProducts.find(p => p.id === product.id);
+        return synced ? { ...product, stock: synced.stock } : product;
+      });
+      return updated;
+    });
+    
+    setNewArrivals(prev => {
+      const updated = prev.map(product => {
+        const synced = syncedProducts.find(p => p.id === product.id);
+        return synced ? { ...product, stock: synced.stock } : product;
+      });
+      return updated;
+    });
+  }
+}, [syncedProducts]);
 
   // 🆕 SIMPLES: Apenas busca por texto
   const [searchTerm, setSearchTerm] = useState('');
@@ -146,37 +169,51 @@ export default function AcessoriosPage() {
     load();
   }, []);
 
-  // CARREGAR CARROSSÉIS
-  useEffect(() => {
-    const loadCarousels = async () => {
-      if (!ready) return;
+  // CARREGAR CARROSSÉIS (APENAS COM RESERVAS, SEM DESCONTO DO CARRINHO)
+useEffect(() => {
+  const loadCarousels = async () => {
+    if (!ready) return;
+    
+    setCarouselsLoading(true);
+    try {
+      const configs = await carouselService.getCarouselConfigs('acessorios'); // ou 'hotwheels'
+      setCarouselConfigs(configs);
       
-      setCarouselsLoading(true);
-      try {
-        const configs = await carouselService.getCarouselConfigs('acessorios');
-        setCarouselConfigs(configs);
-        
-        if (configs.length > 0) {
-          setCurrentConfig(configs[0]);
-        }
-        
-        const best = await carouselService.getBestsellers('acessorios', 10);
-        const syncedBest = syncProductsWithCart(best);
-        setBestsellers(syncedBest);
-        
-        const arrivals = await carouselService.getNewArrivals('acessorios', 10);
-        const syncedArrivals = syncProductsWithCart(arrivals);
-        setNewArrivals(syncedArrivals);
-        
-      } catch (error) {
-        console.error('Erro ao carregar carrosséis:', error);
-      } finally {
-        setCarouselsLoading(false);
+      if (configs.length > 0) {
+        setCurrentConfig(configs[0]);
       }
-    };
+      
+      // ✅ Buscar produtos com available_stock
+      const { getProductsWithAvailableStock } = await import('@/lib/productService');
+      const productsWithStock = await getProductsWithAvailableStock();
+      
+      // ✅ Buscar bestsellers e aplicar APENAS available_stock
+      const best = await carouselService.getBestsellers('acessorios', 10); // ou 'hot-wheels'
+      const syncedBest = best.map(product => {
+        const stockInfo = productsWithStock.find(p => p.id === product.id);
+        const availableStock = stockInfo?.available_stock ?? product.stock;
+        return { ...product, stock: availableStock };
+      });
+      setBestsellers(syncedBest);
+      
+      // ✅ Buscar new arrivals e aplicar APENAS available_stock
+      const arrivals = await carouselService.getNewArrivals('acessorios', 10); // ou 'hot-wheels'
+      const syncedArrivals = arrivals.map(product => {
+        const stockInfo = productsWithStock.find(p => p.id === product.id);
+        const availableStock = stockInfo?.available_stock ?? product.stock;
+        return { ...product, stock: availableStock };
+      });
+      setNewArrivals(syncedArrivals);
+      
+    } catch (error) {
+      console.error('Erro ao carregar carrosséis:', error);
+    } finally {
+      setCarouselsLoading(false);
+    }
+  };
 
-    loadCarousels();
-  }, [ready]);
+  loadCarousels();
+}, [ready]);
 
   const handleCarouselSelect = (type: 'all' | 'bestsellers' | 'new_arrivals') => {
     const config = carouselConfigs.find(c => c.carousel_type === type);
@@ -353,7 +390,7 @@ export default function AcessoriosPage() {
         padding: '20px'
       }}
     >
-      {(viewAllType === 'all' ? products : 
+      {(viewAllType === 'all' ? syncedProducts : 
         viewAllType === 'bestsellers' ? bestsellers : newArrivals)
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((product) => (
@@ -467,7 +504,7 @@ export default function AcessoriosPage() {
                   <div>
                     <Carousel
                       title="Todos os Acessórios"
-                      products={products}
+                      products={syncedProducts}
                       config={carouselConfigs.find(c => c.carousel_type === 'all') || {
                         page_slug: 'acessorios',
                         carousel_type: 'all',
