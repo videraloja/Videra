@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '../../lib/supabaseClient';
+import { useToast } from '../components/Toast';
 
 interface Product {
   id: number;
@@ -61,13 +62,16 @@ export default function CartPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [ready, setReady] = useState(false);
   
-  const [paymentMethod, setPaymentMethod] = useState<string>('pix');
-  const [pickupOption, setPickupOption] = useState<string>('buscar');
+  const [paymentMethod, setPaymentMethod] = useState<string>('');
+  const [pickupOption, setPickupOption] = useState<string>('');
   const [observations, setObservations] = useState<string>('');
   const [showCreditModal, setShowCreditModal] = useState(false);
   const [showPickupModal, setShowPickupModal] = useState(false);
-  const [showCashModal, setShowCashModal] = useState(false); // NOVO modal para dinheiro
+  const [showCashModal, setShowCashModal] = useState(false);
+  const [showPickupInfoModal, setShowPickupInfoModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  const { showToast, ToastContainer } = useToast();
 
   const persistState = (nextCart: CartItem[], nextProducts: Product[]) => {
     setCart(nextCart);
@@ -266,10 +270,17 @@ export default function CartPage() {
     setShowCashModal(true);
   };
 
+  // Função para "Vou buscar" - exibe modal informativo
   const handlePickupClick = () => {
+    setPickupOption('buscar');
+    setShowPickupInfoModal(true);
+  };
+
+  // Função para "Vou mandar buscar"
+  const handleSendPickupClick = () => {
     // Verifica se pagamento é dinheiro
     if (paymentMethod === 'dinheiro') {
-      alert('Indisponível devido à opção de pagamento em dinheiro. Para pagar em dinheiro, você precisa retirar pessoalmente.');
+      showToast('Indisponível devido à opção de pagamento em dinheiro. Para pagar em dinheiro, você precisa retirar pessoalmente.', 'warning');
       return;
     }
     setPickupOption('mandar');
@@ -307,7 +318,7 @@ const createReservations = async (orderId: string, cartItems: CartItem[]) => {
 
   if (stockError) {
     console.error('Erro ao verificar estoque:', stockError);
-    alert('Erro ao verificar disponibilidade. Tente novamente.');
+    showToast('Erro ao verificar disponibilidade. Tente novamente.', 'error');
     setIsProcessing(false);
     return;
   }
@@ -373,7 +384,7 @@ const createReservations = async (orderId: string, cartItems: CartItem[]) => {
     }
     
     message += 'Seu carrinho foi atualizado automaticamente.';
-    alert(message);
+    showToast(message, 'warning');
     
     // ✅ CARRINHO AJUSTADO (NOVO)
     const updatedCart = cart.map(item => {
@@ -435,7 +446,7 @@ const createReservations = async (orderId: string, cartItems: CartItem[]) => {
 
   if (orderError || !order) {
     console.error("Erro ao salvar pedido no Supabase:", orderError);
-    alert("Erro ao registrar o pedido. Tente novamente.");
+    showToast('Erro ao registrar o pedido. Tente novamente.', 'error');
     setIsProcessing(false);
     return;
   }
@@ -446,7 +457,7 @@ const createReservations = async (orderId: string, cartItems: CartItem[]) => {
   } catch (err) {
     console.error('Erro ao criar reservas, pedido será cancelado:', err);
     await supabase.from('orders').delete().eq('id', order.id);
-    alert('Erro ao processar pedido. Tente novamente.');
+    showToast('Erro ao processar pedido. Tente novamente.', 'error');
     setIsProcessing(false);
     return;
   }
@@ -465,7 +476,7 @@ const createReservations = async (orderId: string, cartItems: CartItem[]) => {
 
   if (itemsError) {
     console.error("Erro ao salvar itens:", itemsError);
-    alert("Erro ao salvar itens do pedido.");
+    showToast('Erro ao salvar itens do pedido.', 'error');
     setIsProcessing(false);
     return;
   }
@@ -508,13 +519,25 @@ Aguarde enquanto processamos seu pedido : )
   window.dispatchEvent(new CustomEvent('cartStateChanged'));
 
   // ✅ MENSAGEM MELHORADA (NOVO)
-  alert(`✅ Pedido ${orderCode} registrado com sucesso! Produtos reservados por 30 minutos.`);
+  showToast(`✅ Pedido ${orderCode} registrado com sucesso! Produtos reservados por 30 minutos.`, 'success');
   setIsProcessing(false);
 };
 
   const handleSendOrder = async () => {
     if (!cart || cart.length === 0) {
-      alert('Seu carrinho está vazio!');
+      showToast('Seu carrinho está vazio!', 'warning');
+      return;
+    }
+
+    // VALIDAÇÃO: Verificar se forma de pagamento foi selecionada
+    if (!paymentMethod) {
+      showToast('Por favor, selecione uma forma de pagamento antes de enviar o pedido.', 'warning');
+      return;
+    }
+
+    // VALIDAÇÃO: Verificar se opção de retirada foi selecionada
+    if (!pickupOption) {
+      showToast('Por favor, selecione uma opção de retirada antes de enviar o pedido.', 'warning');
       return;
     }
 
@@ -533,6 +556,7 @@ Aguarde enquanto processamos seu pedido : )
             <p>Carregando carrinho...</p>
           </div>
         </div>
+        <ToastContainer />
       </div>
     );
   }
@@ -572,6 +596,7 @@ Aguarde enquanto processamos seu pedido : )
             </Link>
           </div>
         </div>
+        <ToastContainer />
       </div>
     );
   }
@@ -699,13 +724,13 @@ Aguarde enquanto processamos seu pedido : )
             <label className="section-label"> Retirada</label>
             <div className="options-group">
               <button
-                onClick={() => setPickupOption('buscar')}
+                onClick={handlePickupClick}
                 className={`option-btn ${pickupOption === 'buscar' ? 'active' : ''}`}
               >
                 Vou buscar
               </button>
               <button
-                onClick={handlePickupClick}
+                onClick={handleSendPickupClick}
                 className={`option-btn ${pickupOption === 'mandar' ? 'active' : ''} ${paymentMethod === 'dinheiro' ? 'disabled-option' : ''}`}
                 style={paymentMethod === 'dinheiro' ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                 disabled={paymentMethod === 'dinheiro'}
@@ -738,7 +763,7 @@ Aguarde enquanto processamos seu pedido : )
             </button>
             <button 
               onClick={handleSendOrder} 
-              className="btn-primary"
+              className="btn-primary-whatsapp"
               disabled={isProcessing}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -820,6 +845,28 @@ Aguarde enquanto processamos seu pedido : )
           </div>
         </div>
       )}
+
+      {/* NOVO MODAL: "Vou buscar" - Retirada Pessoal */}
+      {showPickupInfoModal && (
+        <div className="modal-overlay" onClick={() => setShowPickupInfoModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-icon">🏠</span>
+              <h3>Retirada Pessoal</h3>
+            </div>
+            <div className="modal-body">
+              <p>💙 Obrigado por escolher retirar seu pedido pessoalmente!</p>
+              <p>Gostaríamos de esclarecer que a Videra Colecionáveis é uma loja 100% online. Não possuímos uma loja física com ponto comercial.</p>
+              <p>A retirada dos produtos acontece em nossa residência, localizada em um condomínio residencial. Você será recebido na portaria, onde entregaremos seu pedido em mãos com todo carinho e segurança.</p>
+            </div>
+            <div className="modal-footer">
+              <button onClick={() => setShowPickupInfoModal(false)} className="modal-btn-primary">Entendi</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ToastContainer />
 
       <style jsx>{`
         .cart-page {
@@ -1153,9 +1200,10 @@ Aguarde enquanto processamos seu pedido : )
           color: #dc2626;
         }
 
-        .btn-primary {
+        /* NOVO: Botão WhatsApp verde sólido (sem gradiente) */
+        .btn-primary-whatsapp {
           padding: 0.75rem 2rem;
-          background: linear-gradient(135deg, #dc2626, #b91c1c);
+          background: #25D366;
           border: none;
           border-radius: 12px;
           font-size: 0.9rem;
@@ -1166,15 +1214,16 @@ Aguarde enquanto processamos seu pedido : )
           display: inline-flex;
           align-items: center;
           gap: 0.5rem;
-          box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+          box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3);
         }
 
-        .btn-primary:hover:not(:disabled) {
+        .btn-primary-whatsapp:hover:not(:disabled) {
           transform: translateY(-2px);
-          box-shadow: 0 6px 16px rgba(220, 38, 38, 0.4);
+          box-shadow: 0 6px 16px rgba(37, 211, 102, 0.4);
+          background: #20b859;
         }
 
-        .btn-primary:disabled {
+        .btn-primary-whatsapp:disabled {
           opacity: 0.7;
           cursor: not-allowed;
         }
@@ -1379,7 +1428,7 @@ Aguarde enquanto processamos seu pedido : )
             flex-direction: column;
           }
 
-          .btn-primary, .btn-secondary {
+          .btn-primary-whatsapp, .btn-secondary {
             width: 100%;
             justify-content: center;
           }
