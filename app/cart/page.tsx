@@ -72,7 +72,10 @@ export default function CartPage() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const { showToast, ToastContainer } = useToast();
-
+  const [showStockModal, setShowStockModal] = useState(false);
+  const [stockModalData, setStockModalData] = useState<{ adjustedItems: any[]; unavailableItems: any[] }>({ adjustedItems: [], unavailableItems: [] });
+  
+  
   const persistState = (nextCart: CartItem[], nextProducts: Product[]) => {
     setCart(nextCart);
     setProducts(nextProducts);
@@ -306,11 +309,11 @@ const createReservations = async (orderId: string, cartItems: CartItem[]) => {
   console.log(`✅ Reservas criadas para ${cartItems.length} produtos`);
 };
 
-  const processOrder = async () => {
+const processOrder = async () => {
   if (isProcessing) return;
   setIsProcessing(true);
 
-  // ✅ 1. VERIFICAR ESTOQUE DISPONÍVEL (igual ao ANTIGO + AJUSTE)
+  // ✅ 1. VERIFICAR ESTOQUE DISPONÍVEL
   const { data: currentProducts, error: stockError } = await supabase
     .from('products')
     .select('id, stock')
@@ -337,7 +340,7 @@ const createReservations = async (orderId: string, cartItems: CartItem[]) => {
     reservedMap.set(r.product_id, (reservedMap.get(r.product_id) || 0) + r.quantity);
   });
 
-  // ✅ AJUSTE DE QUANTIDADE (NOVO)
+  // ✅ COLETAR AJUSTES E REMOÇÕES
   const unavailableItems: { name: string; available: number; requested: number }[] = [];
   const adjustedItems: { name: string; oldQty: number; newQty: number }[] = [];
 
@@ -363,70 +366,15 @@ const createReservations = async (orderId: string, cartItems: CartItem[]) => {
     }
   }
 
-  // ✅ MENSAGEM COMBINADA (NOVO)
+  // ✅ SE HOUVER AJUSTES OU REMOÇÕES, MOSTRAR MODAL (NÃO TOAST)
   if (adjustedItems.length > 0 || unavailableItems.length > 0) {
-    let message = '';
-    
-    if (adjustedItems.length > 0) {
-      message += '⚠️ QUANTIDADES AJUSTADAS:\n';
-      adjustedItems.forEach(i => {
-        message += `• ${i.name}: ${i.oldQty} → ${i.newQty} unidades\n`;
-      });
-      message += '\n';
-    }
-    
-    if (unavailableItems.length > 0) {
-      message += '❌ PRODUTOS REMOVIDOS (ESGOTADOS):\n';
-      unavailableItems.forEach(i => {
-        message += `• ${i.name}\n`;
-      });
-      message += '\n';
-    }
-    
-    message += 'Seu carrinho foi atualizado automaticamente.';
-    showToast(message, 'warning');
-    
-    // ✅ CARRINHO AJUSTADO (NOVO)
-    const updatedCart = cart.map(item => {
-      const realStock = productStockMap.get(item.id) || 0;
-      const reserved = reservedMap.get(item.id) || 0;
-      const availableStock = realStock - reserved;
-      
-      if (availableStock < item.quantity) {
-        if (availableStock > 0) {
-          return { ...item, quantity: availableStock };
-        }
-        return null;
-      }
-      return item;
-    }).filter(item => item !== null) as CartItem[];
-    
-    let updatedProducts = [...products];
-    for (const item of cart) {
-      const realStock = productStockMap.get(item.id) || 0;
-      const reserved = reservedMap.get(item.id) || 0;
-      const availableStock = realStock - reserved;
-      
-      if (availableStock < item.quantity) {
-        const diff = item.quantity - Math.max(availableStock, 0);
-        updatedProducts = updatedProducts.map(p =>
-          p.id === item.id ? { ...p, stock: p.stock + diff } : p
-        );
-      }
-    }
-    
-    persistState(updatedCart, updatedProducts);
-    
-    // ✅ FORÇAR SINCRONIZAÇÃO (NOVO)
-    window.dispatchEvent(new Event('cart-updated'));
-    window.dispatchEvent(new Event('storage'));
-    window.dispatchEvent(new CustomEvent('cartStateChanged'));
-    
+    setStockModalData({ adjustedItems, unavailableItems });
+    setShowStockModal(true);
     setIsProcessing(false);
     return;
   }
 
-  // ✅ 2. RESERVAR E ENVIAR (MANTIDO DO ANTIGO - usa createReservations separada)
+  // ✅ 2. RESERVAR E ENVIAR
   const phone = '5592986446677';
   const orderCode = generateOrderCode();
 
@@ -451,7 +399,6 @@ const createReservations = async (orderId: string, cartItems: CartItem[]) => {
     return;
   }
 
-  // ✅ Usa a função createReservations separada (como no ANTIGO)
   try {
     await createReservations(order.id, cart);
   } catch (err) {
@@ -513,14 +460,57 @@ Aguarde enquanto processamos seu pedido : )
 
   clearCart();
   
-  // ✅ FORÇAR SINCRONIZAÇÃO (NOVO)
   window.dispatchEvent(new Event('cart-updated'));
   window.dispatchEvent(new Event('storage'));
   window.dispatchEvent(new CustomEvent('cartStateChanged'));
 
-  // ✅ MENSAGEM MELHORADA (NOVO)
   showToast(`✅ Pedido ${orderCode} registrado com sucesso! Produtos reservados por 30 minutos.`, 'success');
   setIsProcessing(false);
+};
+
+// NOVA FUNÇÃO: Confirmar ajustes do modal e aplicar alterações no carrinho
+const confirmStockAdjustments = () => {
+  const { adjustedItems, unavailableItems } = stockModalData;
+  
+  // Aplicar ajustes no carrinho
+  const updatedCart = cart.map(item => {
+    const adjusted = adjustedItems.find(a => a.name === item.name);
+    if (adjusted) {
+      return { ...item, quantity: adjusted.newQty };
+    }
+    const isRemoved = unavailableItems.find(u => u.name === item.name);
+    if (isRemoved) {
+      return null;
+    }
+    return item;
+  }).filter(item => item !== null) as CartItem[];
+  
+  let updatedProducts = [...products];
+  for (const item of cart) {
+    const adjusted = adjustedItems.find(a => a.name === item.name);
+    const isRemoved = unavailableItems.find(u => u.name === item.name);
+    
+    if (adjusted) {
+      const diff = item.quantity - adjusted.newQty;
+      updatedProducts = updatedProducts.map(p =>
+        p.id === item.id ? { ...p, stock: p.stock + diff } : p
+      );
+    } else if (isRemoved) {
+      updatedProducts = updatedProducts.map(p =>
+        p.id === item.id ? { ...p, stock: p.stock + item.quantity } : p
+      );
+    }
+  }
+  
+  persistState(updatedCart, updatedProducts);
+  
+  // Forçar sincronização
+  window.dispatchEvent(new Event('cart-updated'));
+  window.dispatchEvent(new Event('storage'));
+  window.dispatchEvent(new CustomEvent('cartStateChanged'));
+  
+  setShowStockModal(false);
+  setStockModalData({ adjustedItems: [], unavailableItems: [] });
 };
 
   const handleSendOrder = async () => {
@@ -855,9 +845,9 @@ Aguarde enquanto processamos seu pedido : )
               <h3>Retirada Pessoal</h3>
             </div>
             <div className="modal-body">
-              <p>💙 Obrigado por escolher retirar seu pedido pessoalmente!</p>
-              <p>Gostaríamos de esclarecer que a Videra Colecionáveis é uma loja 100% online. Não possuímos uma loja física com ponto comercial.</p>
-              <p>A retirada dos produtos acontece em nossa residência, localizada em um condomínio residencial. Você será recebido na portaria, onde entregaremos seu pedido em mãos com todo carinho e segurança.</p>
+              <p>💙 <strong>Obrigado por escolher retirar seu pedido pessoalmente!</strong></p>
+              <p>Gostaríamos de esclarecer que a <strong>Videra Colecionáveis</strong> é uma loja <strong>100% online</strong>. Não possuímos uma loja física com ponto comercial.</p>
+              <p>A retirada dos produtos acontece em <strong>nossa residência</strong>, localizada em um condomínio residencial. Você será recebido na portaria, onde entregaremos seu pedido em mãos com todo carinho e segurança.</p>
             </div>
             <div className="modal-footer">
               <button onClick={() => setShowPickupInfoModal(false)} className="modal-btn-primary">Entendi</button>
@@ -865,6 +855,73 @@ Aguarde enquanto processamos seu pedido : )
           </div>
         </div>
       )}
+
+      {/* MODAL PARA AJUSTES/REMOÇÕES DE ESTOQUE */}
+{showStockModal && (
+  <div className="modal-overlay" onClick={() => setShowStockModal(false)}>
+    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-header" style={{ background: 'linear-gradient(135deg, #fef3c7, #fff)', borderBottomColor: '#fde68a' }}>
+        <span className="modal-icon">⚠️</span>
+        <h3 style={{ color: '#d97706' }}>Atualização do Carrinho</h3>
+      </div>
+      <div className="modal-body">
+        {stockModalData.adjustedItems.length > 0 && (
+          <>
+            <p style={{ fontWeight: 600, marginBottom: '0.5rem' }}>📦 Quantidades ajustadas:</p>
+            {stockModalData.adjustedItems.map((item, idx) => (
+              <div key={idx} style={{ 
+                background: '#fef3c7', 
+                padding: '0.75rem', 
+                borderRadius: '8px', 
+                marginBottom: '0.75rem',
+                borderLeft: '3px solid #f59e0b'
+              }}>
+                <strong>{item.name}</strong>
+                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem' }}>
+                  Estamos ajustando a quantidade do seu produto <strong>{item.name}</strong> de <strong>{item.oldQty}</strong> para <strong>{item.newQty}</strong>.
+                </p>
+                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#92400e' }}>
+                  ⚡ Isso ocorre porque outro cliente acabou comprando antes de você.
+                </p>
+              </div>
+            ))}
+          </>
+        )}
+        
+        {stockModalData.unavailableItems.length > 0 && (
+          <>
+            <p style={{ fontWeight: 600, marginBottom: '0.5rem', marginTop: '0.5rem' }}>❌ Produtos removidos:</p>
+            {stockModalData.unavailableItems.map((item, idx) => (
+              <div key={idx} style={{ 
+                background: '#fee2e2', 
+                padding: '0.75rem', 
+                borderRadius: '8px', 
+                marginBottom: '0.75rem',
+                borderLeft: '3px solid #ef4444'
+              }}>
+                <strong>{item.name}</strong>
+                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem' }}>
+                  Removemos o item <strong>{item.name}</strong> do seu carrinho.
+                </p>
+                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#991b1b' }}>
+                  ❌ Infelizmente outros clientes compraram antes de você e o produto esgotou.
+                </p>
+              </div>
+            ))}
+          </>
+        )}
+        
+        <div className="alert-message" style={{ background: '#e0f2fe', borderLeftColor: '#0ea5e9', marginTop: '1rem' }}>
+          <span>ℹ️</span>
+          <span style={{ fontSize: '0.875rem' }}>Seu carrinho foi atualizado automaticamente. Por favor, revise os itens e tente novamente.</span>
+        </div>
+      </div>
+      <div className="modal-footer">
+        <button onClick={confirmStockAdjustments} className="modal-btn-primary">Entendi, revisar carrinho</button>
+      </div>
+    </div>
+  </div>
+)}
 
       <ToastContainer />
 

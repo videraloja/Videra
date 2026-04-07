@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 
 interface ToastProps {
   message: string;
@@ -125,10 +125,23 @@ export const Toast: React.FC<ToastProps> = ({ message, type = 'warning', duratio
 
 export const useToast = () => {
   const [toasts, setToasts] = useState<{ id: number; message: string; type: 'success' | 'error' | 'warning' | 'info' }[]>([]);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'warning') => {
+    // Limpa o timeout anterior se existir
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    
     const id = Date.now();
     setToasts(prev => [...prev, { id, message, type }]);
+    
+    // Remove automaticamente após 4 segundos
+    timeoutRef.current = setTimeout(() => {
+      setToasts(prev => prev.filter(toast => toast.id !== id));
+      timeoutRef.current = null;
+    }, 4000);
   };
 
   const removeToast = (id: number) => {
