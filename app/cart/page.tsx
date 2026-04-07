@@ -856,7 +856,7 @@ const confirmStockAdjustments = () => {
         </div>
       )}
 
-      {/* MODAL PARA AJUSTES/REMOÇÕES DE ESTOQUE */}
+ {/* MODAL PARA AJUSTES/REMOÇÕES DE ESTOQUE - SEM REDUNDÂNCIA NAS MENSAGENS */}
 {showStockModal && (
   <div className="modal-overlay" onClick={() => setShowStockModal(false)}>
     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -865,49 +865,45 @@ const confirmStockAdjustments = () => {
         <h3 style={{ color: '#d97706' }}>Atualização do Carrinho</h3>
       </div>
       <div className="modal-body">
+        {/* Produtos com quantidade ajustada */}
         {stockModalData.adjustedItems.length > 0 && (
           <>
-            <p style={{ fontWeight: 600, marginBottom: '0.5rem' }}>📦 Quantidades ajustadas:</p>
+            <p style={{ fontWeight: 600, marginBottom: '0.75rem' }}>📦 Quantidades ajustadas:</p>
             {stockModalData.adjustedItems.map((item, idx) => (
               <div key={idx} style={{ 
                 background: '#fef3c7', 
-                padding: '0.75rem', 
+                padding: '0.5rem 0.75rem', 
                 borderRadius: '8px', 
-                marginBottom: '0.75rem',
+                marginBottom: '0.5rem',
                 borderLeft: '3px solid #f59e0b'
               }}>
-                <strong>{item.name}</strong>
-                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem' }}>
-                  Estamos ajustando a quantidade do seu produto <strong>{item.name}</strong> de <strong>{item.oldQty}</strong> para <strong>{item.newQty}</strong>.
-                </p>
-                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#92400e' }}>
-                  ⚡ Isso ocorre porque outro cliente acabou comprando antes de você.
-                </p>
+                <strong>{item.name}</strong> — de <strong>{item.oldQty}</strong> para <strong>{item.newQty}</strong> unidade{item.newQty !== 1 ? 's' : ''}
               </div>
             ))}
+            <p style={{ margin: '0.75rem 0 0 0', fontSize: '0.875rem', color: '#92400e', fontStyle: 'italic' }}>
+              ⚡ Isso ocorre porque outro cliente acabou comprando antes de você.
+            </p>
           </>
         )}
         
+        {/* Produtos removidos */}
         {stockModalData.unavailableItems.length > 0 && (
           <>
-            <p style={{ fontWeight: 600, marginBottom: '0.5rem', marginTop: '0.5rem' }}>❌ Produtos removidos:</p>
+            <p style={{ fontWeight: 600, marginBottom: '0.75rem', marginTop: stockModalData.adjustedItems.length > 0 ? '1rem' : '0' }}>❌ Produtos removidos:</p>
             {stockModalData.unavailableItems.map((item, idx) => (
               <div key={idx} style={{ 
                 background: '#fee2e2', 
-                padding: '0.75rem', 
+                padding: '0.5rem 0.75rem', 
                 borderRadius: '8px', 
-                marginBottom: '0.75rem',
+                marginBottom: '0.5rem',
                 borderLeft: '3px solid #ef4444'
               }}>
                 <strong>{item.name}</strong>
-                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem' }}>
-                  Removemos o item <strong>{item.name}</strong> do seu carrinho.
-                </p>
-                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#991b1b' }}>
-                  ❌ Infelizmente outros clientes compraram antes de você e o produto esgotou.
-                </p>
               </div>
             ))}
+            <p style={{ margin: '0.75rem 0 0 0', fontSize: '0.875rem', color: '#991b1b', fontStyle: 'italic' }}>
+              ❌ Infelizmente outros clientes compraram antes de você e o produto esgotou.
+            </p>
           </>
         )}
         
