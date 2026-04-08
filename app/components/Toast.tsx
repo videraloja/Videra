@@ -36,15 +36,15 @@ export const Toast: React.FC<ToastProps> = ({ message, type = 'warning', duratio
   const getColors = () => {
     switch (type) {
       case 'success':
-        return { bg: '#dcfce7', border: '#22c55e', text: '#166534', iconBg: '#22c55e' };
+        return { bg: '#dcfce7', border: '#22c55e', text: '#166534' };
       case 'error':
-        return { bg: '#fee2e2', border: '#ef4444', text: '#991b1b', iconBg: '#ef4444' };
+        return { bg: '#fee2e2', border: '#ef4444', text: '#991b1b' };
       case 'warning':
-        return { bg: '#fef3c7', border: '#f59e0b', text: '#92400e', iconBg: '#f59e0b' };
+        return { bg: '#fef3c7', border: '#f59e0b', text: '#92400e' };
       case 'info':
-        return { bg: '#dbeafe', border: '#3b82f6', text: '#1e40af', iconBg: '#3b82f6' };
+        return { bg: '#dbeafe', border: '#3b82f6', text: '#1e40af' };
       default:
-        return { bg: '#fef3c7', border: '#f59e0b', text: '#92400e', iconBg: '#f59e0b' };
+        return { bg: '#fef3c7', border: '#f59e0b', text: '#92400e' };
     }
   };
 
@@ -74,16 +74,15 @@ export const Toast: React.FC<ToastProps> = ({ message, type = 'warning', duratio
           gap: '0.75rem',
         }}
       >
+        {/* Ícone SEM fundo circular */}
         <div
           style={{
-            background: colors.iconBg,
             width: '28px',
             height: '28px',
-            borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '14px',
+            fontSize: '18px',
           }}
         >
           {getIcon()}
@@ -128,7 +127,6 @@ export const useToast = () => {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'warning') => {
-    // Limpa o timeout anterior se existir
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
@@ -137,7 +135,6 @@ export const useToast = () => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, message, type }]);
     
-    // Remove automaticamente após 4 segundos
     timeoutRef.current = setTimeout(() => {
       setToasts(prev => prev.filter(toast => toast.id !== id));
       timeoutRef.current = null;

@@ -69,13 +69,12 @@ export default function CartPage() {
   const [showPickupModal, setShowPickupModal] = useState(false);
   const [showCashModal, setShowCashModal] = useState(false);
   const [showPickupInfoModal, setShowPickupInfoModal] = useState(false);
+  const [showStockModal, setShowStockModal] = useState(false);
+  const [stockModalData, setStockModalData] = useState<{ adjustedItems: any[]; unavailableItems: any[] }>({ adjustedItems: [], unavailableItems: [] });
   const [isProcessing, setIsProcessing] = useState(false);
 
   const { showToast, ToastContainer } = useToast();
-  const [showStockModal, setShowStockModal] = useState(false);
-  const [stockModalData, setStockModalData] = useState<{ adjustedItems: any[]; unavailableItems: any[] }>({ adjustedItems: [], unavailableItems: [] });
-  
-  
+
   const persistState = (nextCart: CartItem[], nextProducts: Product[]) => {
     setCart(nextCart);
     setProducts(nextProducts);
@@ -309,7 +308,7 @@ const createReservations = async (orderId: string, cartItems: CartItem[]) => {
   console.log(`✅ Reservas criadas para ${cartItems.length} produtos`);
 };
 
-const processOrder = async () => {
+  const processOrder = async () => {
   if (isProcessing) return;
   setIsProcessing(true);
 
@@ -366,7 +365,7 @@ const processOrder = async () => {
     }
   }
 
-  // ✅ SE HOUVER AJUSTES OU REMOÇÕES, MOSTRAR MODAL (NÃO TOAST)
+  // ✅ SE HOUVER AJUSTES OU REMOÇÕES, MOSTRAR MODAL
   if (adjustedItems.length > 0 || unavailableItems.length > 0) {
     setStockModalData({ adjustedItems, unavailableItems });
     setShowStockModal(true);
@@ -468,51 +467,6 @@ Aguarde enquanto processamos seu pedido : )
   setIsProcessing(false);
 };
 
-// NOVA FUNÇÃO: Confirmar ajustes do modal e aplicar alterações no carrinho
-const confirmStockAdjustments = () => {
-  const { adjustedItems, unavailableItems } = stockModalData;
-  
-  // Aplicar ajustes no carrinho
-  const updatedCart = cart.map(item => {
-    const adjusted = adjustedItems.find(a => a.name === item.name);
-    if (adjusted) {
-      return { ...item, quantity: adjusted.newQty };
-    }
-    const isRemoved = unavailableItems.find(u => u.name === item.name);
-    if (isRemoved) {
-      return null;
-    }
-    return item;
-  }).filter(item => item !== null) as CartItem[];
-  
-  let updatedProducts = [...products];
-  for (const item of cart) {
-    const adjusted = adjustedItems.find(a => a.name === item.name);
-    const isRemoved = unavailableItems.find(u => u.name === item.name);
-    
-    if (adjusted) {
-      const diff = item.quantity - adjusted.newQty;
-      updatedProducts = updatedProducts.map(p =>
-        p.id === item.id ? { ...p, stock: p.stock + diff } : p
-      );
-    } else if (isRemoved) {
-      updatedProducts = updatedProducts.map(p =>
-        p.id === item.id ? { ...p, stock: p.stock + item.quantity } : p
-      );
-    }
-  }
-  
-  persistState(updatedCart, updatedProducts);
-  
-  // Forçar sincronização
-  window.dispatchEvent(new Event('cart-updated'));
-  window.dispatchEvent(new Event('storage'));
-  window.dispatchEvent(new CustomEvent('cartStateChanged'));
-  
-  setShowStockModal(false);
-  setStockModalData({ adjustedItems: [], unavailableItems: [] });
-};
-
   const handleSendOrder = async () => {
     if (!cart || cart.length === 0) {
       showToast('Seu carrinho está vazio!', 'warning');
@@ -532,6 +486,51 @@ const confirmStockAdjustments = () => {
     }
 
     await processOrder();
+  };
+
+  // Função para confirmar ajustes do modal
+  const confirmStockAdjustments = () => {
+    const { adjustedItems, unavailableItems } = stockModalData;
+    
+    // Aplicar ajustes no carrinho
+    const updatedCart = cart.map(item => {
+      const adjusted = adjustedItems.find(a => a.name === item.name);
+      if (adjusted) {
+        return { ...item, quantity: adjusted.newQty };
+      }
+      const isRemoved = unavailableItems.find(u => u.name === item.name);
+      if (isRemoved) {
+        return null;
+      }
+      return item;
+    }).filter(item => item !== null) as CartItem[];
+    
+    let updatedProducts = [...products];
+    for (const item of cart) {
+      const adjusted = adjustedItems.find(a => a.name === item.name);
+      const isRemoved = unavailableItems.find(u => u.name === item.name);
+      
+      if (adjusted) {
+        const diff = item.quantity - adjusted.newQty;
+        updatedProducts = updatedProducts.map(p =>
+          p.id === item.id ? { ...p, stock: p.stock + diff } : p
+        );
+      } else if (isRemoved) {
+        updatedProducts = updatedProducts.map(p =>
+          p.id === item.id ? { ...p, stock: p.stock + item.quantity } : p
+        );
+      }
+    }
+    
+    persistState(updatedCart, updatedProducts);
+    
+    // Forçar sincronização
+    window.dispatchEvent(new Event('cart-updated'));
+    window.dispatchEvent(new Event('storage'));
+    window.dispatchEvent(new CustomEvent('cartStateChanged'));
+    
+    setShowStockModal(false);
+    setStockModalData({ adjustedItems: [], unavailableItems: [] });
   };
 
   const total = cart.reduce((s, i) => s + getCurrentPrice(i) * i.quantity, 0);
@@ -735,6 +734,40 @@ const confirmStockAdjustments = () => {
             )}
           </div>
 
+{/* ENDEREÇO DA LOJA - Versão neutra e profissional */}
+<div className="store-address-section">
+  <div className="address-card">
+    <div className="address-icon">🗺️</div>
+    <div className="address-content">
+      <h4>Onde nos encontrar</h4>
+      <p>
+        <strong>Videra Loja virtual</strong><br />
+        Rua Áurea Graciano, 15 - Col. Santo Antônio<br />
+        Manaus - AM, 69093-045
+      </p>
+      <div className="address-actions">
+        <a 
+          href="https://www.google.com/maps/place/Videra+Loja+virtual/@-3.0340442,-60.0101189,20.16z/data=!4m6!3m5!1s0x926c1b372da27575:0x4daf1b91802bc5e5!8m2!3d-3.0340946!4d-60.0102163!16s%2Fg%2F11lcmykf0m?entry=ttu&g_ep=EgoyMDI2MDQwNS4wIKXMDSoASAFQAw%3D%3D" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="map-link"
+        >
+           Abrir no Google Maps
+        </a>
+        <button 
+          onClick={() => {
+            navigator.clipboard.writeText('Rua Áurea Graciano, 15 - Col. Santo Antônio, Manaus - AM, 69093-045');
+            showToast('Endereço copiado para a área de transferência!', 'success');
+          }}
+          className="copy-address-btn"
+        >
+           Copiar endereço
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
           {/* Observações */}
           <div className="options-section">
             <label className="section-label">✏️ Observações (opcional)</label>
@@ -836,7 +869,7 @@ const confirmStockAdjustments = () => {
         </div>
       )}
 
-      {/* NOVO MODAL: "Vou buscar" - Retirada Pessoal */}
+      {/* Modal para "Vou buscar" - Retirada Pessoal */}
       {showPickupInfoModal && (
         <div className="modal-overlay" onClick={() => setShowPickupInfoModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -845,9 +878,9 @@ const confirmStockAdjustments = () => {
               <h3>Retirada Pessoal</h3>
             </div>
             <div className="modal-body">
-              <p>💙 <strong>Obrigado por escolher retirar seu pedido pessoalmente!</strong></p>
-              <p>Gostaríamos de esclarecer que a <strong>Videra Colecionáveis</strong> é uma loja <strong>100% online</strong>. Não possuímos uma loja física com ponto comercial.</p>
-              <p>A retirada dos produtos acontece em <strong>nossa residência</strong>, localizada em um condomínio residencial. Você será recebido na portaria, onde entregaremos seu pedido em mãos com todo carinho e segurança.</p>
+              <p>💙 Obrigado por escolher retirar seu pedido pessoalmente!</p>
+              <p>Gostaríamos de esclarecer que a Videra Colecionáveis é uma loja 100% online. Não possuímos uma loja física com ponto comercial.</p>
+              <p>A retirada dos produtos acontece em nossa residência, localizada em um condomínio residencial. Você será recebido na portaria, onde entregaremos seu pedido em mãos com todo carinho e segurança.</p>
             </div>
             <div className="modal-footer">
               <button onClick={() => setShowPickupInfoModal(false)} className="modal-btn-primary">Entendi</button>
@@ -856,68 +889,68 @@ const confirmStockAdjustments = () => {
         </div>
       )}
 
- {/* MODAL PARA AJUSTES/REMOÇÕES DE ESTOQUE - SEM REDUNDÂNCIA NAS MENSAGENS */}
-{showStockModal && (
-  <div className="modal-overlay" onClick={() => setShowStockModal(false)}>
-    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-      <div className="modal-header" style={{ background: 'linear-gradient(135deg, #fef3c7, #fff)', borderBottomColor: '#fde68a' }}>
-        <span className="modal-icon">⚠️</span>
-        <h3 style={{ color: '#d97706' }}>Atualização do Carrinho</h3>
-      </div>
-      <div className="modal-body">
-        {/* Produtos com quantidade ajustada */}
-        {stockModalData.adjustedItems.length > 0 && (
-          <>
-            <p style={{ fontWeight: 600, marginBottom: '0.75rem' }}>📦 Quantidades ajustadas:</p>
-            {stockModalData.adjustedItems.map((item, idx) => (
-              <div key={idx} style={{ 
-                background: '#fef3c7', 
-                padding: '0.5rem 0.75rem', 
-                borderRadius: '8px', 
-                marginBottom: '0.5rem',
-                borderLeft: '3px solid #f59e0b'
-              }}>
-                <strong>{item.name}</strong> — de <strong>{item.oldQty}</strong> para <strong>{item.newQty}</strong> unidade{item.newQty !== 1 ? 's' : ''}
+      {/* MODAL PARA AJUSTES/REMOÇÕES DE ESTOQUE */}
+      {showStockModal && (
+        <div className="modal-overlay" onClick={() => setShowStockModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header" style={{ background: 'linear-gradient(135deg, #fef3c7, #fff)', borderBottomColor: '#fde68a' }}>
+              <span className="modal-icon">⚠️</span>
+              <h3 style={{ color: '#d97706' }}>Atualização do Carrinho</h3>
+            </div>
+            <div className="modal-body">
+              {/* Produtos com quantidade ajustada */}
+              {stockModalData.adjustedItems.length > 0 && (
+                <>
+                  <p style={{ fontWeight: 600, marginBottom: '0.75rem' }}>📦 Quantidades ajustadas:</p>
+                  {stockModalData.adjustedItems.map((item, idx) => (
+                    <div key={idx} style={{ 
+                      background: '#fef3c7', 
+                      padding: '0.5rem 0.75rem', 
+                      borderRadius: '8px', 
+                      marginBottom: '0.5rem',
+                      borderLeft: '3px solid #f59e0b'
+                    }}>
+                      <strong>{item.name}</strong> — de <strong>{item.oldQty}</strong> para <strong>{item.newQty}</strong> unidade{item.newQty !== 1 ? 's' : ''}
+                    </div>
+                  ))}
+                  <p style={{ margin: '0.75rem 0 0 0', fontSize: '0.875rem', color: '#92400e', fontStyle: 'italic' }}>
+                    ⚡ Isso ocorre porque outro cliente acabou comprando antes de você.
+                  </p>
+                </>
+              )}
+              
+              {/* Produtos removidos */}
+              {stockModalData.unavailableItems.length > 0 && (
+                <>
+                  <p style={{ fontWeight: 600, marginBottom: '0.75rem', marginTop: stockModalData.adjustedItems.length > 0 ? '1rem' : '0' }}>❌ Produtos removidos:</p>
+                  {stockModalData.unavailableItems.map((item, idx) => (
+                    <div key={idx} style={{ 
+                      background: '#fee2e2', 
+                      padding: '0.5rem 0.75rem', 
+                      borderRadius: '8px', 
+                      marginBottom: '0.5rem',
+                      borderLeft: '3px solid #ef4444'
+                    }}>
+                      <strong>{item.name}</strong>
+                    </div>
+                  ))}
+                  <p style={{ margin: '0.75rem 0 0 0', fontSize: '0.875rem', color: '#991b1b', fontStyle: 'italic' }}>
+                    ❌ Infelizmente outros clientes compraram antes de você e o produto esgotou.
+                  </p>
+                </>
+              )}
+              
+              <div className="alert-message" style={{ background: '#e0f2fe', borderLeftColor: '#0ea5e9', marginTop: '1rem' }}>
+                <span>ℹ️</span>
+                <span style={{ fontSize: '0.875rem' }}>Seu carrinho foi atualizado automaticamente. Por favor, revise os itens e tente novamente.</span>
               </div>
-            ))}
-            <p style={{ margin: '0.75rem 0 0 0', fontSize: '0.875rem', color: '#92400e', fontStyle: 'italic' }}>
-              ⚡ Isso ocorre porque outro cliente acabou comprando antes de você.
-            </p>
-          </>
-        )}
-        
-        {/* Produtos removidos */}
-        {stockModalData.unavailableItems.length > 0 && (
-          <>
-            <p style={{ fontWeight: 600, marginBottom: '0.75rem', marginTop: stockModalData.adjustedItems.length > 0 ? '1rem' : '0' }}>❌ Produtos removidos:</p>
-            {stockModalData.unavailableItems.map((item, idx) => (
-              <div key={idx} style={{ 
-                background: '#fee2e2', 
-                padding: '0.5rem 0.75rem', 
-                borderRadius: '8px', 
-                marginBottom: '0.5rem',
-                borderLeft: '3px solid #ef4444'
-              }}>
-                <strong>{item.name}</strong>
-              </div>
-            ))}
-            <p style={{ margin: '0.75rem 0 0 0', fontSize: '0.875rem', color: '#991b1b', fontStyle: 'italic' }}>
-              ❌ Infelizmente outros clientes compraram antes de você e o produto esgotou.
-            </p>
-          </>
-        )}
-        
-        <div className="alert-message" style={{ background: '#e0f2fe', borderLeftColor: '#0ea5e9', marginTop: '1rem' }}>
-          <span>ℹ️</span>
-          <span style={{ fontSize: '0.875rem' }}>Seu carrinho foi atualizado automaticamente. Por favor, revise os itens e tente novamente.</span>
+            </div>
+            <div className="modal-footer">
+              <button onClick={confirmStockAdjustments} className="modal-btn-primary">Entendi, revisar carrinho</button>
+            </div>
+          </div>
         </div>
-      </div>
-      <div className="modal-footer">
-        <button onClick={confirmStockAdjustments} className="modal-btn-primary">Entendi, revisar carrinho</button>
-      </div>
-    </div>
-  </div>
-)}
+      )}
 
       <ToastContainer />
 
@@ -1253,7 +1286,7 @@ const confirmStockAdjustments = () => {
           color: #dc2626;
         }
 
-        /* NOVO: Botão WhatsApp verde sólido (sem gradiente) */
+        /* Botão WhatsApp verde sólido */
         .btn-primary-whatsapp {
           padding: 0.75rem 2rem;
           background: #25D366;
@@ -1280,6 +1313,111 @@ const confirmStockAdjustments = () => {
           opacity: 0.7;
           cursor: not-allowed;
         }
+
+/* Seção de endereço da loja - Versão neutra e profissional */
+.store-address-section {
+  margin: 1.5rem 0;
+  padding: 0;
+}
+
+.address-card {
+  background: #f8fafc;
+  border-radius: 16px;
+  padding: 1.25rem;
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  border: 1px solid #e2e8f0;
+  transition: all 0.2s ease;
+}
+
+.address-card:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.address-icon {
+  font-size: 1.5rem;
+  
+  width: 44px;
+  height: 44px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+
+}
+
+.address-content {
+  flex: 1;
+}
+
+.address-content h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1e293b;
+  letter-spacing: -0.2px;
+}
+
+.address-content p {
+  margin: 0 0 1rem 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #475569;
+}
+
+.address-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.map-link, .copy-address-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 1rem;
+  background: white;
+  border: 1px solid #cbd5e1;
+  border-radius: 40px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+  color: #475569;
+}
+
+.map-link:hover, .copy-address-btn:hover {
+  background: #334155;
+  border-color: #334155;
+  color: white;
+}
+
+@media (max-width: 768px) {
+  .address-card {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  
+  .address-icon {
+    margin-bottom: 0.5rem;
+  }
+  
+  .address-actions {
+    justify-content: center;
+  }
+  
+  .map-link, .copy-address-btn {
+    font-size: 0.7rem;
+    padding: 0.4rem 0.75rem;
+  }
+}
 
         .cart-loading {
           text-align: center;
@@ -1497,6 +1635,25 @@ const confirmStockAdjustments = () => {
 
           .modal-body {
             padding: 1rem;
+          }
+
+          .address-card {
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+          }
+          
+          .address-icon {
+            margin-bottom: 0.5rem;
+          }
+          
+          .address-actions {
+            justify-content: center;
+          }
+          
+          .map-link, .copy-address-btn {
+            font-size: 0.7rem;
+            padding: 0.4rem 0.75rem;
           }
         }
       `}</style>
