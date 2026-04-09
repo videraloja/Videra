@@ -6,155 +6,144 @@ import { supabase } from "@/lib/supabaseClient";
 import AuthGuard from "@/app/components/AuthGuard";
 import ThemeToggle from "@/app/components/ThemeToggle";
 
-// Componente principal com toda a lógica existente
+interface Order {
+  id: string;
+  order_code: string;
+  status: string;
+  payment_method: string;
+  pickup_option: string;
+  observations: string | null;
+  created_at: string;
+}
+
+interface OrderItem {
+  id: string;
+  quantity: number;
+  price: number;
+  products: {
+    id: number;
+    name: string;
+    image_url: string;
+  } | null;
+}
+
 function OrderDetailsContent() {
   const { id } = useParams();
   const router = useRouter();
-  const [order, setOrder] = useState<any>(null);
-  const [items, setItems] = useState<any[]>([]);
+  const [order, setOrder] = useState<Order | null>(null);
+  const [items, setItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  console.log("DEBUG OrderDetailsPage loaded — versão protegida com tema");
+useEffect(() => {
+  const fetchOrderData = async () => {
+    if (!id) return;
 
-  // Busca os dados do pedido e dos itens
-  useEffect(() => {
-    const fetchOrderData = async () => {
-      if (!id) return;
-
-      const { data: orderData, error: orderError } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("id", id)
-        .single();
-
-      if (orderError) {
-        console.error("Erro ao buscar pedido:", orderError);
-        return;
-      }
-
-      const { data: itemsData, error: itemsError } = await supabase
-        .from("order_items")
-        .select(`
-          id,
-          quantity,
-          price,
-          products (
-            id,
-            name,
-            image_url
-          )
-        `)
-        .eq("order_id", id);
-
-      if (itemsError) {
-        console.error("Erro ao buscar itens:", itemsError);
-        return;
-      }
-
-      setOrder(orderData);
-      setItems(itemsData || []);
-      setLoading(false);
-    };
-
-    fetchOrderData();
-  }, [id]);
-
-  const handleStatusChange = async (newStatus: string) => {
-  if (newStatus === order.status) return;
-
-  console.log("⚙️ Iniciando mudança de status para:", newStatus);
-
-  // 1️⃣ Se for PAGO, remover reservas primeiro
-  if (newStatus === "pago") {
-    // Remover reservas (libera visualmente para outros clientes)
-    const { error: deleteResError } = await supabase
-      .from('reservations')
-      .delete()
-      .eq('order_id', id);
-
-    if (deleteResError) {
-      console.error('❌ Erro ao remover reservas:', deleteResError);
-    } else {
-      console.log('✅ Reservas removidas com sucesso');
-    }
-
-    // Atualizar o status do pedido
-    const { error: orderError } = await supabase
+    // Buscar dados do pedido
+    const { data: orderData, error: orderError } = await supabase
       .from("orders")
-      .update({ status: newStatus })
-      .eq("id", id);
+      .select("*")
+      .eq("id", id)
+      .single();
 
     if (orderError) {
-      console.error("❌ Erro ao atualizar status:", orderError);
-      alert("Erro ao alterar status.");
+      console.error("Erro ao buscar pedido:", orderError);
       return;
     }
 
-    // Debitar estoque real
-    for (const item of items) {
-      if (item.quantity > 0 && item.products?.id) {
-        const productIdNum = Number(item.products.id);
-        const qtyNum = Number(item.quantity);
+    // Buscar itens do pedido (SEM o join)
+    const { data: itemsData, error: itemsError } = await supabase
+      .from("order_items")
+      .select("*")
+      .eq("order_id", id);
 
-        // Buscar estoque atual
-        const { data: product, error: fetchError } = await supabase
-          .from("products")
-          .select("stock")
-          .eq("id", productIdNum)
-          .single();
-
-        if (fetchError) {
-          console.error("❌ Erro ao buscar produto:", fetchError);
-          continue;
-        }
-
-        const newStock = Math.max(0, (product.stock || 0) - qtyNum);
-        
-        const { error: directError } = await supabase
-          .from("products")
-          .update({ stock: newStock })
-          .eq("id", productIdNum);
-
-        if (directError) {
-          console.error("❌ Falha ao debitar estoque:", directError);
-        } else {
-          console.log(`✅ Estoque debitado para produto ${productIdNum}: ${product.stock} → ${newStock}`);
-        }
-      }
+    if (itemsError) {
+      console.error("Erro ao buscar itens:", itemsError);
+      return;
     }
 
-    alert(`Pedido marcado como PAGO. Estoque debitado.`);
-    router.refresh();
-    return;
-  }
+    // Buscar produtos manualmente para cada item
+    const productIds = [...new Set(itemsData.map(item => item.product_id))];
+    
+    const { data: productsData, error: productsError } = await supabase
+      .from("products")
+      .select("id, name, image_url")
+      .in("id", productIds);
 
-  // 2️⃣ Se for CANCELADO, remover reservas e devolver estoque se necessário
-  if (newStatus === "cancelado") {
-    // Remover reservas (liberar visualmente)
-    const { error: deleteResError } = await supabase
-      .from('reservations')
-      .delete()
-      .eq('order_id', id);
-
-    if (deleteResError) {
-      console.error('❌ Erro ao remover reservas:', deleteResError);
-    } else {
-      console.log('✅ Reservas removidas');
+    if (productsError) {
+      console.error("Erro ao buscar produtos:", productsError);
     }
 
-    // Se estava pago, devolver estoque real
-    if (order.status === "pago") {
-      console.log("🔄 Iniciando devolução de estoque...");
+    // Criar um mapa de produtos por ID
+    const productsMap = new Map();
+    productsData?.forEach(product => {
+      productsMap.set(product.id, product);
+    });
+
+    // Formatar os itens com os produtos encontrados
+    const formattedItems = (itemsData || []).map((item: any) => {
+      const product = productsMap.get(item.product_id);
       
-      for (const item of items) {
-        const productId = Number(item.products?.id);
-        const quantity = Number(item.quantity);
+      return {
+        id: item.id,
+        quantity: item.quantity,
+        price: item.price,
+        products: product || null  // Se não encontrar produto, fica null
+      };
+    });
 
-        if (productId && quantity > 0) {
+    console.log("📦 Itens formatados:", formattedItems);
+    console.log("🗺️ Mapa de produtos:", productsMap);
+    console.log("📋 ItemsData original:", itemsData);
+
+    setOrder(orderData);
+    setItems(formattedItems);
+    setLoading(false);
+  };
+
+  fetchOrderData();
+}, [id]);
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (newStatus === order?.status) return;
+
+    console.log("⚙️ Iniciando mudança de status para:", newStatus);
+
+    // 1️⃣ Se for PAGO, remover reservas primeiro
+    if (newStatus === "pago") {
+      // Remover reservas (libera visualmente para outros clientes)
+      const { error: deleteResError } = await supabase
+        .from('reservations')
+        .delete()
+        .eq('order_id', id);
+
+      if (deleteResError) {
+        console.error('❌ Erro ao remover reservas:', deleteResError);
+      } else {
+        console.log('✅ Reservas removidas com sucesso');
+      }
+
+      // Atualizar o status do pedido
+      const { error: orderError } = await supabase
+        .from("orders")
+        .update({ status: newStatus })
+        .eq("id", id);
+
+      if (orderError) {
+        console.error("❌ Erro ao atualizar status:", orderError);
+        alert("Erro ao alterar status.");
+        return;
+      }
+
+      // Debitar estoque real
+      for (const item of items) {
+        if (item.quantity > 0 && item.products?.id) {
+          const productIdNum = Number(item.products.id);
+          const qtyNum = Number(item.quantity);
+
           const { data: product, error: fetchError } = await supabase
             .from("products")
             .select("stock")
-            .eq("id", productId)
+            .eq("id", productIdNum)
             .single();
 
           if (fetchError) {
@@ -162,23 +151,94 @@ function OrderDetailsContent() {
             continue;
           }
 
-          const newStock = (product.stock || 0) + quantity;
-
-          const { error: stockError } = await supabase
+          const newStock = Math.max(0, (product.stock || 0) - qtyNum);
+          
+          const { error: directError } = await supabase
             .from("products")
             .update({ stock: newStock })
-            .eq("id", productId);
+            .eq("id", productIdNum);
 
-          if (stockError) {
-            console.error("❌ Erro ao devolver estoque:", stockError);
+          if (directError) {
+            console.error("❌ Falha ao debitar estoque:", directError);
           } else {
-            console.log(`✅ Estoque devolvido para produto ${productId}: ${product.stock} → ${newStock}`);
+            console.log(`✅ Estoque debitado para produto ${productIdNum}: ${product.stock} → ${newStock}`);
           }
         }
       }
+
+      alert(`✅ Pedido ${order?.order_code} marcado como PAGO. Estoque debitado.`);
+      router.refresh();
+      return;
     }
 
-    // Atualizar status
+    // 2️⃣ Se for CANCELADO, remover reservas e devolver estoque se necessário
+    if (newStatus === "cancelado") {
+      // Remover reservas (liberar visualmente)
+      const { error: deleteResError } = await supabase
+        .from('reservations')
+        .delete()
+        .eq('order_id', id);
+
+      if (deleteResError) {
+        console.error('❌ Erro ao remover reservas:', deleteResError);
+      } else {
+        console.log('✅ Reservas removidas');
+      }
+
+      // Se estava pago, devolver estoque real
+      if (order?.status === "pago") {
+        console.log("🔄 Iniciando devolução de estoque...");
+        
+        for (const item of items) {
+          const productId = Number(item.products?.id);
+          const quantity = Number(item.quantity);
+
+          if (productId && quantity > 0) {
+            const { data: product, error: fetchError } = await supabase
+              .from("products")
+              .select("stock")
+              .eq("id", productId)
+              .single();
+
+            if (fetchError) {
+              console.error("❌ Erro ao buscar produto:", fetchError);
+              continue;
+            }
+
+            const newStock = (product.stock || 0) + quantity;
+
+            const { error: stockError } = await supabase
+              .from("products")
+              .update({ stock: newStock })
+              .eq("id", productId);
+
+            if (stockError) {
+              console.error("❌ Erro ao devolver estoque:", stockError);
+            } else {
+              console.log(`✅ Estoque devolvido para produto ${productId}: ${product.stock} → ${newStock}`);
+            }
+          }
+        }
+      }
+
+      // Atualizar status
+      const { error: orderError } = await supabase
+        .from("orders")
+        .update({ status: newStatus })
+        .eq("id", id);
+
+      if (orderError) {
+        console.error("❌ Erro ao atualizar status:", orderError);
+        alert("Erro ao alterar status.");
+        return;
+      }
+
+      alert(`❌ Pedido ${order?.order_code} CANCELADO. ${order?.status === "pago" ? 'Estoque devolvido.' : 'Reservas removidas.'}`);
+      router.refresh();
+      return;
+    }
+
+    // 3️⃣ Para outros status (pendente)
     const { error: orderError } = await supabase
       .from("orders")
       .update({ status: newStatus })
@@ -190,26 +250,9 @@ function OrderDetailsContent() {
       return;
     }
 
-    alert(`Pedido CANCELADO. ${order.status === "pago" ? 'Estoque devolvido.' : 'Reservas removidas.'}`);
+    alert(`✅ Status alterado para "${newStatus}"`);
     router.refresh();
-    return;
-  }
-
-  // 3️⃣ Para outros status (pendente)
-  const { error: orderError } = await supabase
-    .from("orders")
-    .update({ status: newStatus })
-    .eq("id", id);
-
-  if (orderError) {
-    console.error("❌ Erro ao atualizar status:", orderError);
-    alert("Erro ao alterar status.");
-    return;
-  }
-
-  alert(`Status alterado para "${newStatus}"`);
-  router.refresh();
-};
+  };
 
   const handleItemUpdate = async (itemId: string, newQty: number) => {
     const { error } = await supabase
@@ -291,6 +334,7 @@ function OrderDetailsContent() {
   );
 
   const statusColor = getStatusColor(order.status);
+  const totalValue = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
   return (
     <div style={{ 
@@ -358,7 +402,9 @@ function OrderDetailsContent() {
           display: 'flex', 
           justifyContent: 'space-between', 
           alignItems: 'flex-start',
-          marginBottom: 16 
+          marginBottom: 16,
+          flexWrap: 'wrap',
+          gap: 16
         }}>
           <div>
             <h2 style={{ 
@@ -367,7 +413,7 @@ function OrderDetailsContent() {
               marginBottom: 8,
               color: 'var(--text-primary)'
             }}>
-              Pedido #{order.id?.slice(0, 8)}
+              🏷️ {order.order_code}
             </h2>
             <div style={{ 
               display: 'flex', 
@@ -376,10 +422,22 @@ function OrderDetailsContent() {
               fontSize: 14, 
               color: 'var(--text-secondary)' 
             }}>
-              <span><strong>👤 Cliente:</strong> {order.client_name}</span>
-              <span><strong>📞 WhatsApp:</strong> {order.client_whatsapp}</span>
+              <span><strong>💳 Pagamento:</strong> {order.payment_method}</span>
+              <span><strong>📦 Retirada:</strong> {order.pickup_option}</span>
               <span><strong>📅 Data:</strong> {new Date(order.created_at).toLocaleString('pt-BR')}</span>
             </div>
+            {order.observations && (
+              <div style={{ 
+                marginTop: 12, 
+                padding: 8, 
+                background: '#fef3c7', 
+                borderRadius: 8,
+                color: '#92400e',
+                fontSize: 13
+              }}>
+                💬 <strong>Observações:</strong> {order.observations}
+              </div>
+            )}
           </div>
           
           <div
@@ -492,9 +550,10 @@ function OrderDetailsContent() {
                 border: "1px solid var(--border-color)",
                 background: item.quantity === 0 ? 'var(--bg-secondary)' : 'var(--bg-card)',
                 opacity: item.quantity === 0 ? 0.6 : 1,
+                flexWrap: 'wrap'
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1, minWidth: 200 }}>
                 {item.products?.image_url ? (
                   <img
                     src={item.products.image_url}
@@ -592,6 +651,48 @@ function OrderDetailsContent() {
             </div>
           ))}
         </div>
+
+        {/* Total do Pedido */}
+        <div style={{
+          marginTop: 24,
+          paddingTop: 16,
+          borderTop: '2px solid var(--border-color)',
+          textAlign: 'right'
+        }}>
+          <span style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>
+            TOTAL DO PEDIDO: R$ {totalValue.toFixed(2)}
+          </span>
+        </div>
+      </div>
+
+      {/* Botão WhatsApp para contato */}
+      <div style={{ 
+        marginTop: 24, 
+        display: 'flex',
+        justifyContent: 'center'
+      }}>
+        <button
+          onClick={() => {
+            const message = `Olá! Gostaria de informações sobre o pedido *${order.order_code}*`;
+            window.open(`https://wa.me/5592986446677?text=${encodeURIComponent(message)}`, '_blank');
+          }}
+          style={{
+            background: '#25D366',
+            color: 'white',
+            padding: '12px 24px',
+            border: 'none',
+            borderRadius: 40,
+            cursor: 'pointer',
+            fontSize: 14,
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            boxShadow: '0 4px 12px rgba(37, 211, 102, 0.3)'
+          }}
+        >
+          📱 Falar com cliente sobre o pedido {order.order_code}
+        </button>
       </div>
 
       {/* Rodapé Informativo */}
@@ -615,7 +716,6 @@ function OrderDetailsContent() {
   );
 }
 
-// Componente exportado com proteção
 export default function OrderDetailsPage() {
   return (
     <AuthGuard>

@@ -295,7 +295,7 @@ const createReservations = async (orderId: string, cartItems: CartItem[]) => {
     order_id: orderId,
     product_id: item.id,
     quantity: item.quantity,
-    expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 minutos
+    expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString() // 30 minutos
   }));
   
   const { error } = await supabase.from('reservations').insert(reservations);
@@ -442,7 +442,7 @@ const createReservations = async (orderId: string, cartItems: CartItem[]) => {
     return `• ${i.name} — ${priceFormatted}\n  ${quantityText}`;
   });
 
-  const message = `
+ const message = `
 *PEDIDO:* ${orderCode} - ${paymentMethodLabels[paymentMethod]} - ${pickupOptionLabels[pickupOption]}
 
 ${lines.join("\n\n")}
@@ -451,6 +451,8 @@ ${lines.join("\n\n")}
 ${observations ? `\n*Observações:* ${observations}` : ''}
 
 ___/___/___/___/___
+⚠️ *ATENÇÃO:* Não reservamos/seguramos produtos. Seu pedido tem limite de *1 hora* para pagamento/confirmação. Após esse prazo, será necessário fazer um novo pedido.
+
 Aguarde enquanto processamos seu pedido : )
 `.trim();
 

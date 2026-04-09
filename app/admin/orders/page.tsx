@@ -8,22 +8,23 @@ import ThemeToggle from '../../components/ThemeToggle';
 
 interface Order {
   id: string;
-  client_name: string;
-  client_whatsapp: string;
+  order_code: string;
   status: string;
+  payment_method: string;
+  pickup_option: string;
+  observations: string | null;
   created_at: string;
 }
 
 interface OrderItem {
   id: string;
   order_id: string;
-  product_id: string;
+  product_id: number;
   quantity: number;
   price: number;
-  name?: string;
+  name: string;
 }
 
-// Componente principal com toda a lógica existente
 function OrdersContent() {
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -32,6 +33,9 @@ function OrdersContent() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pendente' | 'pago' | 'cancelado'>('all');
   const [monthFilter, setMonthFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('');
+  
+  // 🆕 ESTADO PARA PESQUISA
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   useEffect(() => {
     const loadOrders = async () => {
@@ -87,7 +91,6 @@ function OrdersContent() {
     }
   };
 
-  // Obter meses únicos dos pedidos
   const getUniqueMonths = () => {
     const months = orders.map(order => {
       const date = new Date(order.created_at);
@@ -112,7 +115,7 @@ function OrdersContent() {
     ];
   };
 
-  // Filtrar pedidos
+  // 🔍 FUNÇÃO DE PESQUISA
   const filteredOrders = orders.filter(order => {
     // Filtro por status
     const statusMatch = statusFilter === 'all' || order.status === statusFilter;
@@ -130,7 +133,14 @@ function OrdersContent() {
       dateMatch = orderDateOnly.getTime() === filterDate.getTime();
     }
     
-    return statusMatch && monthMatch && dateMatch;
+    // 🆕 FILTRO POR PESQUISA (código do pedido, pagamento ou retirada)
+    const searchLower = searchTerm.toLowerCase();
+const searchMatch = searchTerm === '' || 
+  (order.order_code && order.order_code.toLowerCase().includes(searchLower)) ||
+  (order.payment_method && order.payment_method.toLowerCase().includes(searchLower)) ||
+  (order.pickup_option && order.pickup_option.toLowerCase().includes(searchLower));
+    
+    return statusMatch && monthMatch && dateMatch && searchMatch;
   });
 
   const ordersForList = filteredOrders.map((order) => {
@@ -142,27 +152,30 @@ function OrdersContent() {
 
     return {
       id: order.id,
-      customer_name: order.client_name,
+      order_code: order.order_code,
+      payment_method: order.payment_method,
+      pickup_option: order.pickup_option,
+      observations: order.observations,
       total,
       status: order.status,
       created_at: order.created_at,
       items_count: items.length,
-      client_whatsapp: order.client_whatsapp
     };
   });
 
-  // ESTATÍSTICAS BASEADAS NOS PEDIDOS FILTRADOS
   const totalOrders = filteredOrders.length;
   const pendingOrders = filteredOrders.filter(o => o.status === 'pendente').length;
   const paidOrders = filteredOrders.filter(o => o.status === 'pago').length;
   const cancelledOrders = filteredOrders.filter(o => o.status === 'cancelado').length;
-
-  // Calcular valor total dos pedidos filtrados
   const totalValue = ordersForList.reduce((sum, order) => sum + order.total, 0);
 
-  // Limpar filtro de data
   const clearDateFilter = () => {
     setDateFilter('');
+  };
+
+  // 🆕 LIMPAR PESQUISA
+  const clearSearch = () => {
+    setSearchTerm('');
   };
 
   if (loading) return (
@@ -187,12 +200,13 @@ function OrdersContent() {
       maxWidth: 1200,
       margin: '0 auto'
     }}>
-      {/* Cabeçalho */}
       <div style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'flex-start',
-        marginBottom: 32 
+        marginBottom: 32,
+        flexWrap: 'wrap',
+        gap: 16
       }}>
         <div>
           <button
@@ -231,7 +245,7 @@ function OrdersContent() {
         <ThemeToggle />
       </div>
 
-      {/* Cartões de Estatísticas - AGORA MOSTRAM APENAS OS FILTRADOS */}
+      {/* Cards de estatísticas */}
       <div style={{ 
         display: 'grid', 
         gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
@@ -243,7 +257,6 @@ function OrdersContent() {
           padding: 20, 
           borderRadius: 12,
           border: '1px solid var(--border-color)',
-          boxShadow: 'var(--shadow)',
           textAlign: 'center'
         }}>
           <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 8 }}>Pedidos no Período</div>
@@ -257,72 +270,131 @@ function OrdersContent() {
           padding: 20, 
           borderRadius: 12,
           border: '1px solid var(--border-color)',
-          boxShadow: 'var(--shadow)',
           textAlign: 'center'
         }}>
           <div style={{ fontSize: 14, color: '#f59e0b', marginBottom: 8 }}>Pendentes</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: '#f59e0b' }}>{pendingOrders}</div>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
-            {totalOrders > 0 ? `${((pendingOrders / totalOrders) * 100).toFixed(0)}%` : '0%'}
-          </div>
         </div>
         <div style={{ 
           background: 'var(--bg-card)', 
           padding: 20, 
           borderRadius: 12,
           border: '1px solid var(--border-color)',
-          boxShadow: 'var(--shadow)',
           textAlign: 'center'
         }}>
           <div style={{ fontSize: 14, color: '#10b981', marginBottom: 8 }}>Pagos</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: '#10b981' }}>{paidOrders}</div>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
-            {totalOrders > 0 ? `${((paidOrders / totalOrders) * 100).toFixed(0)}%` : '0%'}
-          </div>
         </div>
         <div style={{ 
           background: 'var(--bg-card)', 
           padding: 20, 
           borderRadius: 12,
           border: '1px solid var(--border-color)',
-          boxShadow: 'var(--shadow)',
           textAlign: 'center'
         }}>
           <div style={{ fontSize: 14, color: '#ef4444', marginBottom: 8 }}>Cancelados</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: '#ef4444' }}>{cancelledOrders}</div>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
-            {totalOrders > 0 ? `${((cancelledOrders / totalOrders) * 100).toFixed(0)}%` : '0%'}
-          </div>
         </div>
       </div>
 
-      {/* Filtros */}
+      {/* 🆕 BARRA DE PESQUISA */}
       <div style={{ 
         background: 'var(--bg-card)', 
         padding: 24, 
         borderRadius: 12,
         border: '1px solid var(--border-color)',
-        boxShadow: 'var(--shadow)',
         marginBottom: 24
       }}>
-        <div style={{ display: 'grid', gap: 16 }}>
-          {/* Filtro por Status */}
-          <div>
-            <label style={{ 
-              display: 'block', 
-              marginBottom: 8, 
-              fontWeight: 600,
-              color: 'var(--text-primary)'
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ 
+            display: 'block', 
+            marginBottom: 8, 
+            fontWeight: 600,
+            color: 'var(--text-primary)'
+          }}>
+            🔍 Pesquisar Pedido:
+          </label>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{ flex: 1, position: 'relative' }}>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Buscar por código do pedido (ex: VID-1234), forma de pagamento ou opção de retirada..."
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  paddingLeft: '40px',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 8,
+                  fontSize: 14,
+                  background: 'var(--bg-primary)',
+                  color: 'var(--text-primary)',
+                  outline: 'none',
+                  transition: 'all 0.2s ease'
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = '#7c3aed'}
+                onBlur={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
+              />
+              <span style={{ 
+                position: 'absolute', 
+                left: 12, 
+                top: '50%', 
+                transform: 'translateY(-50%)',
+                fontSize: 18
+              }}>
+                🔍
+              </span>
+            </div>
+            {searchTerm && (
+              <button
+                onClick={clearSearch}
+                style={{
+                  background: '#ef4444',
+                  color: 'white',
+                  padding: '10px 16px',
+                  border: 'none',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}
+              >
+                ❌ Limpar
+              </button>
+            )}
+          </div>
+          {searchTerm && (
+            <div style={{ 
+              marginTop: 8, 
+              fontSize: 12, 
+              color: '#7c3aed',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8
             }}>
+              <span>🔍</span>
+              <span>Mostrando resultados para: <strong>"{searchTerm}"</strong> ({ordersForList.length} pedido{ordersForList.length !== 1 ? 's' : ''})</span>
+            </div>
+          )}
+        </div>
+
+        {/* Filtros existentes */}
+        <div style={{ display: 'grid', gap: 16 }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: 'var(--text-primary)' }}>
               Status do Pedido:
             </label>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {[
-                { value: 'all' as const, label: '📋 Todos', emoji: '📋' },
-                { value: 'pendente' as const, label: 'Pendentes', emoji: '🟡' },
-                { value: 'pago' as const, label: 'Pagos', emoji: '🟢' },
-                { value: 'cancelado' as const, label: 'Cancelados', emoji: '🔴' }
-              ].map(({ value, label, emoji }) => (
+                { value: 'all' as const, label: '📋 Todos' },
+                { value: 'pendente' as const, label: '🟡 Pendentes' },
+                { value: 'pago' as const, label: '🟢 Pagos' },
+                { value: 'cancelado' as const, label: '🔴 Cancelados' }
+              ].map(({ value, label }) => (
                 <button
                   key={value}
                   onClick={() => setStatusFilter(value)}
@@ -335,28 +407,18 @@ function OrdersContent() {
                     cursor: 'pointer',
                     fontSize: 14,
                     fontWeight: 600,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
                     transition: 'all 0.2s ease'
                   }}
                 >
-                  {emoji} {label}
+                  {label}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Filtro por Mês e Data */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            {/* Filtro por Mês */}
             <div>
-              <label style={{ 
-                display: 'block', 
-                marginBottom: 8, 
-                fontWeight: 600,
-                color: 'var(--text-primary)'
-              }}>
+              <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: 'var(--text-primary)' }}>
                 Filtrar por Mês:
               </label>
               <select
@@ -380,14 +442,8 @@ function OrdersContent() {
               </select>
             </div>
 
-            {/* Filtro por Data Específica */}
             <div>
-              <label style={{ 
-                display: 'block', 
-                marginBottom: 8, 
-                fontWeight: 600,
-                color: 'var(--text-primary)'
-              }}>
+              <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: 'var(--text-primary)' }}>
                 Filtrar por Data:
               </label>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -419,7 +475,7 @@ function OrdersContent() {
                       fontWeight: 600
                     }}
                   >
-                    ❌
+                    ❌ Limpar
                   </button>
                 )}
               </div>
@@ -433,29 +489,18 @@ function OrdersContent() {
         background: 'var(--bg-card)', 
         borderRadius: 12,
         border: '1px solid var(--border-color)',
-        boxShadow: 'var(--shadow)',
         overflow: 'hidden'
       }}>
         {ordersForList.length === 0 ? (
-          <div style={{ 
-            padding: 60, 
-            textAlign: 'center', 
-            color: 'var(--text-secondary)',
-            background: 'var(--bg-card)'
-          }}>
+          <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-secondary)' }}>
             <div style={{ fontSize: 64, marginBottom: 16 }}>📭</div>
-            <h3 style={{ 
-              fontSize: 18, 
-              fontWeight: 600, 
-              marginBottom: 8,
-              color: 'var(--text-primary)'
-            }}>
+            <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, color: 'var(--text-primary)' }}>
               Nenhum pedido encontrado
             </h3>
             <p style={{ margin: 0 }}>
-              {statusFilter !== 'all' || monthFilter !== 'all' || dateFilter
-                ? 'Tente ajustar os filtros para ver mais resultados.'
-                : 'Ainda não há pedidos cadastrados.'}
+              {searchTerm 
+                ? `Nenhum pedido corresponde a "${searchTerm}"`
+                : 'Nenhum pedido corresponde aos filtros selecionados'}
             </p>
           </div>
         ) : (
@@ -487,24 +532,13 @@ function OrdersContent() {
                     display: 'grid', 
                     gridTemplateColumns: '1fr auto auto', 
                     gap: '16px', 
-                    alignItems: 'center' 
+                    alignItems: 'center',
+                    flexWrap: 'wrap'
                   }}>
-                    {/* Informações do Pedido */}
                     <div>
-                      {/* NOME DO CLIENTE EM DESTAQUE */}
-                      <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: 12, 
-                        marginBottom: 8 
-                      }}>
-                        <h3 style={{ 
-                          fontSize: 18, 
-                          fontWeight: 700, 
-                          color: 'var(--text-primary)',
-                          margin: 0
-                        }}>
-                          👤 {order.customer_name}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
+                        <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                          🏷️ {order.order_code}
                         </h3>
                         <div
                           style={{
@@ -521,60 +555,34 @@ function OrdersContent() {
                         </div>
                       </div>
                       
-                      <div style={{ 
-                        display: 'flex', 
-                        gap: 16, 
-                        flexWrap: 'wrap',
-                        fontSize: 14, 
-                        color: 'var(--text-secondary)' 
-                      }}>
-                        {/* TELEFONE DO CLIENTE ADICIONADO */}
-                        <span>
-                          <strong>📞 Telefone:</strong> {order.client_whatsapp}
-                        </span>
-                        <span>
-                          <strong>📦 Itens:</strong> {order.items_count}
-                        </span>
-                        <span>
-                          <strong>📅 Data:</strong> {new Date(order.created_at).toLocaleDateString('pt-BR')}
-                        </span>
-                        <span>
-                          <strong>⏰ Hora:</strong> {new Date(order.created_at).toLocaleTimeString('pt-BR', { 
-                            hour: '2-digit', 
-                            minute: '2-digit' 
-                          })}
-                        </span>
+                      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 14, color: 'var(--text-secondary)' }}>
+                        <span><strong>💳 Pagamento:</strong> {order.payment_method}</span>
+                        <span><strong>📦 Retirada:</strong> {order.pickup_option}</span>
+                        <span><strong>📦 Itens:</strong> {order.items_count}</span>
+                        <span><strong>📅 Data:</strong> {new Date(order.created_at).toLocaleDateString('pt-BR')}</span>
+                        <span><strong>⏰ Hora:</strong> {new Date(order.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
+                      
+                      {order.observations && (
+                        <div style={{ marginTop: 8, fontSize: 13, color: '#f59e0b', background: '#fef3c7', padding: '4px 8px', borderRadius: 6, display: 'inline-block' }}>
+                          💬 Obs: {order.observations}
+                        </div>
+                      )}
                     </div>
 
-                    {/* Total */}
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ 
-                        fontSize: 18, 
-                        fontWeight: 700, 
-                        color: 'var(--text-primary)',
-                        marginBottom: 4
-                      }}>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>
                         R$ {order.total.toFixed(2)}
                       </div>
-                      <div style={{ 
-                        fontSize: 12, 
-                        color: 'var(--text-secondary)' 
-                      }}>
-                        Total
-                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Total</div>
                     </div>
 
-                    {/* Ação */}
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center' 
-                    }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          window.open(`https://wa.me/55${order.client_whatsapp}`, '_blank');
+                          const message = `Olá! Gostaria de informações sobre o pedido *${order.order_code}*`;
+                          window.open(`https://wa.me/5592986446677?text=${encodeURIComponent(message)}`, '_blank');
                         }}
                         style={{
                           background: '#25D366',
@@ -601,7 +609,6 @@ function OrdersContent() {
         )}
       </div>
 
-      {/* Rodapé Informativo */}
       <div style={{ 
         marginTop: 24, 
         padding: 16, 
@@ -610,11 +617,7 @@ function OrdersContent() {
         border: '1px solid var(--border-color)',
         textAlign: 'center'
       }}>
-        <p style={{ 
-          color: 'var(--text-secondary)', 
-          fontSize: 14,
-          margin: 0
-        }}>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: 0 }}>
           💡 <strong>Dica:</strong> Clique em qualquer pedido para ver detalhes completos e gerenciar o status.
         </p>
       </div>
@@ -622,7 +625,6 @@ function OrdersContent() {
   );
 }
 
-// Componente exportado com proteção
 export default function OrdersPage() {
   return (
     <AuthGuard>
