@@ -739,7 +739,7 @@ Aguarde enquanto processamos seu pedido : )
   <div className="address-card">
     <div className="address-icon">🗺️</div>
     <div className="address-content">
-      <h4>Onde nos encontrar</h4>
+      <h4>Nosso Endereço</h4>
       <p>
         <strong>Videra Loja virtual</strong><br />
         Rua Áurea Graciano, 15 - Col. Santo Antônio<br />
@@ -1227,8 +1227,9 @@ Aguarde enquanto processamos seu pedido : )
         }
 
         .option-btn:hover:not(:disabled) {
+          background: #dc2626;
           border-color: #dc2626;
-          color: #dc2626;
+          color: #e5e7eb;
         }
 
         .option-btn.active {
