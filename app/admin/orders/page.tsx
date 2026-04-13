@@ -25,6 +25,13 @@ interface OrderItem {
   name: string;
 }
 
+// 🆕 Interface para reserva
+interface Reservation {
+  id: string;
+  order_id: string;
+  expires_at: string;
+}
+
 function OrdersContent() {
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -33,9 +40,11 @@ function OrdersContent() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pendente' | 'pago' | 'cancelado'>('all');
   const [monthFilter, setMonthFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('');
-  
-  // 🆕 ESTADO PARA PESQUISA
   const [searchTerm, setSearchTerm] = useState<string>('');
+  
+  // 🆕 Estado para reservas ativas
+  const [activeReservations, setActiveReservations] = useState<Map<string, Reservation>>(new Map());
+  const [reservationStatus, setReservationStatus] = useState<Map<string, { active: boolean; expiresAt: Date | null; timeLeft: string }>>(new Map());
 
   useEffect(() => {
     const loadOrders = async () => {
@@ -67,11 +76,115 @@ function OrdersContent() {
       });
 
       setOrderItems(grouped);
+      
+      // 🆕 Buscar reservas ativas para todos os pedidos
+      await loadReservations(ordersData || []);
+      
       setLoading(false);
     };
 
     loadOrders();
   }, []);
+
+const loadReservations = async (ordersList: Order[]) => {
+  const orderIds = ordersList.map(o => o.id);
+  if (orderIds.length === 0) return;
+
+  const { data: reservationsData, error } = await supabase
+    .from('reservations')
+    .select('id, order_id, expires_at')
+    .in('order_id', orderIds);
+
+  if (error) {
+    console.error('Erro ao buscar reservas:', error);
+    return;
+  }
+
+  const reservationsMap = new Map();
+  reservationsData?.forEach((res: Reservation) => {
+    reservationsMap.set(res.order_id, res);
+  });
+  setActiveReservations(reservationsMap);
+
+  const statusMap = new Map();
+  const nowUtc = Date.now(); // timestamp UTC em ms
+
+  ordersList.forEach(order => {
+    const reservation = reservationsMap.get(order.id);
+    
+    if (reservation && order.status === 'pendente') {
+      // 🔧 FORÇAR leitura como UTC: adicionar 'Z' se não tiver
+      let expiresStr = reservation.expires_at;
+      if (!expiresStr.endsWith('Z')) {
+        expiresStr += 'Z';
+      }
+      const expiresUtc = new Date(expiresStr).getTime();
+      const diffMs = expiresUtc - nowUtc;
+      
+      console.log(`🔍 Depuração pedido ${order.order_code}:`, {
+        expires_at_original: reservation.expires_at,
+        expires_utc: new Date(expiresUtc).toISOString(),
+        now_utc: new Date(nowUtc).toISOString(),
+        diff_ms: diffMs,
+        diff_min: Math.floor(diffMs / 60000)
+      });
+      
+      if (diffMs > 0) {
+        const totalMinutes = Math.floor(diffMs / 60000);
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        
+        let timeLeft = '';
+        if (hours > 0) {
+          timeLeft = `${hours}h ${minutes}min`;
+        } else {
+          timeLeft = `${minutes}min`;
+        }
+        
+        const isExpiringSoon = totalMinutes < 10;
+        
+        statusMap.set(order.id, {
+          active: true,
+          expiresAt: new Date(expiresUtc),
+          timeLeft,
+          isExpiringSoon
+        });
+      } else {
+        statusMap.set(order.id, {
+          active: false,
+          expiresAt: null,
+          timeLeft: 'Expirada',
+          isExpiringSoon: false
+        });
+      }
+    } else {
+      let timeLeft = '';
+      if (order.status === 'pago') timeLeft = 'Pago';
+      else if (order.status === 'cancelado') timeLeft = 'Cancelado';
+      else timeLeft = 'Sem reserva';
+      
+      statusMap.set(order.id, {
+        active: false,
+        expiresAt: null,
+        timeLeft,
+        isExpiringSoon: false
+      });
+    }
+  });
+  
+  setReservationStatus(statusMap);
+};
+
+  // 🆕 Atualizar reservas a cada 10 segundos
+  useEffect(() => {
+    if (orders.length === 0) return;
+
+    const interval = setInterval(() => {
+      loadReservations(orders);
+    }, 10000); // Atualiza a cada 10 segundos
+
+    return () => clearInterval(interval);
+  }, [orders]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -89,6 +202,27 @@ function OrdersContent() {
       case 'cancelado': return '🔴';
       default: return '⚪';
     }
+  };
+
+  // 🆕 Função para pegar cor do status da reserva
+  const getReservationColor = (orderId: string) => {
+    const status = reservationStatus.get(orderId);
+    if (!status) return { bg: '#f3f4f6', text: '#6b7280', icon: '⚪' };
+    
+    if (status.active) {
+      const timeLeft = status.timeLeft;
+      const mins = parseInt(timeLeft);
+      if (!isNaN(mins) && mins < 10) {
+        return { bg: '#fee2e2', text: '#dc2626', icon: '🔴', label: `⏰ Expira em ${timeLeft}` };
+      }
+      return { bg: '#dbeafe', text: '#2563eb', icon: '⏳', label: `🕐 Reservado (${timeLeft})` };
+    }
+    
+    if (status.timeLeft === 'Expirada') {
+      return { bg: '#fef3c7', text: '#d97706', icon: '⚠️', label: '⏰ Reserva expirada' };
+    }
+    
+    return { bg: '#f3f4f6', text: '#6b7280', icon: '⚪', label: status.timeLeft };
   };
 
   const getUniqueMonths = () => {
@@ -115,17 +249,13 @@ function OrdersContent() {
     ];
   };
 
-  // 🔍 FUNÇÃO DE PESQUISA
   const filteredOrders = orders.filter(order => {
-    // Filtro por status
     const statusMatch = statusFilter === 'all' || order.status === statusFilter;
     
-    // Filtro por mês
     const orderDate = new Date(order.created_at);
     const orderMonth = `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, '0')}`;
     const monthMatch = monthFilter === 'all' || orderMonth === monthFilter;
     
-    // Filtro por data específica
     let dateMatch = true;
     if (dateFilter) {
       const filterDate = new Date(dateFilter);
@@ -133,12 +263,15 @@ function OrdersContent() {
       dateMatch = orderDateOnly.getTime() === filterDate.getTime();
     }
     
-    // 🆕 FILTRO POR PESQUISA (código do pedido, pagamento ou retirada)
-    const searchLower = searchTerm.toLowerCase();
-const searchMatch = searchTerm === '' || 
-  (order.order_code && order.order_code.toLowerCase().includes(searchLower)) ||
-  (order.payment_method && order.payment_method.toLowerCase().includes(searchLower)) ||
-  (order.pickup_option && order.pickup_option.toLowerCase().includes(searchLower));
+    let searchMatch = true;
+if (searchTerm !== '') {
+  const searchLower = searchTerm.toLowerCase();
+  searchMatch = !!(
+    (order.order_code && order.order_code.toLowerCase().includes(searchLower)) ||
+    (order.payment_method && order.payment_method.toLowerCase().includes(searchLower)) ||
+    (order.pickup_option && order.pickup_option.toLowerCase().includes(searchLower))
+  );
+}
     
     return statusMatch && monthMatch && dateMatch && searchMatch;
   });
@@ -173,7 +306,6 @@ const searchMatch = searchTerm === '' ||
     setDateFilter('');
   };
 
-  // 🆕 LIMPAR PESQUISA
   const clearSearch = () => {
     setSearchTerm('');
   };
@@ -297,7 +429,7 @@ const searchMatch = searchTerm === '' ||
         </div>
       </div>
 
-      {/* 🆕 BARRA DE PESQUISA */}
+      {/* Barra de Pesquisa */}
       <div style={{ 
         background: 'var(--bg-card)', 
         padding: 24, 
@@ -367,22 +499,9 @@ const searchMatch = searchTerm === '' ||
               </button>
             )}
           </div>
-          {searchTerm && (
-            <div style={{ 
-              marginTop: 8, 
-              fontSize: 12, 
-              color: '#7c3aed',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8
-            }}>
-              <span>🔍</span>
-              <span>Mostrando resultados para: <strong>"{searchTerm}"</strong> ({ordersForList.length} pedido{ordersForList.length !== 1 ? 's' : ''})</span>
-            </div>
-          )}
         </div>
 
-        {/* Filtros existentes */}
+        {/* Filtros */}
         <div style={{ display: 'grid', gap: 16 }}>
           <div>
             <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: 'var(--text-primary)' }}>
@@ -497,16 +616,12 @@ const searchMatch = searchTerm === '' ||
             <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, color: 'var(--text-primary)' }}>
               Nenhum pedido encontrado
             </h3>
-            <p style={{ margin: 0 }}>
-              {searchTerm 
-                ? `Nenhum pedido corresponde a "${searchTerm}"`
-                : 'Nenhum pedido corresponde aos filtros selecionados'}
-            </p>
           </div>
         ) : (
           <div style={{ display: 'grid', gap: 1, background: 'var(--bg-secondary)' }}>
             {ordersForList.map((order, index) => {
               const statusColor = getStatusColor(order.status);
+              const reservation = getReservationColor(order.id);
               
               return (
                 <div
@@ -552,6 +667,23 @@ const searchMatch = searchTerm === '' ||
                           }}
                         >
                           {getStatusIcon(order.status)} {order.status.toUpperCase()}
+                        </div>
+                        {/* 🆕 Badge de status da reserva */}
+                        <div
+                          style={{
+                            background: reservation.bg,
+                            color: reservation.text,
+                            padding: '4px 10px',
+                            borderRadius: 12,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6
+                          }}
+                        >
+                          <span>{reservation.icon}</span>
+                          <span>{reservation.label}</span>
                         </div>
                       </div>
                       
@@ -619,6 +751,7 @@ const searchMatch = searchTerm === '' ||
       }}>
         <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: 0 }}>
           💡 <strong>Dica:</strong> Clique em qualquer pedido para ver detalhes completos e gerenciar o status.
+          {pendingOrders > 0 && ` 🔴 Pedidos pendentes têm reserva de 1 hora.`}
         </p>
       </div>
     </div>
