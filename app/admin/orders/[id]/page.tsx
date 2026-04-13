@@ -168,8 +168,90 @@ const handleStatusChange = async (newStatus: string) => {
 
   console.log("⚙️ Iniciando mudança de status para:", newStatus);
 
-  // 1️⃣ Se for PAGO, remover reservas e debitar estoque
+  // 1️⃣ Se for PAGO, validar reserva e estoque antes de prosseguir
   if (newStatus === "pago") {
+    // 🔒 VALIDAÇÃO 1: Verificar se a reserva ainda está ativa
+    const { data: activeReservation, error: resError } = await supabase
+      .from("reservations")
+      .select("id, expires_at")
+      .eq("order_id", id)
+      .gte("expires_at", new Date().toISOString())
+      .maybeSingle();
+
+    if (resError) {
+      console.error("Erro ao verificar reserva:", resError);
+      alert("Erro ao validar reserva. Tente novamente.");
+      return;
+    }
+
+    if (!activeReservation) {
+      alert("❌ Não é possível marcar como PAGO: a reserva deste pedido expirou. O cliente precisa fazer um novo pedido.");
+      return;
+    }
+
+    // 🔒 VALIDAÇÃO 2: Verificar estoque disponível (considerando reservas de outros pedidos)
+    const productIds = items.map(item => item.products?.id).filter(Boolean);
+    if (productIds.length === 0) {
+      alert("Erro: pedido sem produtos válidos.");
+      return;
+    }
+
+    // Buscar estoque real dos produtos
+    const { data: productsStock, error: stockError } = await supabase
+      .from("products")
+      .select("id, stock")
+      .in("id", productIds);
+
+    if (stockError) {
+      console.error("Erro ao buscar estoque:", stockError);
+      alert("Erro ao validar estoque. Tente novamente.");
+      return;
+    }
+
+    // Buscar reservas ativas de OUTROS pedidos (excluindo este)
+    const { data: otherReservations, error: otherResError } = await supabase
+      .from("reservations")
+      .select("product_id, quantity")
+      .in("product_id", productIds)
+      .neq("order_id", id)
+      .gte("expires_at", new Date().toISOString());
+
+    if (otherResError) {
+      console.error("Erro ao buscar reservas de outros pedidos:", otherResError);
+      alert("Erro ao validar disponibilidade. Tente novamente.");
+      return;
+    }
+
+    // Calcular reservas totais por produto (excluindo este pedido)
+    const reservedMap = new Map();
+    otherReservations?.forEach(r => {
+      reservedMap.set(r.product_id, (reservedMap.get(r.product_id) || 0) + r.quantity);
+    });
+
+    // Verificar item por item
+    let stockOk = true;
+    let insufficientItems: string[] = [];
+
+    for (const item of items) {
+      if (!item.products?.id) continue;
+      const productId = item.products.id;
+      const requestedQty = item.quantity;
+      const realStock = productsStock?.find(p => p.id === productId)?.stock || 0;
+      const reservedOther = reservedMap.get(productId) || 0;
+      const availableStock = realStock - reservedOther;
+
+      if (availableStock < requestedQty) {
+        stockOk = false;
+        insufficientItems.push(`${item.products.name} (disponível: ${availableStock}, pedido: ${requestedQty})`);
+      }
+    }
+
+    if (!stockOk) {
+      alert(`❌ Não é possível marcar como PAGO: estoque insuficiente para:\n${insufficientItems.join("\n")}\n\nPeça ao cliente para fazer um novo pedido.`);
+      return;
+    }
+
+    // ✅ Se passou nas validações, prossegue com o fluxo normal de PAGO
     // Remover reservas (libera visualmente para outros clientes)
     const { error: deleteResError } = await supabase
       .from('reservations')
