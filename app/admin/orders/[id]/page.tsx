@@ -163,18 +163,192 @@ function OrderDetailsContent() {
     return () => clearInterval(interval);
   }, [id]);
 
-  const handleStatusChange = async (newStatus: string) => {
-    // ... (mantenha a mesma lógica que você já tem)
-    // (não vou repetir para não poluir, mas você deve manter o código existente)
-  };
+const handleStatusChange = async (newStatus: string) => {
+  if (newStatus === order?.status) return;
 
-  const handleItemUpdate = async (itemId: string, newQty: number) => {
-    // ... (mantenha)
-  };
+  console.log("⚙️ Iniciando mudança de status para:", newStatus);
 
-  const handleItemCancel = async (itemId: string) => {
-    // ... (mantenha)
-  };
+  // 1️⃣ Se for PAGO, remover reservas e debitar estoque
+  if (newStatus === "pago") {
+    // Remover reservas (libera visualmente para outros clientes)
+    const { error: deleteResError } = await supabase
+      .from('reservations')
+      .delete()
+      .eq('order_id', id);
+
+    if (deleteResError) {
+      console.error('❌ Erro ao remover reservas:', deleteResError);
+    } else {
+      console.log('✅ Reservas removidas com sucesso');
+    }
+
+    // Atualizar o status do pedido
+    const { error: orderError } = await supabase
+      .from("orders")
+      .update({ status: newStatus })
+      .eq("id", id);
+
+    if (orderError) {
+      console.error("❌ Erro ao atualizar status:", orderError);
+      alert("Erro ao alterar status.");
+      return;
+    }
+
+    // Debitar estoque real
+    for (const item of items) {
+      if (item.quantity > 0 && item.products?.id) {
+        const productIdNum = Number(item.products.id);
+        const qtyNum = Number(item.quantity);
+
+        // Buscar estoque atual
+        const { data: product, error: fetchError } = await supabase
+          .from("products")
+          .select("stock")
+          .eq("id", productIdNum)
+          .single();
+
+        if (fetchError) {
+          console.error("❌ Erro ao buscar produto:", fetchError);
+          continue;
+        }
+
+        const newStock = Math.max(0, (product.stock || 0) - qtyNum);
+        
+        const { error: directError } = await supabase
+          .from("products")
+          .update({ stock: newStock })
+          .eq("id", productIdNum);
+
+        if (directError) {
+          console.error("❌ Falha ao debitar estoque:", directError);
+        } else {
+          console.log(`✅ Estoque debitado para produto ${productIdNum}: ${product.stock} → ${newStock}`);
+        }
+      }
+    }
+
+    alert(`✅ Pedido ${order?.order_code} marcado como PAGO. Estoque debitado.`);
+    router.refresh();
+    return;
+  }
+
+  // 2️⃣ Se for CANCELADO, remover reservas e devolver estoque se necessário
+  if (newStatus === "cancelado") {
+    // Remover reservas
+    const { error: deleteResError } = await supabase
+      .from('reservations')
+      .delete()
+      .eq('order_id', id);
+
+    if (deleteResError) {
+      console.error('❌ Erro ao remover reservas:', deleteResError);
+    } else {
+      console.log('✅ Reservas removidas');
+    }
+
+    // Se estava pago, devolver estoque real
+    if (order?.status === "pago") {
+      console.log("🔄 Iniciando devolução de estoque...");
+      
+      for (const item of items) {
+        const productId = Number(item.products?.id);
+        const quantity = Number(item.quantity);
+
+        if (productId && quantity > 0) {
+          const { data: product, error: fetchError } = await supabase
+            .from("products")
+            .select("stock")
+            .eq("id", productId)
+            .single();
+
+          if (fetchError) {
+            console.error("❌ Erro ao buscar produto:", fetchError);
+            continue;
+          }
+
+          const newStock = (product.stock || 0) + quantity;
+
+          const { error: stockError } = await supabase
+            .from("products")
+            .update({ stock: newStock })
+            .eq("id", productId);
+
+          if (stockError) {
+            console.error("❌ Erro ao devolver estoque:", stockError);
+          } else {
+            console.log(`✅ Estoque devolvido para produto ${productId}: ${product.stock} → ${newStock}`);
+          }
+        }
+      }
+    }
+
+    // Atualizar status
+    const { error: orderError } = await supabase
+      .from("orders")
+      .update({ status: newStatus })
+      .eq("id", id);
+
+    if (orderError) {
+      console.error("❌ Erro ao atualizar status:", orderError);
+      alert("Erro ao alterar status.");
+      return;
+    }
+
+    alert(`❌ Pedido ${order?.order_code} CANCELADO. ${order?.status === "pago" ? 'Estoque devolvido.' : 'Reservas removidas.'}`);
+    router.refresh();
+    return;
+  }
+
+  // 3️⃣ Para PENDENTE (ou outros)
+  const { error: orderError } = await supabase
+    .from("orders")
+    .update({ status: newStatus })
+    .eq("id", id);
+
+  if (orderError) {
+    console.error("❌ Erro ao atualizar status:", orderError);
+    alert("Erro ao alterar status.");
+    return;
+  }
+
+  alert(`✅ Status alterado para "${newStatus}"`);
+  router.refresh();
+};
+
+ const handleItemUpdate = async (itemId: string, newQty: number) => {
+  const { error } = await supabase
+    .from("order_items")
+    .update({ quantity: newQty })
+    .eq("id", itemId);
+
+  if (error) {
+    console.error("Erro ao atualizar item:", error);
+    alert("Erro ao alterar quantidade.");
+    return;
+  }
+
+  alert("Quantidade atualizada!");
+  router.refresh();
+};
+
+const handleItemCancel = async (itemId: string) => {
+  const confirmCancel = confirm("Deseja realmente cancelar este item?");
+  if (!confirmCancel) return;
+
+  const { error } = await supabase
+    .from("order_items")
+    .update({ quantity: 0 })
+    .eq("id", itemId);
+
+  if (error) {
+    console.error("Erro ao cancelar item:", error);
+    alert("Erro ao cancelar item.");
+    return;
+  }
+
+  alert("Item cancelado!");
+  router.refresh();
+};
 
   const getStatusColor = (status: string) => {
     switch (status) {
