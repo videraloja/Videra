@@ -145,7 +145,7 @@ useEffect(() => {
     
     setCarouselsLoading(true);
     try {
-      const configs = await carouselService.getCarouselConfigs('pokemontcg');
+      const configs = await carouselService.getCarouselConfigs('home');
       setCarouselConfigs(configs);
       
       if (configs.length > 0) {
@@ -157,7 +157,7 @@ useEffect(() => {
       const productsWithStock = await getProductsWithAvailableStock();
       
       // ✅ Buscar bestsellers e aplicar APENAS available_stock (sem desconto do carrinho)
-      const best = await carouselService.getBestsellers('pokemon', 10);
+      const best = await carouselService.getBestsellers('home', 10);
       const syncedBest = best.map(product => {
         const stockInfo = productsWithStock.find(p => p.id === product.id);
         const availableStock = stockInfo?.available_stock ?? product.stock;
@@ -167,7 +167,7 @@ useEffect(() => {
       setBestsellers(syncedBest);
       
       // ✅ Buscar new arrivals e aplicar APENAS available_stock
-      const arrivals = await carouselService.getNewArrivals('pokemon', 10);
+      const arrivals = await carouselService.getNewArrivals('home', 10);
       const syncedArrivals = arrivals.map(product => {
         const stockInfo = productsWithStock.find(p => p.id === product.id);
         const availableStock = stockInfo?.available_stock ?? product.stock;
