@@ -1,4 +1,4 @@
-// app/layout.tsx - FOOTER BONITÃO (endereço + WhatsApp + Instagram)
+// app/layout.tsx - FOOTER COM HORÁRIO + MOBILE LADO A LADO
 import "./globals.css";
 import React from "react";
 import FloatingCartButton from "./components/floatingcartbutton";
@@ -38,7 +38,7 @@ export default function RootLayout({
                   <main>{children}</main>
                   <FloatingCartButton />
 
-                  {/* 🌟 FOOTER BONITÃO */}
+                  {/* 🎨 FOOTER COM HORÁRIO E MOBILE LADO A LADO */}
                   <footer style={{
                     background: 'var(--bg-secondary)',
                     borderTop: '1px solid var(--border-color)',
@@ -46,18 +46,18 @@ export default function RootLayout({
                     padding: '48px 20px 32px',
                   }}>
                     <div style={{
-                      maxWidth: '1000px',
+                      maxWidth: '1200px',
                       margin: '0 auto',
                       display: 'flex',
                       flexWrap: 'wrap',
                       justifyContent: 'center',
-                      gap: '48px',
+                      gap: '32px',
                       textAlign: 'center'
                     }}>
-                      {/* Endereço */}
+                      {/* 1. Endereço */}
                       <div style={{
-                        flex: '1',
-                        minWidth: '200px',
+                        flex: '1 1 180px',
+                        minWidth: '140px',
                       }}>
                         <div style={{
                           width: '48px',
@@ -84,19 +84,51 @@ export default function RootLayout({
                         </p>
                       </div>
 
-                      {/* WhatsApp */}
+                      {/* 2. Horário de funcionamento */}
                       <div style={{
-                        flex: '1',
-                        minWidth: '200px',
+                        flex: '1 1 200px',
+                        minWidth: '160px',
+                      }}>
+                        <div style={{
+                          width: '48px',
+                          height: '48px',
+                          background: 'var(--primary-color)',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          margin: '0 auto 12px',
+                          fontSize: '24px',
+                          opacity: 0.9
+                        }}>
+                          🕒
+                        </div>
+                        <div style={{
+                          fontSize: '13px',
+                          lineHeight: '1.6',
+                          color: 'var(--text-secondary)',
+                          textAlign: 'center'
+                        }}>
+                          <p style={{ margin: 0 }}><strong>Segunda</strong> 8h – 21h</p>
+                          <p style={{ margin: 0 }}><strong>Terça</strong> 8h – 18h</p>
+                          <p style={{ margin: 0 }}><strong>Quarta</strong> 8h – 21h</p>
+                          <p style={{ margin: 0 }}><strong>Quinta</strong> 8h – 18h</p>
+                          <p style={{ margin: 0 }}><strong>Sexta</strong> 8h – 18h</p>
+                          <p style={{ margin: 0 }}><strong>Sábado</strong> 8h – 13h</p>
+                          <p style={{ margin: 0, opacity: 0.7 }}><strong>Domingo</strong> Fechado</p>
+                        </div>
+                      </div>
+
+                      {/* 3. WhatsApp */}
+                      <div style={{
+                        flex: '1 1 180px',
+                        minWidth: '140px',
                       }}>
                         <a
-                          href="https://wa.me/559986446677"
+                          href="https://wa.me/5592986446677"
                           target="_blank"
                           rel="noopener noreferrer"
-                          style={{
-                            textDecoration: 'none',
-                            display: 'block'
-                          }}
+                          style={{ textDecoration: 'none', display: 'block' }}
                         >
                           <div style={{
                             width: '48px',
@@ -113,7 +145,7 @@ export default function RootLayout({
                             💬
                           </div>
                           <span style={{
-                            fontSize: '16px',
+                            fontSize: '15px',
                             fontWeight: '500',
                             color: 'var(--text-primary)'
                           }}>
@@ -122,19 +154,16 @@ export default function RootLayout({
                         </a>
                       </div>
 
-                      {/* Instagram */}
+                      {/* 4. Instagram */}
                       <div style={{
-                        flex: '1',
-                        minWidth: '200px',
+                        flex: '1 1 180px',
+                        minWidth: '140px',
                       }}>
                         <a
                           href="https://www.instagram.com/videra_lojavirtual?igsh=bzBoYmFpanVvM2N5"
                           target="_blank"
                           rel="noopener noreferrer"
-                          style={{
-                            textDecoration: 'none',
-                            display: 'block'
-                          }}
+                          style={{ textDecoration: 'none', display: 'block' }}
                         >
                           <div style={{
                             width: '48px',
@@ -151,7 +180,7 @@ export default function RootLayout({
                             📷
                           </div>
                           <span style={{
-                            fontSize: '16px',
+                            fontSize: '15px',
                             fontWeight: '500',
                             color: 'var(--text-primary)'
                           }}>
