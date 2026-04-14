@@ -1,4 +1,4 @@
-// components/ProductCard.tsx - VERSÃO ATUALIZADA COM CARRINHO GLOBAL
+// components/ProductCard.tsx - VERSÃO CORRIGIDA (SEM EFEITO VERDE)
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -21,14 +21,12 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
   const { colors, emojis, getShadow, getCardStyles, applyCardStyles } = useThemeColors();
   const { stockLabel } = useStock();
   
-  // 🆕 USAR O CONTEXTO GLOBAL DO CARRINHO
   const { isInCart, getItemQuantity } = useCartContext();
   
   const [isAdded, setIsAdded] = useState(false);
   const [quantityInCart, setQuantityInCart] = useState(0);
   const [currentStock, setCurrentStock] = useState(product.stock);
   
-  // 🆕 SINCRONIZAR COM O CARRINHO GLOBAL
   useEffect(() => {
     const productId = String(product.id);
     
@@ -39,17 +37,14 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
       setIsAdded(inCart);
       setQuantityInCart(quantity);
       
-      // Calcular estoque atual baseado na quantidade no carrinho
       const newStock = Math.max(product.stock - quantity, 0);
       setCurrentStock(newStock);
       
       console.log(`🔄 ProductCard ${product.name}: Carrinho=${quantity}, Estoque=${newStock}`);
     };
     
-    // Verificar status inicial
     checkCartStatus();
     
-    // 🆕 OUVIR EVENTOS DE ATUALIZAÇÃO DO CARRINHO
     const handleCartUpdate = (e: CustomEvent) => {
       if (e.detail && String(e.detail.productId) === String(product.id)) {
         checkCartStatus();
@@ -57,15 +52,16 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
     };
 
     const handleCartCleared = () => {
-    console.log(`🧹 ProductCard ${product.name} recebeu evento de limpeza`);
-    setIsAdded(false);
-    setQuantityInCart(0);
-  };
+      console.log(`🧹 ProductCard ${product.name} recebeu evento de limpeza`);
+      setIsAdded(false);
+      setQuantityInCart(0);
+      setCurrentStock(product.stock);
+    };
     
     window.addEventListener('cartStateUpdated', handleCartUpdate as EventListener);
     window.addEventListener('cart-updated', checkCartStatus);
     window.addEventListener('storage', checkCartStatus);
-    window.addEventListener('cartCleared', handleCartCleared); // 🆕
+    window.addEventListener('cartCleared', handleCartCleared);
     
     return () => {
       window.removeEventListener('cartStateUpdated', handleCartUpdate as EventListener);
@@ -79,7 +75,6 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
   const displayPrice = product.on_sale ? product.sale_price! : product.price;
   const originalPrice = product.on_sale ? product.original_price : undefined;
   
-  // Configuração de categoria padrão se não for fornecida
   const defaultConfig = {
     color: colors.primary,
     icon: '📦',
@@ -87,76 +82,58 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
   };
   
   const config = categoryConfig || defaultConfig;
-
-  // 🎨 OBTER ESTILOS GRANULARES DO CARD
   const cardStyles = getCardStyles();
   
-  // 🎯 CORREÇÃO 1: DIMENSÕES FIXAS DO CARD
   const cardContainerStyles = {
-    width: '280px', // Largura fixa
-    minHeight: '420px', // Altura mínima garantida
-    maxHeight: '480px', // Altura máxima
+    width: '280px',
+    minHeight: '420px',
+    maxHeight: '480px',
     display: 'flex',
     flexDirection: 'column' as const,
   };
 
-  // 🎯 CORREÇÃO 2: CONTAINER DO BOTÃO COM ALTURA FIXA
   const buttonContainerStyles = {
-    height: '50px', // Altura fixa para evitar redimensionamento
+    height: '50px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 'auto' // Empurra para baixo
+    marginTop: 'auto'
   };
 
   const handleAddToCart = () => {
     if (currentStock <= 0) return;
     
-    // Chamar a função de adicionar ao carrinho
     onAddToCart(product);
     
-    // 🆕 ATUALIZAÇÃO IMEDIATA DO ESTADO LOCAL
     setIsAdded(true);
     const newQuantity = quantityInCart + 1;
     setQuantityInCart(newQuantity);
     setCurrentStock(prev => Math.max(prev - 1, 0));
     
-    // Feedback visual
-    const button = document.getElementById(`add-to-cart-${product.id}`);
-    if (button) {
-      const originalBackground = button.style.background;
-      button.style.background = '#10b981';
-      
-      setTimeout(() => {
-        button.style.background = originalBackground;
-      }, 300);
-    }
+    // ❌ REMOVIDO: feedback visual verde (flash e mudança de cor via DOM)
   };
 
-  // 🎨 FUNÇÃO PARA OBTER CONTEÚDO DO BOTÃO
   const getButtonContent = () => {
     if (currentStock === 0) return 'Esgotado';
     if (isAdded) return `✓ Adicionado (${quantityInCart})`;
     return `${config.icon} Adicionar ao Carrinho`;
   };
 
-  // 🆕 FUNÇÃO PARA OBTER COR DO BOTÃO
+  // ✅ CORRIGIDO: sempre usar a cor do tema, nunca verde
   const getButtonColor = () => {
     if (currentStock === 0) return cardStyles.addToCart.disabledBackgroundColor;
-    if (isAdded) return '#10b981'; // Verde para "Adicionado"
     return cardStyles.addToCart.backgroundColor;
   };
 
-  // 🆕 FUNÇÃO PARA OBTER COR DO BOTÃO NO HOVER
+  // ✅ CORRIGIDO: hover sempre usa a cor do tema
   const getButtonHoverColor = () => {
     if (currentStock === 0) return cardStyles.addToCart.disabledBackgroundColor;
-    if (isAdded) return '#0da271'; // Verde mais escuro
     return cardStyles.addToCart.hoverBackgroundColor;
   };
 
   return (
     <div
-    className="product-card-mobile-optimized"
+      className="product-card-mobile-optimized"
       style={{
         ...cardContainerStyles,
         background: cardStyles.cardBackground,
@@ -176,8 +153,6 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
         e.currentTarget.style.boxShadow = cardStyles.shadow;
       }}
     >
-    
-      {/* Badge de Promoção */}
       {product.on_sale && originalPrice && (
         <div style={{
           ...applyCardStyles('badgeDiscount', {
@@ -195,10 +170,9 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
         </div>
       )}
       
-      {/* Imagem do Produto */}
       <div style={{
         width: '100%',
-        height: '200px', // Altura fixa para imagens
+        height: '200px',
         overflow: 'hidden',
         position: 'relative',
         background: cardStyles.imageOverlay
@@ -212,18 +186,15 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
             objectFit: 'cover'
           }}
         />
-
       </div>
 
-      {/* Conteúdo do Card */}
       <div style={{ 
         padding: '20px',
         display: 'flex',
         flexDirection: 'column',
-        flex: '1', // Ocupa espaço restante
-        minHeight: '220px' // Altura mínima do conteúdo
+        flex: '1',
+        minHeight: '220px'
       }}>
-        {/* Nome do Produto */}
         <h3 style={{
           ...applyCardStyles('productName', {
             fontSize: '16px',
@@ -239,9 +210,7 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
         }}>
           {product.name}
         </h3>
-
         
-        {/* Preços */}
         <div style={{ marginBottom: '12px' }}>
           {product.on_sale && originalPrice && (
             <div style={{
@@ -280,7 +249,6 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
           )}
         </div>
         
-        {/* Informações de Estoque */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -298,7 +266,6 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
           </span>
         </div>
         
-        {/* 🎯 CONTAINER DO BOTÃO COM ALTURA FIXA */}
         <div style={buttonContainerStyles}>
           <button
             id={`add-to-cart-${product.id}`}
@@ -307,7 +274,7 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
             style={{
               ...applyCardStyles('addToCart', {
                 width: '100%',
-                height: '44px', // Altura fixa
+                height: '44px',
                 padding: '12px 16px',
                 border: 'none',
                 borderRadius: '12px',
@@ -318,7 +285,6 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                // 🆕 COR DINÂMICA BASEADA NO ESTADO
                 backgroundColor: getButtonColor()
               })
             }}
