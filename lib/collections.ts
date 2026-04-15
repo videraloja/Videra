@@ -14,7 +14,7 @@ export const POKEMON_COLLECTIONS: CollectionConfig[] = [
   { id: 'evolucoes-prismaticas', name: 'Evoluções Prismáticas' },
   { id: 'herois-excelsos', name: 'Heróis Excelsos' },
   { id: 'fagulhas-impetuosas', name: 'Fagulhas Impetuosas' },
-  { id: 'dominio-draconico', name: 'Domínio Dracônico' }, // 🔥 SEM ACENTOS NO ID
+   { id: 'equilibrio-perfeito', name: 'Equilíbrio Perfeito' },
 ];
 
 // ✅ FUNÇÕES PARA O ADMIN
