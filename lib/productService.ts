@@ -1,4 +1,4 @@
-// lib/productService.ts
+// lib/productService.ts - CORRIGIDO (usa RPC get_available_stock)
 import { supabase } from './supabaseClient';
 
 export interface ProductWithAvailableStock {
@@ -16,7 +16,7 @@ export interface ProductWithAvailableStock {
 }
 
 export const getProductsWithAvailableStock = async (): Promise<ProductWithAvailableStock[]> => {
-  // Buscar todos os produtos
+  // 1. Buscar todos os produtos
   const { data: products, error } = await supabase
     .from('products')
     .select('*');
@@ -25,28 +25,33 @@ export const getProductsWithAvailableStock = async (): Promise<ProductWithAvaila
     console.error('Erro ao buscar produtos:', error);
     return [];
   }
-  
-  // Buscar reservas ativas (não expiradas)
-  const { data: reservations, error: resError } = await supabase
-    .from('reservations')
-    .select('product_id, quantity')
-    .gte('expires_at', new Date().toISOString());
-  
-  if (resError) {
-    console.error('Erro ao buscar reservas:', resError);
+
+  if (!products || products.length === 0) {
+    return [];
+  }
+
+  // 2. Buscar estoque disponível via RPC (funciona para usuários anônimos)
+  const productIds = products.map(p => p.id);
+  const { data: stockData, error: rpcError } = await supabase.rpc('get_available_stock', {
+    p_product_ids: productIds
+  });
+
+  if (rpcError) {
+    console.error('Erro ao chamar get_available_stock RPC:', rpcError);
+    // Fallback: retornar produtos com stock bruto
     return products.map(p => ({ ...p, available_stock: p.stock }));
   }
-  
-  // Calcular total reservado por produto
-  const reservedByProduct: Record<number, number> = {};
-  reservations?.forEach(res => {
-    reservedByProduct[res.product_id] = (reservedByProduct[res.product_id] || 0) + res.quantity;
+
+  // 3. Criar mapa product_id -> available_stock
+  const stockMap = new Map<number, number>();
+  stockData?.forEach((item: { product_id: number; available_stock: number }) => {
+    stockMap.set(item.product_id, item.available_stock);
   });
-  
-  // Calcular estoque disponível = stock real - reservas ativas
+
+  // 4. Montar resultado
   return products.map(product => ({
     ...product,
-    available_stock: Math.max(0, product.stock - (reservedByProduct[product.id] || 0))
+    available_stock: stockMap.get(product.id) ?? product.stock
   }));
 };
 
