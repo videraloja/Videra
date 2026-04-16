@@ -289,160 +289,139 @@ export default function CartPage() {
     setShowPickupModal(true);
   };
 
-  // Criar reserva para cada produto no carrinho
-const createReservations = async (orderId: string, cartItems: CartItem[]) => {
-  const reservations = cartItems.map(item => ({
-    order_id: orderId,
-    product_id: item.id,
-    quantity: item.quantity,
-    expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString() // 30 minutos
-  }));
-  
-  const { error } = await supabase.from('reservations').insert(reservations);
-  
-  if (error) {
-    console.error('Erro ao criar reservas:', error);
-    throw error;
-  }
-  
-  console.log(`✅ Reservas criadas para ${cartItems.length} produtos`);
-};
-
+  // 🟢 NOVA VERSÃO DO processOrder USANDO RPCs
   const processOrder = async () => {
-  if (isProcessing) return;
-  setIsProcessing(true);
+    if (isProcessing) return;
+    setIsProcessing(true);
 
-  // ✅ 1. VERIFICAR ESTOQUE DISPONÍVEL
-  const { data: currentProducts, error: stockError } = await supabase
-    .from('products')
-    .select('id, stock')
-    .in('id', cart.map(i => i.id));
+    const productIds = cart.map(i => i.id);
 
-  if (stockError) {
-    console.error('Erro ao verificar estoque:', stockError);
-    showToast('Erro ao verificar disponibilidade. Tente novamente.', 'error');
-    setIsProcessing(false);
-    return;
-  }
+    // 1. VERIFICAR ESTOQUE DISPONÍVEL (considera reservas ativas de outros pedidos)
+    const { data: stockData, error: stockError } = await supabase.rpc('get_available_stock', {
+      p_product_ids: productIds
+    });
 
-  const productStockMap = new Map();
-  currentProducts?.forEach(p => productStockMap.set(p.id, p.stock));
+    if (stockError) {
+      console.error('Erro ao verificar estoque via RPC:', stockError);
+      showToast('Erro ao verificar disponibilidade. Tente novamente.', 'error');
+      setIsProcessing(false);
+      return;
+    }
 
-  const { data: activeReservations } = await supabase
-    .from('reservations')
-    .select('product_id, quantity')
-    .in('product_id', cart.map(i => i.id))
-    .gte('expires_at', new Date().toISOString());
+    // Mapear estoque disponível por product_id
+    const availableMap = new Map<number, number>();
+    stockData?.forEach((s: { product_id: number; available_stock: number }) => {
+      availableMap.set(s.product_id, s.available_stock);
+    });
 
-  const reservedMap = new Map();
-  activeReservations?.forEach(r => {
-    reservedMap.set(r.product_id, (reservedMap.get(r.product_id) || 0) + r.quantity);
-  });
+    // Verificar cada item do carrinho
+    const unavailableItems: { name: string; available: number; requested: number }[] = [];
+    const adjustedItems: { name: string; oldQty: number; newQty: number }[] = [];
 
-  // ✅ COLETAR AJUSTES E REMOÇÕES
-  const unavailableItems: { name: string; available: number; requested: number }[] = [];
-  const adjustedItems: { name: string; oldQty: number; newQty: number }[] = [];
-
-  for (const item of cart) {
-    const realStock = productStockMap.get(item.id) || 0;
-    const reserved = reservedMap.get(item.id) || 0;
-    const availableStock = realStock - reserved;
-
-    if (availableStock < item.quantity) {
-      if (availableStock > 0) {
-        adjustedItems.push({
-          name: item.name,
-          oldQty: item.quantity,
-          newQty: availableStock
-        });
-      } else {
-        unavailableItems.push({
-          name: item.name,
-          available: availableStock,
-          requested: item.quantity
-        });
+    for (const item of cart) {
+      const available = availableMap.get(item.id) ?? 0;
+      if (available < item.quantity) {
+        if (available > 0) {
+          adjustedItems.push({
+            name: item.name,
+            oldQty: item.quantity,
+            newQty: available
+          });
+        } else {
+          unavailableItems.push({
+            name: item.name,
+            available,
+            requested: item.quantity
+          });
+        }
       }
     }
-  }
 
-  // ✅ SE HOUVER AJUSTES OU REMOÇÕES, MOSTRAR MODAL
-  if (adjustedItems.length > 0 || unavailableItems.length > 0) {
-    setStockModalData({ adjustedItems, unavailableItems });
-    setShowStockModal(true);
-    setIsProcessing(false);
-    return;
-  }
-
-  // ✅ 2. RESERVAR E ENVIAR
-  const phone = '5592986446677';
-  const orderCode = generateOrderCode();
-
-  const { data: order, error: orderError } = await supabase
-    .from("orders")
-    .insert([
-      {
-        order_code: orderCode,
-        status: "pendente",
-        payment_method: paymentMethodLabels[paymentMethod],
-        pickup_option: pickupOptionLabels[pickupOption],
-        observations: observations || null,
-      },
-    ])
-    .select()
-    .single();
-
-  if (orderError || !order) {
-    console.error("Erro ao salvar pedido no Supabase:", orderError);
-    showToast('Erro ao registrar o pedido. Tente novamente.', 'error');
-    setIsProcessing(false);
-    return;
-  }
-
-  try {
-    await createReservations(order.id, cart);
-  } catch (err) {
-    console.error('Erro ao criar reservas, pedido será cancelado:', err);
-    await supabase.from('orders').delete().eq('id', order.id);
-    showToast('Erro ao processar pedido. Tente novamente.', 'error');
-    setIsProcessing(false);
-    return;
-  }
-
-  const itemsPayload = cart.map((item) => ({
-    order_id: order.id,
-    product_id: item.id,
-    name: item.name,
-    quantity: item.quantity,
-    price: getCurrentPrice(item),
-  }));
-
-  const { error: itemsError } = await supabase
-    .from("order_items")
-    .insert(itemsPayload);
-
-  if (itemsError) {
-    console.error("Erro ao salvar itens:", itemsError);
-    showToast('Erro ao salvar itens do pedido.', 'error');
-    setIsProcessing(false);
-    return;
-  }
-
-  const total = cart.reduce((s, i) => s + getCurrentPrice(i) * i.quantity, 0);
-
-  const lines = cart.map((i) => {
-    const price = getCurrentPrice(i);
-    const hasPromo = hasPromotion(i);
-    const priceFormatted = `R$ ${price.toFixed(2).replace(".", ",")}`;
-    const quantityText = `${i.quantity} ${i.quantity === 1 ? 'uni' : 'uni'}`;
-    
-    if (hasPromo) {
-      const originalPriceFormatted = `R$ ${getOriginalPrice(i).toFixed(2).replace(".", ",")}`;
-      return `• ${i.name} — ${originalPriceFormatted} por ${priceFormatted}\n  ${quantityText}`;
+    // Se houver ajustes ou indisponibilidade, mostrar modal e interromper
+    if (adjustedItems.length > 0 || unavailableItems.length > 0) {
+      setStockModalData({ adjustedItems, unavailableItems });
+      setShowStockModal(true);
+      setIsProcessing(false);
+      return;
     }
-    return `• ${i.name} — ${priceFormatted}\n  ${quantityText}`;
-  });
 
- const message = `
+    // 2. CRIAR PEDIDO VIA RPC
+    const orderCode = generateOrderCode();
+    const { data: orderResult, error: orderError } = await supabase.rpc('create_order', {
+      p_order_code: orderCode,
+      p_status: 'pendente',
+      p_payment_method: paymentMethodLabels[paymentMethod],
+      p_pickup_option: pickupOptionLabels[pickupOption],
+      p_observations: observations || null
+    });
+
+    if (orderError || !orderResult?.id) {
+      console.error('Erro ao criar pedido via RPC:', orderError);
+      showToast('Erro ao registrar o pedido. Tente novamente.', 'error');
+      setIsProcessing(false);
+      return;
+    }
+
+    const orderId = orderResult.id;
+
+    // 3. CRIAR RESERVAS VIA RPC
+    const itemsForReservation = cart.map(item => ({
+      product_id: item.id,
+      quantity: item.quantity
+    }));
+
+    const { error: reserveError } = await supabase.rpc('create_reservations', {
+      p_order_id: orderId,
+      p_items: itemsForReservation
+    });
+
+    if (reserveError) {
+      console.error('Erro ao criar reservas via RPC:', reserveError);
+      // Cancelar o pedido (opcional)
+      await supabase.from('orders').delete().eq('id', orderId);
+      showToast('Erro ao processar pedido. Tente novamente.', 'error');
+      setIsProcessing(false);
+      return;
+    }
+
+    // 4. INSERIR ITENS DO PEDIDO (ordem_items) – a política pública permite INSERT
+    const itemsPayload = cart.map((item) => ({
+      order_id: orderId,
+      product_id: item.id,
+      name: item.name,
+      quantity: item.quantity,
+      price: getCurrentPrice(item),
+    }));
+
+    const { error: itemsError } = await supabase
+      .from("order_items")
+      .insert(itemsPayload);
+
+    if (itemsError) {
+      console.error("Erro ao salvar itens:", itemsError);
+      showToast('Erro ao salvar itens do pedido.', 'error');
+      setIsProcessing(false);
+      return;
+    }
+
+    // 5. ENVIAR MENSAGEM PARA WHATSAPP
+    const phone = '5592986446677';
+    const total = cart.reduce((s, i) => s + getCurrentPrice(i) * i.quantity, 0);
+
+    const lines = cart.map((i) => {
+      const price = getCurrentPrice(i);
+      const hasPromo = hasPromotion(i);
+      const priceFormatted = `R$ ${price.toFixed(2).replace(".", ",")}`;
+      const quantityText = `${i.quantity} ${i.quantity === 1 ? 'uni' : 'uni'}`;
+      
+      if (hasPromo) {
+        const originalPriceFormatted = `R$ ${getOriginalPrice(i).toFixed(2).replace(".", ",")}`;
+        return `• ${i.name} — ${originalPriceFormatted} por ${priceFormatted}\n  ${quantityText}`;
+      }
+      return `• ${i.name} — ${priceFormatted}\n  ${quantityText}`;
+    });
+
+    const message = `
 *PEDIDO:* ${orderCode} - ${paymentMethodLabels[paymentMethod]} - ${pickupOptionLabels[pickupOption]}
 
 ${lines.join("\n\n")}
@@ -456,18 +435,18 @@ ___/___/___/___/___
 Aguarde enquanto processamos seu pedido : )
 `.trim();
 
-  const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-  window.open(url, "_blank");
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    window.open(url, "_blank");
 
-  clearCart();
-  
-  window.dispatchEvent(new Event('cart-updated'));
-  window.dispatchEvent(new Event('storage'));
-  window.dispatchEvent(new CustomEvent('cartStateChanged'));
+    clearCart();
+    
+    window.dispatchEvent(new Event('cart-updated'));
+    window.dispatchEvent(new Event('storage'));
+    window.dispatchEvent(new CustomEvent('cartStateChanged'));
 
-  showToast(`✅ Pedido ${orderCode} registrado com sucesso! Produtos reservados por 30 minutos.`, 'success');
-  setIsProcessing(false);
-};
+    showToast(`✅ Pedido ${orderCode} registrado com sucesso! Produtos reservados por 1 hora.`, 'success');
+    setIsProcessing(false);
+  };
 
   const handleSendOrder = async () => {
     if (!cart || cart.length === 0) {
