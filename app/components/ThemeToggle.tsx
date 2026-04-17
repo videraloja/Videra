@@ -1,12 +1,17 @@
-// components/ThemeToggle.tsx - ATUALIZADO
 "use client";
 
-import { useTheme } from "../../app/contexts/ThemeContext"; // ← IMPORT DO CONTEXTO
-import { useThemeColors } from "../../hooks/useThemeColors"; // ← IMPORT DO HOOK NA RAIZ
+import { usePathname } from "next/navigation";
+import { useTheme } from "../../app/contexts/ThemeContext";
+import { useThemeColors } from "../../hooks/useThemeColors";
 
 export default function ThemeToggle() {
+  const pathname = usePathname();
+  const isAdmin = pathname?.startsWith("/admin");
   const { theme, toggleTheme } = useTheme();
   const { colors, getShadow } = useThemeColors();
+
+  // Se não estiver na área admin, não renderiza nada
+  if (!isAdmin) return null;
 
   return (
     <button
