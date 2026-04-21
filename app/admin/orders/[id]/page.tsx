@@ -184,28 +184,46 @@ function OrderDetailsContent() {
         return;
       }
 
-      // 🔒 VALIDAÇÃO 2: Verificar estoque disponível usando a RPC get_available_stock
+            // 🔒 VALIDAÇÃO 2: Verificar estoque disponível (excluindo reservas deste pedido)
       const productIds = items.map((item) => item.products?.id).filter(Boolean);
       if (productIds.length === 0) {
         alert("Erro: pedido sem produtos válidos.");
         return;
       }
 
-      const { data: stockData, error: stockRpcError } = await supabase.rpc(
-        "get_available_stock",
-        { p_product_ids: productIds }
-      );
+      // Buscar estoque real dos produtos
+      const { data: productsStock, error: stockError } = await supabase
+        .from("products")
+        .select("id, stock")
+        .in("id", productIds);
 
-      if (stockRpcError) {
-        console.error("Erro ao buscar estoque via RPC:", stockRpcError);
+      if (stockError) {
+        console.error("Erro ao buscar estoque:", stockError);
+        alert("Erro ao validar estoque. Tente novamente.");
+        return;
+      }
+
+      const productStockMap = new Map();
+      productsStock?.forEach((p) => productStockMap.set(p.id, p.stock));
+
+      // Buscar reservas ativas de OUTROS pedidos (excluindo este)
+      const { data: otherReservations, error: otherResError } = await supabase
+        .from("reservations")
+        .select("product_id, quantity")
+        .in("product_id", productIds)
+        .neq("order_id", id)
+        .gte("expires_at", new Date().toISOString());
+
+      if (otherResError) {
+        console.error("Erro ao buscar reservas de outros pedidos:", otherResError);
         alert("Erro ao validar disponibilidade. Tente novamente.");
         return;
       }
 
-      // Mapear product_id -> available_stock
-      const availableMap = new Map();
-      stockData?.forEach((s: { product_id: number; available_stock: number }) => {
-        availableMap.set(s.product_id, s.available_stock);
+      // Calcular reservas totais por produto (excluindo este pedido)
+      const reservedMap = new Map();
+      otherReservations?.forEach((r) => {
+        reservedMap.set(r.product_id, (reservedMap.get(r.product_id) || 0) + r.quantity);
       });
 
       let stockOk = true;
@@ -215,12 +233,14 @@ function OrderDetailsContent() {
         if (!item.products?.id) continue;
         const productId = item.products.id;
         const requestedQty = item.quantity;
-        const available = availableMap.get(productId) ?? 0;
+        const realStock = productStockMap.get(productId) || 0;
+        const reservedOther = reservedMap.get(productId) || 0;
+        const availableStock = realStock - reservedOther; // não desconta a reserva deste pedido
 
-        if (available < requestedQty) {
+        if (availableStock < requestedQty) {
           stockOk = false;
           insufficientItems.push(
-            `${item.products.name} (disponível: ${available}, pedido: ${requestedQty})`
+            `${item.products.name} (disponível: ${availableStock}, pedido: ${requestedQty})`
           );
         }
       }
