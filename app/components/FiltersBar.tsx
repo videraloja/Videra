@@ -6,7 +6,7 @@ import Image from 'next/image';
 
 // Tipos para os filtros (MANTIDO IGUAL)
 export type PokemonFilter = 
-  | 'colecoes' | 'etbs' | 'decks'
+  | 'colecoes' | 'etbs1' | 'decks'
   | 'unitarios' | 'triplos' | 'quadruplos'
   | 'box' | 'mini-box' | 'booster-box';
 
@@ -95,10 +95,10 @@ const POKEMON_FILTERS: FilterItem[] = [
     imageUrl: getFilterImageUrl('colecoes') // ✅ IMAGEM PERSONALIZADA
   },
   { 
-    id: 'etbs', 
+    id: 'etbs1', 
     name: 'ETBs', 
     emoji: '🎁',
-    imageUrl: getFilterImageUrl('etbs') // ✅ IMAGEM PERSONALIZADA
+    imageUrl: getFilterImageUrl('etbs1') // ✅ IMAGEM PERSONALIZADA
   },
   { 
     id: 'decks', 
