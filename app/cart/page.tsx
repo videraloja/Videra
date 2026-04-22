@@ -698,15 +698,22 @@ Aguarde enquanto processamos seu pedido : )
   // Loading state
   if (!ready) {
     return (
-      <div className="cart-page">
-        <div className="cart-container">
-          <div className="cart-loading">
-            <div className="loading-spinner"></div>
-            <p>Carregando carrinho...</p>
+      <>
+        <style jsx global>{`
+          footer.site-footer, footer:not([class]) {
+            display: none !important;
+          }
+        `}</style>
+        <div className="cart-page">
+          <div className="cart-container">
+            <div className="cart-loading">
+              <div className="loading-spinner"></div>
+              <p>Carregando carrinho...</p>
+            </div>
           </div>
+          <ToastContainer />
         </div>
-        <ToastContainer />
-      </div>
+      </>
     );
   }
 
