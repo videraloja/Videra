@@ -601,7 +601,7 @@ Aguarde enquanto processamos seu pedido : )
   const copyOrderMessage = () => {
     if (orderSuccess) {
       navigator.clipboard.writeText(orderSuccess.message);
-      showToast('Mensagem do pedido copiada! Envie no WhatsApp.', 'success');
+      showToast('Pedido copiado! Envie no WhatsApp.', 'success');
     }
   };
 
