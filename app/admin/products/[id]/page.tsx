@@ -622,15 +622,15 @@ function EditProductContent() {
                     style={smallInputStyle}
                   >
                     <option value="">Selecione o tipo</option>
-                    <option value="deck">Deck Pré-construído</option>
-                    <option value="booster-pack">Booster Pack</option>
+                    <option value="deck">Deck</option>
+                    <option value="booster-pack">Unitarios</option>
                     <option value="booster-box">Booster Box</option>
-                    <option value="elite-trainer-box">Elite Trainer Box (ETB)</option>
+                    <option value="elite-trainer-box">ETB</option>
                     <option value="single">Carta Avulsa</option>
-                    <option value="collection-box">Collection Box</option>
+                    <option value="collection-box">Box</option>
                     <option value="mini-box">Mini Box</option>
-                    <option value="triple-box">Triple Box</option>
-                    <option value="quadruple-box">Quadruple Box</option>
+                    <option value="triple-box">Triple</option>
+                    <option value="quadruple-box">Quadruple</option>
                     <option value="accessory">Acessório Pokémon</option>
                   </select>
                 </div>
