@@ -12,19 +12,19 @@ import ConditionalFooter from './components/ConditionalFooter';
 import CartExitHandler from './components/CartExitHandler';
 
 export const metadata = {
-  title: "Videra Colecionáveis - Pokémon TCG e Board Games",
+  title: "Videra Site Oficial - Pokémon TCG e Board Games",
   description: "Sua loja de colecionáveis em Manaus! Pokémon TCG, cartas avulsas, boosters, ETBs, jogos de tabuleiro, acessórios e muito mais. Compre online com segurança.",
   openGraph: {
-    title: "Videra Colecionáveis",
-    description: "Pokémon TCG, Board Games e Acessórios em Manaus. Confira nossas ofertas!",
+    title: "Videra Site Oficial",
+    description: "Pokémon TCG, Board Games e Acessórios. Confira nossos produtos!",
     url: "https://videra-nine.vercel.app",
-    siteName: "Videra Colecionáveis",
+    siteName: "Videra",
     images: [
       {
         url: "https://videra-nine.vercel.app/og-image.jpg",
         width: 1200,
         height: 630,
-        alt: "Videra Colecionáveis - Loja de Pokémon TCG e Board Games",
+        alt: "Videra - Loja de Pokémon TCG e Board Games",
       },
     ],
     locale: "pt_BR",
@@ -32,8 +32,8 @@ export const metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Videra Colecionáveis",
-    description: "Pokémon TCG, Board Games e Acessórios em Manaus.",
+    title: "Videra Site Oficial",
+    description: "Pokémon TCG, Board Games e Acessórios.",
     images: ["https://videra-nine.vercel.app/og-image.jpg"],
   },
 };
