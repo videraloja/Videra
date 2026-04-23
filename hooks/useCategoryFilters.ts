@@ -1,4 +1,4 @@
-// hooks/useCategoryFilters.ts - VERSÃO SIMPLIFICADA
+// hooks/useCategoryFilters.ts - VERSÃO CORRIGIDA COM MAPEAMENTO EXATO
 'use client';
 
 import { Product } from '../app/types';
@@ -6,6 +6,18 @@ import { useCallback } from 'react';
 import { getCollectionName } from '@/lib/collections';
 
 export const useCategoryFilters = () => {
+  // 🗺️ MAPEAMENTO EXATO: ID do filtro da UI -> Valores de product_type no banco
+  const POKEMON_TYPE_MAP: Record<string, string[]> = {
+    'etbs1': ['elite-trainer-box'],
+    'decks': ['deck'],
+    'unitarios': ['booster-pack', 'single'],
+    'triplos': ['triple-box'],
+    'quadruplos': ['quadruple-box'],
+    'box': ['collection-box'],
+    'mini-box': ['mini-box'],
+    'booster-box': ['booster-box']
+  };
+
   // FILTROS POKÉMON
   const filterPokemon = useCallback((products: Product[], filters: string[]) => {
     if (filters.length === 0 || products.length === 0) {
@@ -14,102 +26,71 @@ export const useCategoryFilters = () => {
     
     let filtered = [...products];
     
-    // Filtros por TIPO
+    // 1. FILTROS POR TIPO (usando mapeamento exato)
     const typeFilters = filters.filter(f => 
-      ['etbs', 'decks', 'unitarios', 'triplos', 'quadruplos', 'box', 'mini-box', 'booster-box'].includes(f)
+      Object.keys(POKEMON_TYPE_MAP).includes(f)
     );
     
     if (typeFilters.length > 0) {
       filtered = filtered.filter(product => {
-        const productType = (product.product_type || '').toLowerCase();
-        const productName = (product.name || '').toLowerCase();
+        const productType = (product.product_type || '').toLowerCase().trim();
         
-        return typeFilters.some(filter => {
-          const typeMapping: Record<string, string[]> = {
-            'etbs': ['elite-trainer-box', 'etb', 'elite trainer'],
-            'booster-box': ['booster-box', 'booster', 'display'],
-            'decks': ['deck', 'baralho', 'pré-construído'],
-            'unitarios': ['unidade', 'single', 'avulsa'],
-            'triplos': ['triplo', '3x', 'três'],
-            'quadruplos': ['quádruplo', '4x', 'quatro'],
-            'box': ['box', 'caixa'],
-            'mini-box': ['mini box', 'minibox', 'caixa pequena']
-          };
-          
-          const searchTerms = typeMapping[filter] || [filter];
-          
-          if (searchTerms.some(term => productType.includes(term))) {
-            return true;
-          }
-          
-          return searchTerms.some(term => productName.includes(term));
+        // Verifica se o product_type do produto corresponde a algum dos tipos mapeados
+        return typeFilters.some(filterId => {
+          const allowedTypes = POKEMON_TYPE_MAP[filterId];
+          return allowedTypes.includes(productType);
         });
       });
     }
     
-    // FILTROS POR COLEÇÃO (VERSÃO CORRIGIDA - REMOVE ACENTOS)
-const collectionFilters = filters.filter(f => 
-  f.startsWith('colecao:') || f === 'colecoes'
-);
-
-console.log('🔍 FILTROS DE COLEÇÃO ATIVOS:', collectionFilters);
-
-if (collectionFilters.length > 0) {
-  if (collectionFilters.includes('colecoes')) {
-    // Filtro genérico "todas as coleções"
-    filtered = filtered.filter(product => 
-      !!product.collection && product.collection.trim() !== ''
+    // 2. FILTROS POR COLEÇÃO (mantido com normalização robusta)
+    const collectionFilters = filters.filter(f => 
+      f.startsWith('colecao:') || f === 'colecoes'
     );
-  } else {
-    // Filtro por coleção específica (REMOVENDO ACENTOS)
-    filtered = filtered.filter(product => {
-      const matches = collectionFilters.some(filter => {
-        if (filter.startsWith('colecao:')) {
-          // Normaliza o filtro (remove acentos, lowercase)
-          const filterCollectionId = filter
-            .replace('colecao:', '')
-            .toLowerCase()
-            .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // 🔥 REMOVE ACENTOS
-            .trim();
-          
-          // Normaliza a coleção do produto
-          const productCollection = (product.collection || '')
-            .toLowerCase()
-            .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // 🔥 REMOVE ACENTOS
-            .trim();
-          
-          // Debug para coleções problemáticas
-          if (filterCollectionId.includes('dominio') || productCollection.includes('dominio')) {
-            console.log('🔍🔥 COMPARAÇÃO DOMÍNIO DRACÔNICO:', {
-              filtroOriginal: filter,
-              filtroNormalizado: filterCollectionId,
-              produtoOriginal: product.collection,
-              produtoNormalizado: productCollection,
-              nomeProduto: product.name,
-              match: filterCollectionId === productCollection
-            });
-          }
-          
-          return filterCollectionId === productCollection;
-        }
-        return false;
+    
+    if (collectionFilters.length > 0) {
+      if (collectionFilters.includes('colecoes')) {
+        // Filtro genérico "todas as coleções" (produtos com qualquer coleção definida)
+        filtered = filtered.filter(product => 
+          !!product.collection && product.collection.trim() !== ''
+        );
+      } else {
+        // Filtro por coleção específica (com remoção de acentos)
+        filtered = filtered.filter(product => {
+          return collectionFilters.some(filter => {
+            if (filter.startsWith('colecao:')) {
+              const filterCollectionId = filter
+                .replace('colecao:', '')
+                .toLowerCase()
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
+                .trim();
+              
+              const productCollection = (product.collection || '')
+                .toLowerCase()
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                .trim();
+              
+              return filterCollectionId === productCollection;
+            }
+            return false;
+          });
+        });
+      }
+    }
+    
+    // Log para debug (opcional, pode remover depois)
+    if (filters.length > 0) {
+      console.log('🔍 [FILTROS POKÉMON]', {
+        total: products.length,
+        filtrados: filtered.length,
+        filtros: filters
       });
-      
-      return matches;
-    });
-  }
-  
-  console.log('📊 RESULTADO FILTRAGEM:', {
-    totalProdutos: products.length,
-    produtosFiltrados: filtered.length,
-    filtrosAplicados: collectionFilters
-  });
-}
+    }
     
     return filtered;
   }, []);
 
-  // FILTROS JOGOS DE TABULEIRO (mantido igual)
+  // FILTROS JOGOS DE TABULEIRO (mantido como estava, mas pode ser melhorado depois)
   const filterBoardGames = useCallback((products: Product[], filters: string[]) => {
     if (filters.length === 0 || products.length === 0) return products;
     
@@ -162,7 +143,7 @@ if (collectionFilters.length > 0) {
     return filtered;
   }, []);
 
-  // ✅ OBTÉM COLECÕES (usa getCollectionName do lib/collections)
+  // OBTÉM COLECÕES (usa getCollectionName do lib/collections)
   const getPokemonCollections = useCallback((products: Product[]): string[] => {
     if (products.length === 0) return [];
     
