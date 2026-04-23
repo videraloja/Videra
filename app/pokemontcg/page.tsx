@@ -20,6 +20,7 @@ export default function PokemonTCGPage() {
   const [ready, setReady] = useState(false); // 🆕 REMOVIDO: const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const { addToCart: addToCartGlobal } = useCartContext();
    const { syncedProducts } = useAvailableStock(products);
+   const availableProducts = syncedProducts.filter(p => p.stock > 0);
 
   // 🆕 STATES PARA FILTROS
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
@@ -33,6 +34,9 @@ export default function PokemonTCGPage() {
   const [viewAllType, setViewAllType] = useState<'all' | 'bestsellers' | 'new_arrivals'>('all');
   const [carouselsLoading, setCarouselsLoading] = useState(false);
   const [currentConfig, setCurrentConfig] = useState<CarouselConfig | null>(null);
+
+  const filteredBestsellers = bestsellers.filter(p => p.stock > 0);
+const filteredNewArrivals = newArrivals.filter(p => p.stock > 0);
 
 // ✅ Sincronizar bestsellers e newArrivals com o estoque disponível
 useEffect(() => {
@@ -586,7 +590,7 @@ useEffect(() => {
         padding: '20px'
       }}
     >
-      {(viewAllType === 'all' ? syncedProducts : 
+      {(viewAllType === 'all' ? availableProducts : 
         viewAllType === 'bestsellers' ? bestsellers : newArrivals)
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((product) => (
@@ -631,7 +635,7 @@ useEffect(() => {
                   <div>
                     <Carousel
                       title="Todos os Produtos"
-                      products={syncedProducts}
+                      products={availableProducts}
                       config={carouselConfigs.find(c => c.carousel_type === 'all') || {
                         page_slug: 'pokemontcg',
                         carousel_type: 'all',
@@ -684,7 +688,7 @@ useEffect(() => {
 
                     <Carousel
                       title="Mais Vendidos"
-                      products={bestsellers}
+                      products={filteredBestsellers}
                       config={carouselConfigs.find(c => c.carousel_type === 'bestsellers') || {
                         page_slug: 'pokemontcg',
                         carousel_type: 'bestsellers',
@@ -737,7 +741,7 @@ useEffect(() => {
 
                     <Carousel
                       title="Lançamentos"
-                      products={newArrivals}
+                      products={filteredNewArrivals}
                       config={carouselConfigs.find(c => c.carousel_type === 'new_arrivals') || {
                         page_slug: 'pokemontcg',
                         carousel_type: 'new_arrivals',
