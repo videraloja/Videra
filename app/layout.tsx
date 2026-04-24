@@ -15,8 +15,8 @@ export const metadata = {
   title: "Videra Site Oficial - Pokémon TCG e Board Games",
   description: "Sua loja de colecionáveis em Manaus! Pokémon TCG, cartas avulsas, boosters, ETBs, jogos de tabuleiro, acessórios e muito mais. Compre online com segurança.",
   openGraph: {
-    title: "Videra Site Oficial",
-    description: "Pokémon TCG, Board Games e Acessórios. Confira nossos produtos!",
+    title: "Videra Site Oficial - Pokémon TCG e Board Games",
+    description: "Produtos lacrados e originais Pokémon, Jogos de Tabuleiro, Acessórios, Hot Wheels. Confira nossos produtos!",
     url: "https://videra-nine.vercel.app",
     siteName: "Videra",
     images: [
