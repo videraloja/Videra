@@ -267,10 +267,10 @@ useEffect(() => {
 
   return (
     <div style={{ 
-      minHeight: '100vh',
-      background: `linear-gradient(135deg, ${colors.background} 0%, ${colors.secondary} 100%)`,
-      color: colors.text
-    }}>
+  minHeight: '100vh',
+  background: colors.background,
+  color: colors.text
+}}>
       <Header 
         onSearch={setSearchTerm}
         searchTerm={searchTerm}
