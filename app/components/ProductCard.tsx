@@ -1,4 +1,4 @@
-// components/ProductCard.tsx - VERSÃO CORRIGIDA (SEM EFEITO VERDE)
+// app/components/ProductCard.tsx - VERSÃO OTIMIZADA (SEM LOG NO CONSOLE)
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -20,49 +20,45 @@ interface ProductCardProps {
 export default function ProductCard({ product, onAddToCart, categoryConfig }: ProductCardProps) {
   const { colors, emojis, getShadow, getCardStyles, applyCardStyles } = useThemeColors();
   const { stockLabel } = useStock();
-  
   const { isInCart, getItemQuantity } = useCartContext();
-  
+
   const [isAdded, setIsAdded] = useState(false);
   const [quantityInCart, setQuantityInCart] = useState(0);
   const [currentStock, setCurrentStock] = useState(product.stock);
-  
+
   useEffect(() => {
     const productId = String(product.id);
-    
+
     const checkCartStatus = () => {
       const inCart = isInCart(productId);
       const quantity = getItemQuantity(productId);
-      
+
       setIsAdded(inCart);
       setQuantityInCart(quantity);
-      
+
       const newStock = Math.max(product.stock - quantity, 0);
       setCurrentStock(newStock);
-      
-      console.log(`🔄 ProductCard ${product.name}: Carrinho=${quantity}, Estoque=${newStock}`);
     };
-    
+
     checkCartStatus();
-    
+
     const handleCartUpdate = (e: CustomEvent) => {
-      if (e.detail && String(e.detail.productId) === String(product.id)) {
+      if (e.detail && String(e.detail.productId) === productId) {
         checkCartStatus();
       }
     };
 
     const handleCartCleared = () => {
-      console.log(`🧹 ProductCard ${product.name} recebeu evento de limpeza`);
       setIsAdded(false);
       setQuantityInCart(0);
       setCurrentStock(product.stock);
     };
-    
+
     window.addEventListener('cartStateUpdated', handleCartUpdate as EventListener);
     window.addEventListener('cart-updated', checkCartStatus);
     window.addEventListener('storage', checkCartStatus);
     window.addEventListener('cartCleared', handleCartCleared);
-    
+
     return () => {
       window.removeEventListener('cartStateUpdated', handleCartUpdate as EventListener);
       window.removeEventListener('cart-updated', checkCartStatus);
@@ -74,16 +70,16 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
   const stockInfo = stockLabel(currentStock);
   const displayPrice = product.on_sale ? product.sale_price! : product.price;
   const originalPrice = product.on_sale ? product.original_price : undefined;
-  
+
   const defaultConfig = {
     color: colors.primary,
     icon: '📦',
     badgeText: 'PRODUTO'
   };
-  
+
   const config = categoryConfig || defaultConfig;
   const cardStyles = getCardStyles();
-  
+
   const cardContainerStyles = {
     width: '280px',
     minHeight: '420px',
@@ -102,15 +98,13 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
 
   const handleAddToCart = () => {
     if (currentStock <= 0) return;
-    
+
     onAddToCart(product);
-    
+
     setIsAdded(true);
     const newQuantity = quantityInCart + 1;
     setQuantityInCart(newQuantity);
     setCurrentStock(prev => Math.max(prev - 1, 0));
-    
-    // ❌ REMOVIDO: feedback visual verde (flash e mudança de cor via DOM)
   };
 
   const getButtonContent = () => {
@@ -119,13 +113,11 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
     return `${config.icon} Adicionar ao Carrinho`;
   };
 
-  // ✅ CORRIGIDO: sempre usar a cor do tema, nunca verde
   const getButtonColor = () => {
     if (currentStock === 0) return cardStyles.addToCart.disabledBackgroundColor;
     return cardStyles.addToCart.backgroundColor;
   };
 
-  // ✅ CORRIGIDO: hover sempre usa a cor do tema
   const getButtonHoverColor = () => {
     if (currentStock === 0) return cardStyles.addToCart.disabledBackgroundColor;
     return cardStyles.addToCart.hoverBackgroundColor;
@@ -169,7 +161,7 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
           🔥 {Math.round(((originalPrice - displayPrice) / originalPrice) * 100)}% OFF
         </div>
       )}
-      
+
       <div style={{
         width: '100%',
         height: '200px',
@@ -177,8 +169,8 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
         position: 'relative',
         background: cardStyles.imageOverlay
       }}>
-        <img 
-          src={product.image_url} 
+        <img
+          src={product.image_url}
           alt={product.name}
           style={{
             width: '100%',
@@ -188,7 +180,7 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
         />
       </div>
 
-      <div style={{ 
+      <div style={{
         padding: '20px',
         display: 'flex',
         flexDirection: 'column',
@@ -210,7 +202,7 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
         }}>
           {product.name}
         </h3>
-        
+
         <div style={{ marginBottom: '12px' }}>
           {product.on_sale && originalPrice && (
             <div style={{
@@ -248,7 +240,7 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
             </span>
           )}
         </div>
-        
+
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -265,7 +257,7 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
             {stockInfo.text}
           </span>
         </div>
-        
+
         <div style={buttonContainerStyles}>
           <button
             id={`add-to-cart-${product.id}`}

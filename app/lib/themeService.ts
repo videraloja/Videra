@@ -1,8 +1,25 @@
-// app/lib/themeService.ts - VERSÃO CORRIGIDA COM backgroundImage
+// app/lib/themeService.ts - VERSÃO OTIMIZADA (SEM LOGS, COM CACHE)
 import { supabase } from '@/lib/supabaseClient';
 import { ThemeConfig, ComponentStyles } from '@/app/types';
 
-console.log('🔄 themeService.ts CARREGADO');
+// ============================================
+// CACHE EM MEMÓRIA (evita buscas repetidas)
+// ============================================
+const themeCache = new Map<string, { theme: ThemeConfig; timestamp: number }>();
+const CACHE_TTL = 2000; // 2 segundos
+
+function getCachedTheme(key: string): ThemeConfig | null {
+  const cached = themeCache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.theme;
+  }
+  themeCache.delete(key);
+  return null;
+}
+
+function setCachedTheme(key: string, theme: ThemeConfig): void {
+  themeCache.set(key, { theme, timestamp: Date.now() });
+}
 
 // ============================================
 // FUNÇÕES PRINCIPAIS
@@ -10,15 +27,13 @@ console.log('🔄 themeService.ts CARREGADO');
 
 export async function getAllThemes(): Promise<ThemeConfig[]> {
   try {
-    console.log('📦 Buscando todos os temas...');
-    
     const { data: themes, error } = await supabase
       .from('themes')
       .select('id, name, is_active, is_default, priority')
       .order('priority', { ascending: true });
 
     if (error) {
-      console.error('❌ Erro ao buscar temas:', error);
+      console.error('Erro ao buscar temas:', error);
       return getDefaultThemes();
     }
 
@@ -33,20 +48,16 @@ export async function getAllThemes(): Promise<ThemeConfig[]> {
     );
 
     const validThemes = themesWithDetails.filter(Boolean) as ThemeConfig[];
-    console.log('✅ Temas carregados:', validThemes.length);
-    
     return validThemes.length > 0 ? validThemes : getDefaultThemes();
 
   } catch (error) {
-    console.error('❌ Erro geral:', error);
+    console.error('Erro geral ao buscar temas:', error);
     return getDefaultThemes();
   }
 }
 
 export async function getActiveTheme(): Promise<ThemeConfig> {
   try {
-    console.log('🎯 Buscando tema ativo...');
-    
     const { data: activeThemes, error } = await supabase
       .from('themes')
       .select('id, name')
@@ -54,23 +65,19 @@ export async function getActiveTheme(): Promise<ThemeConfig> {
       .limit(1);
 
     if (error) {
-      console.error('❌ Erro na query:', error.message);
+      console.error('Erro na query de tema ativo:', error.message);
       return await getDefaultThemeFallback();
     }
 
     if (activeThemes && activeThemes.length > 0) {
       const theme = await getThemeById(activeThemes[0].id);
-      if (theme) {
-        console.log('✅ Tema ativo encontrado:', theme.name);
-        return theme;
-      }
+      if (theme) return theme;
     }
 
-    console.log('🔍 Nenhum tema ativo, buscando padrão...');
     return await getDefaultThemeFallback();
 
   } catch (error) {
-    console.error('❌ Erro crítico:', error);
+    console.error('Erro crítico ao buscar tema ativo:', error);
     return getDefaultThemes()[0];
   }
 }
@@ -85,10 +92,7 @@ async function getDefaultThemeFallback(): Promise<ThemeConfig> {
 
     if (defaultThemes && defaultThemes.length > 0) {
       const theme = await getThemeById(defaultThemes[0].id);
-      if (theme) {
-        console.log('✅ Usando tema padrão:', theme.name);
-        return theme;
-      }
+      if (theme) return theme;
     }
 
     const { data: anyTheme } = await supabase
@@ -98,25 +102,23 @@ async function getDefaultThemeFallback(): Promise<ThemeConfig> {
 
     if (anyTheme && anyTheme.length > 0) {
       const theme = await getThemeById(anyTheme[0].id);
-      if (theme) {
-        console.log('✅ Usando primeiro tema disponível:', theme.name);
-        return theme;
-      }
+      if (theme) return theme;
     }
 
-    console.log('⚠️  Usando fallback padrão');
     return getDefaultThemes()[0];
 
   } catch (error) {
-    console.error('❌ Erro no fallback:', error);
+    console.error('Erro no fallback de tema padrão:', error);
     return getDefaultThemes()[0];
   }
 }
 
 export async function getThemeById(themeId: string): Promise<ThemeConfig | null> {
+  // Verifica cache primeiro
+  const cached = getCachedTheme(themeId);
+  if (cached) return cached;
+
   try {
-    console.log(`🔍 Buscando tema ${themeId}...`);
-    
     const [themeResult, colorsResult, emojisResult, stylesResult] = await Promise.all([
       supabase.from('themes').select('*').eq('id', themeId).single(),
       supabase.from('theme_colors').select('color_type, color_value').eq('theme_id', themeId),
@@ -125,13 +127,12 @@ export async function getThemeById(themeId: string): Promise<ThemeConfig | null>
     ]);
 
     if (themeResult.error || !themeResult.data) {
-      console.log(`❌ Tema não encontrado:`, themeResult.error?.message);
       return null;
     }
 
     const themeData = themeResult.data;
-    
-    // 1. Primeiro coleta como Record
+
+    // Cores
     const colorsRecord: Record<string, string> = {};
     if (colorsResult.data) {
       colorsResult.data.forEach(row => {
@@ -139,18 +140,7 @@ export async function getThemeById(themeId: string): Promise<ThemeConfig | null>
       });
     }
 
-    // 2. Converte para ThemeColors com valores padrão
-    const colors: {
-      primary: string;
-      secondary: string;
-      accent: string;
-      background: string;
-      text: string;
-      cardBg: string;
-      success: string;
-      warning: string;
-      error: string;
-    } = {
+    const colors = {
       primary: colorsRecord.primary || '#7c3aed',
       secondary: colorsRecord.secondary || '#f1f5f9',
       accent: colorsRecord.accent || '#10b981',
@@ -162,7 +152,7 @@ export async function getThemeById(themeId: string): Promise<ThemeConfig | null>
       error: colorsRecord.error || '#ef4444',
     };
 
-    // 1. Primeiro coleta como Record
+    // Emojis
     const emojisRecord: Record<string, string> = {};
     if (emojisResult.data) {
       emojisResult.data.forEach(row => {
@@ -170,15 +160,7 @@ export async function getThemeById(themeId: string): Promise<ThemeConfig | null>
       });
     }
 
-    // 2. Converte para o tipo esperado por ThemeConfig
-    const emojis: {
-      cart: string;
-      success: string;
-      search: string;
-      filter: string;
-      stock: string;
-      category: string;
-    } = {
+    const emojis = {
       cart: emojisRecord.cart || '🛒',
       success: emojisRecord.success || '✅',
       search: emojisRecord.search || '🔍',
@@ -189,23 +171,18 @@ export async function getThemeById(themeId: string): Promise<ThemeConfig | null>
 
     const componentStyles = stylesResult.data?.[0]?.styles as ComponentStyles | undefined;
 
-    // 🆕 🆕 🆕 PROCESSAR backgroundImage DA TABELA themes COM FALLBACK SEGURO
+    // Background image
     let backgroundImage = undefined;
-
-    // Verificar se a coluna background_image existe nos dados
     if ('background_image' in themeData) {
       try {
         const bgData = themeData.background_image;
-        
         if (bgData && typeof bgData === 'object' && bgData !== null) {
-          // Se já é um objeto JSONB
           backgroundImage = {
             url: bgData.url || '',
             overlayColor: bgData.overlayColor,
             opacity: bgData.opacity
           };
         } else if (typeof bgData === 'string' && bgData.trim() !== '') {
-          // Se é string JSON
           const parsed = JSON.parse(bgData);
           backgroundImage = {
             url: parsed.url || '',
@@ -214,11 +191,8 @@ export async function getThemeById(themeId: string): Promise<ThemeConfig | null>
           };
         }
       } catch (parseError) {
-        console.error('❌ Erro ao processar background_image:', parseError);
-        console.error('Dados:', themeData.background_image);
+        console.error('Erro ao processar background_image:', parseError);
       }
-    } else {
-      console.log('ℹ️  Coluna background_image não encontrada na tabela themes');
     }
 
     const theme: ThemeConfig = {
@@ -232,44 +206,30 @@ export async function getThemeById(themeId: string): Promise<ThemeConfig | null>
       colors,
       emojis,
       componentStyles,
-      // 🆕 🆕 🆕 ADICIONAR backgroundImage AO TEMA
       backgroundImage,
       createdAt: themeData.created_at,
       updatedAt: themeData.updated_at
     };
 
-    console.log(`✅ Tema carregado: ${theme.name}`, {
-      cores: Object.keys(colors).length,
-      emojis: Object.keys(emojis).length,
-      temEstilos: !!componentStyles,
-      temImagemFundo: !!backgroundImage?.url
-    });
-
+    setCachedTheme(themeId, theme);
     return theme;
 
   } catch (error) {
-    console.error(`❌ Erro ao buscar tema ${themeId}:`, error);
+    console.error(`Erro ao buscar tema ${themeId}:`, error);
     return null;
   }
 }
 
 export async function saveTheme(theme: ThemeConfig): Promise<boolean> {
   try {
-    console.log(`💾 Salvando tema "${theme.name}"...`);
-    
-    // 🆕 VERIFICAR SESSÃO
     const { data: { session } } = await supabase.auth.getSession();
-    
     if (!session) {
-      console.error('❌ Usuário não autenticado!');
+      console.error('Usuário não autenticado ao tentar salvar tema.');
       alert('❌ Você precisa fazer login para salvar temas.');
       return false;
     }
-    
-    console.log('✅ Usuário autenticado:', session.user.email);
-    
-    // 🆕 🆕 🆕 PREPARAR backgroundImage PARA SALVAR
-    const backgroundImageData = theme.backgroundImage?.url 
+
+    const backgroundImageData = theme.backgroundImage?.url
       ? {
           url: theme.backgroundImage.url,
           overlayColor: theme.backgroundImage.overlayColor || null,
@@ -277,7 +237,6 @@ export async function saveTheme(theme: ThemeConfig): Promise<boolean> {
         }
       : null;
 
-    // 1. Salvar tema principal COM background_image
     const { error: themeError } = await supabase
       .from('themes')
       .upsert({
@@ -289,26 +248,17 @@ export async function saveTheme(theme: ThemeConfig): Promise<boolean> {
         priority: theme.priority || 1,
         start_date: theme.startDate,
         end_date: theme.endDate,
-        background_image: backgroundImageData, // 🆕 SALVAR backgroundImage
+        background_image: backgroundImageData,
         updated_at: new Date().toISOString()
-      }, { 
-        onConflict: 'id' 
+      }, {
+        onConflict: 'id'
       });
 
-    if (themeError) {
-      console.error('❌ Erro ao salvar tema principal:', themeError);
-      throw themeError;
-    }
+    if (themeError) throw themeError;
 
-    console.log('✅ Tema principal salvo');
-
-    // 2. 🆕 CORES - USAR UPSERT COM ON CONFLICT DO UPDATE
+    // Salvar cores
     if (theme.colors && Object.keys(theme.colors).length > 0) {
-      console.log('🎨 Processando cores...');
-      
-      // Remover headerBg se existir
       const colorsToSave = { ...theme.colors };
-      
       const colorEntries = Object.entries(colorsToSave)
         .filter(([_, value]) => value && typeof value === 'string' && value.trim() !== '')
         .map(([type, value]) => ({
@@ -317,11 +267,7 @@ export async function saveTheme(theme: ThemeConfig): Promise<boolean> {
           color_value: value.trim()
         }));
 
-      console.log(`📝 ${colorEntries.length} cores para salvar:`, 
-        colorEntries.map(c => c.color_type));
-
       if (colorEntries.length > 0) {
-        // 🆕 USAR UPSERT COM ON CONFLICT - ATUALIZA SE JÁ EXISTIR
         const { error: colorsError } = await supabase
           .from('theme_colors')
           .upsert(colorEntries, {
@@ -330,40 +276,19 @@ export async function saveTheme(theme: ThemeConfig): Promise<boolean> {
           });
 
         if (colorsError) {
-          console.error('❌ Erro ao upsert cores:', colorsError);
-          console.error('🔍 Detalhes:', colorsError.message);
-          
-          // 🆕 FALLBACK: Tentar update um por um
-          console.log('🔄 Tentando update individual para cores...');
-          let updatedCount = 0;
-          
           for (const entry of colorEntries) {
-            try {
-              const { error: updateError } = await supabase
-                .from('theme_colors')
-                .update({ color_value: entry.color_value })
-                .eq('theme_id', entry.theme_id)
-                .eq('color_type', entry.color_type);
-              
-              if (!updateError) {
-                updatedCount++;
-              }
-            } catch (singleError) {
-              console.error(`❌ Erro em ${entry.color_type}:`, singleError);
-            }
+            await supabase
+              .from('theme_colors')
+              .update({ color_value: entry.color_value })
+              .eq('theme_id', entry.theme_id)
+              .eq('color_type', entry.color_type);
           }
-          
-          console.log(`✅ ${updatedCount}/${colorEntries.length} cores atualizadas`);
-        } else {
-          console.log(`✅ ${colorEntries.length} cores salvas via upsert`);
         }
       }
     }
 
-    // 3. 🆕 EMOJIS - MESMA ABORDAGEM UPSERT
+    // Salvar emojis
     if (theme.emojis && Object.keys(theme.emojis).length > 0) {
-      console.log('😀 Processando emojis...');
-      
       const emojiEntries = Object.entries(theme.emojis)
         .filter(([_, value]) => value && typeof value === 'string' && value.trim() !== '')
         .map(([type, value]) => ({
@@ -381,33 +306,20 @@ export async function saveTheme(theme: ThemeConfig): Promise<boolean> {
           });
 
         if (emojisError) {
-          console.error('❌ Erro ao upsert emojis:', emojisError);
-          
-          // FALLBACK: Update individual
-          let updatedEmojis = 0;
           for (const entry of emojiEntries) {
-            try {
-              const { error: updateError } = await supabase
-                .from('theme_emojis')
-                .update({ emoji_value: entry.emoji_value })
-                .eq('theme_id', entry.theme_id)
-                .eq('emoji_type', entry.emoji_type);
-              
-              if (!updateError) updatedEmojis++;
-            } catch {}
+            await supabase
+              .from('theme_emojis')
+              .update({ emoji_value: entry.emoji_value })
+              .eq('theme_id', entry.theme_id)
+              .eq('emoji_type', entry.emoji_type);
           }
-          console.log(`✅ ${updatedEmojis}/${emojiEntries.length} emojis atualizados`);
-        } else {
-          console.log(`✅ ${emojiEntries.length} emojis salvos via upsert`);
         }
       }
     }
 
-    // 4. ESTILOS DE COMPONENTE (já usa upsert)
+    // Salvar estilos
     if (theme.componentStyles) {
-      console.log('🎨 Processando estilos de componente...');
-      
-      const { error: stylesError } = await supabase
+      await supabase
         .from('component_styles')
         .upsert({
           theme_id: theme.id,
@@ -417,324 +329,166 @@ export async function saveTheme(theme: ThemeConfig): Promise<boolean> {
         }, {
           onConflict: 'theme_id,component_type'
         });
-
-      if (stylesError) {
-        console.error('❌ Erro ao salvar estilos:', stylesError);
-      } else {
-        console.log('✅ Estilos de componente salvos');
-      }
     }
 
-    // 🆕 🆕 🆕 REMOVIDO: Código de pageBackgrounds (tabela theme_backgrounds)
-    // Agora usamos background_image na tabela themes
-
-    console.log(`🎉 Tema "${theme.name}" salvo com sucesso!`);
+    // Invalida cache
+    themeCache.delete(theme.id);
     return true;
 
   } catch (error) {
-    console.error(`❌ ERRO ao salvar tema "${theme.name}":`, error);
+    console.error(`Erro ao salvar tema "${theme.name}":`, error);
     return false;
   }
 }
 
-// FUNÇÃO activateTheme CORRIGIDA - AGORA COM WHERE CLAUSE
 export async function activateTheme(themeId: string): Promise<boolean> {
   try {
-    console.log(`🎯 Ativando tema ${themeId}...`);
-
-    // 1. Primeiro verifica se o tema existe
     const { data: themeToActivate, error: checkError } = await supabase
       .from('themes')
       .select('id, name, is_default')
       .eq('id', themeId)
       .single();
 
-    if (checkError || !themeToActivate) {
-      console.error(`❌ Tema ${themeId} não encontrado:`, checkError);
-      return false;
-    }
+    if (checkError || !themeToActivate) return false;
 
-    console.log(`📋 Tema encontrado: ${themeToActivate.name}`);
-
-    // 2. Se for o mesmo tema que já está ativo, não faz nada
     const { data: currentlyActive } = await supabase
       .from('themes')
       .select('id')
       .eq('is_active', true)
       .limit(1);
 
-    if (currentlyActive && currentlyActive[0]?.id === themeId) {
-      console.log(`ℹ️  Tema ${themeToActivate.name} já está ativo`);
-      return true;
-    }
+    if (currentlyActive && currentlyActive[0]?.id === themeId) return true;
 
-    // 3. Inicia uma transação
-    console.log('🔄 Iniciando ativação...');
-    
-    // Primeiro: Desativa todos os temas (COM WHERE para evitar erro)
-    const { error: deactivateError } = await supabase
+    await supabase
       .from('themes')
-      .update({ 
-        is_active: false,
-        updated_at: new Date().toISOString()
-      })
-      .neq('id', 'nonexistent'); // Usando neq para atualizar todos (trick seguro)
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .neq('id', 'nonexistent');
 
-    if (deactivateError) {
-      console.error('❌ Erro ao desativar temas:', deactivateError);
-      // Tentar abordagem alternativa: desativar um por um
-      await deactivateAllThemesIndividually();
-    } else {
-      console.log('✅ Todos os temas foram desativados');
-    }
-
-    // Segundo: Ativa apenas o tema selecionado
     const { error: activateError } = await supabase
       .from('themes')
-      .update({ 
-        is_active: true,
-        updated_at: new Date().toISOString()
-      })
+      .update({ is_active: true, updated_at: new Date().toISOString() })
       .eq('id', themeId);
 
     if (activateError) {
-      console.error('❌ Erro ao ativar novo tema:', activateError);
-      
-      // EM CASO DE ERRO: Tenta ativar o tema padrão
-      console.log('🔄 Tentando fallback para tema padrão...');
       await activateDefaultTheme();
       return false;
     }
 
-    console.log(`✅ Tema ${themeToActivate.name} ativado com sucesso!`);
+    themeCache.clear();
     return true;
 
   } catch (error) {
-    console.error(`❌ Erro crítico ao ativar tema:`, error);
-    
-    // Fallback para tema padrão em caso de erro
+    console.error('Erro crítico ao ativar tema:', error);
     await activateDefaultTheme();
     return false;
   }
 }
 
-// 🆕 NOVA FUNÇÃO: Buscar tema específico de uma página
-export async function getThemeForPage(pagePath: string): Promise<ThemeConfig | null> {
-  try {
-    console.log(`🔍 Buscando tema para página: ${pagePath}`);
-    
-    // Primeiro, busca se há um tema específico para esta página
-    const { data: pageThemeData, error: pageError } = await supabase
-      .from('page_themes')
-      .select('theme_id')
-      .eq('page_path', pagePath)
-      .limit(1);
-
-    if (pageError) {
-      console.error('❌ Erro ao buscar tema da página:', pageError);
-      return null;
-    }
-
-    // Se encontrou um tema específico para a página
-    if (pageThemeData && pageThemeData.length > 0 && pageThemeData[0].theme_id) {
-      const themeId = pageThemeData[0].theme_id;
-      console.log(`🎯 Tema específico encontrado para página ${pagePath}: ${themeId}`);
-      
-      // Busca os detalhes do tema
-      const theme = await getThemeById(themeId);
-      if (theme) {
-        console.log(`✅ Tema da página carregado: ${theme.name}`);
-        return theme;
-      }
-    }
-
-    console.log(`📭 Nenhum tema específico para a página ${pagePath}`);
-    return null;
-
-  } catch (error) {
-    console.error(`❌ Erro ao buscar tema para página ${pagePath}:`, error);
-    return null;
-  }
-}
-
-// 🆕 NOVA FUNÇÃO: Buscar tema efetivo considerando página
-export async function getEffectiveTheme(pagePath?: string): Promise<ThemeConfig> {
-  try {
-    console.log(`🎯 Buscando tema efetivo${pagePath ? ` para página ${pagePath}` : ''}...`);
-    
-    let theme: ThemeConfig | null = null;
-
-    // 1. PRIORIDADE: Tema específico da página (se página for fornecida)
-    if (pagePath) {
-      theme = await getThemeForPage(pagePath);
-      if (theme) {
-        console.log(`✅ Usando tema específico da página: ${theme.name}`);
-        return theme;
-      }
-    }
-
-    // 2. PRIORIDADE: Tema ativo global
-    theme = await getActiveTheme();
-    if (theme) {
-      console.log(`✅ Usando tema ativo global: ${theme.name}`);
-      return theme;
-    }
-
-    // 3. PRIORIDADE: Tema padrão como fallback final
-    console.log('⚠️  Nenhum tema encontrado, usando padrão');
-    const defaultTheme = await getThemeById('default');
-    if (defaultTheme) {
-      return defaultTheme;
-    }
-
-    // 4. EMERGÊNCIA: Tema de emergência
-    return getDefaultThemes()[0];
-
-  } catch (error) {
-    console.error('❌ Erro ao buscar tema efetivo:', error);
-    return getDefaultThemes()[0];
-  }
-}
-
-// Função auxiliar para desativar todos os temas individualmente
 async function deactivateAllThemesIndividually(): Promise<void> {
   try {
-    console.log('🔄 Desativando temas individualmente...');
-    
-    // Busca todos os temas
     const { data: allThemes, error } = await supabase
       .from('themes')
       .select('id');
-    
-    if (error) {
-      console.error('❌ Erro ao buscar temas:', error);
-      return;
-    }
-    
-    if (!allThemes || allThemes.length === 0) {
-      console.log('ℹ️  Nenhum tema encontrado para desativar');
-      return;
-    }
-    
-    // Desativa cada tema individualmente
+
+    if (error || !allThemes) return;
+
     for (const theme of allThemes) {
-      const { error: updateError } = await supabase
+      await supabase
         .from('themes')
-        .update({ 
-          is_active: false,
-          updated_at: new Date().toISOString()
-        })
+        .update({ is_active: false, updated_at: new Date().toISOString() })
         .eq('id', theme.id);
-      
-      if (updateError) {
-        console.error(`❌ Erro ao desativar tema ${theme.id}:`, updateError);
-      }
     }
-    
-    console.log(`✅ ${allThemes.length} temas desativados individualmente`);
-    
   } catch (error) {
-    console.error('❌ Erro em deactivateAllThemesIndividually:', error);
+    console.error('Erro em deactivateAllThemesIndividually:', error);
   }
 }
 
-// Nova função específica para ativar o tema padrão
 export async function activateDefaultTheme(): Promise<boolean> {
   try {
-    console.log('🔄 Ativando tema padrão...');
-    
-    // 1. Busca o tema padrão
     const { data: defaultTheme, error: findError } = await supabase
       .from('themes')
       .select('id, name')
       .eq('is_default', true)
       .limit(1);
 
-    if (findError || !defaultTheme || defaultTheme.length === 0) {
-      console.error('❌ Não foi possível encontrar tema padrão:', findError);
-      return false;
-    }
+    if (findError || !defaultTheme || defaultTheme.length === 0) return false;
 
     const defaultThemeId = defaultTheme[0].id;
-    const defaultThemeName = defaultTheme[0].name;
-    
-    // 2. Desativa todos os outros temas (exceto o padrão)
-    const { error: deactivateError } = await supabase
+
+    await supabase
       .from('themes')
-      .update({ 
-        is_active: false,
-        updated_at: new Date().toISOString()
-      })
+      .update({ is_active: false, updated_at: new Date().toISOString() })
       .neq('id', defaultThemeId);
 
-    if (deactivateError) {
-      console.error('❌ Erro ao desativar temas:', deactivateError);
-      // Tenta a abordagem individual
-      await deactivateAllThemesIndividuallyExcept(defaultThemeId);
-    }
-
-    // 3. Ativa apenas o tema padrão
     const { error: activateError } = await supabase
       .from('themes')
-      .update({ 
-        is_active: true,
-        updated_at: new Date().toISOString()
-      })
+      .update({ is_active: true, updated_at: new Date().toISOString() })
       .eq('id', defaultThemeId);
 
-    if (activateError) {
-      console.error('❌ Erro ao ativar tema padrão:', activateError);
-      return false;
-    }
-
-    console.log(`✅ Tema padrão "${defaultThemeName}" ativado com sucesso!`);
-    return true;
-    
+    return !activateError;
   } catch (error) {
-    console.error('❌ Erro no activateDefaultTheme:', error);
+    console.error('Erro no activateDefaultTheme:', error);
     return false;
   }
 }
 
-// Função auxiliar para desativar todos exceto um
-async function deactivateAllThemesIndividuallyExcept(exceptThemeId: string): Promise<void> {
+export async function getThemeForPage(pagePath: string): Promise<ThemeConfig | null> {
   try {
-    console.log(`🔄 Desativando todos os temas exceto ${exceptThemeId}...`);
-    
-    const { data: allThemes, error } = await supabase
-      .from('themes')
-      .select('id')
-      .neq('id', exceptThemeId);
-    
-    if (error || !allThemes) {
-      console.error('❌ Erro ao buscar temas:', error);
-      return;
+    const { data: pageThemeData, error: pageError } = await supabase
+      .from('page_themes')
+      .select('theme_id')
+      .eq('page_path', pagePath)
+      .limit(1);
+
+    if (pageError || !pageThemeData || pageThemeData.length === 0 || !pageThemeData[0].theme_id) {
+      return null;
     }
-    
-    for (const theme of allThemes) {
-      const { error: updateError } = await supabase
-        .from('themes')
-        .update({ 
-          is_active: false,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', theme.id);
-      
-      if (updateError) {
-        console.error(`❌ Erro ao desativar tema ${theme.id}:`, updateError);
-      }
-    }
-    
-    console.log(`✅ ${allThemes.length} temas desativados (exceto ${exceptThemeId})`);
-    
+
+    const themeId = pageThemeData[0].theme_id;
+    return await getThemeById(themeId);
+
   } catch (error) {
-    console.error('❌ Erro em deactivateAllThemesIndividuallyExcept:', error);
+    console.error(`Erro ao buscar tema para página ${pagePath}:`, error);
+    return null;
   }
 }
 
-// ============================================
-// FUNÇÕES DEFAULT
-// ============================================
+export async function getEffectiveTheme(pagePath?: string): Promise<ThemeConfig> {
+  try {
+    // Cache composto pela página
+    const cacheKey = `effective:${pagePath || 'global'}`;
+    const cached = getCachedTheme(cacheKey);
+    if (cached) return cached;
+
+    let theme: ThemeConfig | null = null;
+
+    if (pagePath) {
+      theme = await getThemeForPage(pagePath);
+      if (theme) {
+        setCachedTheme(cacheKey, theme);
+        return theme;
+      }
+    }
+
+    theme = await getActiveTheme();
+    if (theme) {
+      setCachedTheme(cacheKey, theme);
+      return theme;
+    }
+
+    const defaultTheme = await getThemeById('default');
+    if (defaultTheme) {
+      setCachedTheme(cacheKey, defaultTheme);
+      return defaultTheme;
+    }
+
+    return getDefaultThemes()[0];
+
+  } catch (error) {
+    console.error('Erro ao buscar tema efetivo:', error);
+    return getDefaultThemes()[0];
+  }
+}
 
 function getDefaultThemes(): ThemeConfig[] {
   return [{
@@ -749,8 +503,8 @@ function getDefaultThemes(): ThemeConfig[] {
       background: '#ffffff',
       text: '#1f2937',
       cardBg: '#ffffff',
-      success: '#10b981',  
-      warning: '#f59e0b',   
+      success: '#10b981',
+      warning: '#f59e0b',
       error: '#ef4444'
     },
     emojis: {
@@ -761,7 +515,6 @@ function getDefaultThemes(): ThemeConfig[] {
       stock: '📦',
       category: '📁'
     },
-    // 🆕 🆕 🆕 backgroundImage PADRÃO
     backgroundImage: {
       url: 'https://images.unsplash.com/photo-1607082350899-7e105aa886ae?w=1200&h=400&fit=crop',
       overlayColor: '#000000',
