@@ -1,7 +1,8 @@
-// app/components/ProductCard.tsx - VERSÃO OTIMIZADA (SEM LOG NO CONSOLE)
+// app/components/ProductCard.tsx - VERSÃO COM next/image (OTIMIZAÇÃO DE IMAGENS)
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { Product } from '../types';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useStock } from '../../hooks/useStock';
@@ -18,7 +19,7 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product, onAddToCart, categoryConfig }: ProductCardProps) {
-  const { colors, emojis, getShadow, getCardStyles, applyCardStyles } = useThemeColors();
+  const { colors, getCardStyles, applyCardStyles } = useThemeColors();
   const { stockLabel } = useStock();
   const { isInCart, getItemQuantity } = useCartContext();
 
@@ -32,20 +33,15 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
     const checkCartStatus = () => {
       const inCart = isInCart(productId);
       const quantity = getItemQuantity(productId);
-
       setIsAdded(inCart);
       setQuantityInCart(quantity);
-
-      const newStock = Math.max(product.stock - quantity, 0);
-      setCurrentStock(newStock);
+      setCurrentStock(Math.max(product.stock - quantity, 0));
     };
 
     checkCartStatus();
 
     const handleCartUpdate = (e: CustomEvent) => {
-      if (e.detail && String(e.detail.productId) === productId) {
-        checkCartStatus();
-      }
+      if (e.detail && String(e.detail.productId) === productId) checkCartStatus();
     };
 
     const handleCartCleared = () => {
@@ -76,34 +72,14 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
     icon: '📦',
     badgeText: 'PRODUTO'
   };
-
   const config = categoryConfig || defaultConfig;
   const cardStyles = getCardStyles();
 
-  const cardContainerStyles = {
-    width: '280px',
-    minHeight: '420px',
-    maxHeight: '480px',
-    display: 'flex',
-    flexDirection: 'column' as const,
-  };
-
-  const buttonContainerStyles = {
-    height: '50px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 'auto'
-  };
-
   const handleAddToCart = () => {
     if (currentStock <= 0) return;
-
     onAddToCart(product);
-
     setIsAdded(true);
-    const newQuantity = quantityInCart + 1;
-    setQuantityInCart(newQuantity);
+    setQuantityInCart(prev => prev + 1);
     setCurrentStock(prev => Math.max(prev - 1, 0));
   };
 
@@ -127,7 +103,11 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
     <div
       className="product-card-mobile-optimized"
       style={{
-        ...cardContainerStyles,
+        width: '280px',
+        minHeight: '420px',
+        maxHeight: '480px',
+        display: 'flex',
+        flexDirection: 'column',
         background: cardStyles.cardBackground,
         border: `1px solid ${cardStyles.borderColor}`,
         borderRadius: cardStyles.cornerRadius,
@@ -162,6 +142,7 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
         </div>
       )}
 
+      {/* Container da imagem com next/image */}
       <div style={{
         width: '100%',
         height: '200px',
@@ -169,14 +150,13 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
         position: 'relative',
         background: cardStyles.imageOverlay
       }}>
-        <img
-          src={product.image_url}
+        <Image
+          src={product.image_url || '/placeholder.png'}
           alt={product.name}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover'
-          }}
+          fill
+          sizes="280px"
+          style={{ objectFit: 'cover' }}
+          priority={false}
         />
       </div>
 
@@ -205,60 +185,30 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
 
         <div style={{ marginBottom: '12px' }}>
           {product.on_sale && originalPrice && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginBottom: '4px'
-            }}>
-              <span style={{
-                ...applyCardStyles('originalPrice', {
-                  fontSize: '14px',
-                  fontWeight: '500'
-                })
-              }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <span style={applyCardStyles('originalPrice', { fontSize: '14px', fontWeight: '500' })}>
                 R$ {originalPrice.toFixed(2)}
               </span>
-              <span style={{
-                ...applyCardStyles('salePrice', {
-                  fontSize: '18px',
-                  fontWeight: '700'
-                })
-              }}>
+              <span style={applyCardStyles('salePrice', { fontSize: '18px', fontWeight: '700' })}>
                 R$ {displayPrice.toFixed(2)}
               </span>
             </div>
           )}
           {!product.on_sale && (
-            <span style={{
-              ...applyCardStyles('price', {
-                fontSize: '18px',
-                fontWeight: '700'
-              })
-            }}>
+            <span style={applyCardStyles('price', { fontSize: '18px', fontWeight: '700' })}>
               R$ {displayPrice.toFixed(2)}
             </span>
           )}
         </div>
 
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          marginBottom: '16px'
-        }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px' }}>
           <span style={{ fontSize: '14px' }}>{stockInfo.icon}</span>
-          <span style={{
-            ...applyCardStyles('stockInfo', {
-              fontSize: '14px',
-              fontWeight: '500'
-            })
-          }}>
+          <span style={applyCardStyles('stockInfo', { fontSize: '14px', fontWeight: '500' })}>
             {stockInfo.text}
           </span>
         </div>
 
-        <div style={buttonContainerStyles}>
+        <div style={{ height: '50px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 'auto' }}>
           <button
             id={`add-to-cart-${product.id}`}
             onClick={handleAddToCart}
@@ -281,14 +231,10 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
               })
             }}
             onMouseEnter={(e) => {
-              if (currentStock > 0) {
-                e.currentTarget.style.background = getButtonHoverColor();
-              }
+              if (currentStock > 0) e.currentTarget.style.background = getButtonHoverColor();
             }}
             onMouseLeave={(e) => {
-              if (currentStock > 0) {
-                e.currentTarget.style.background = getButtonColor();
-              }
+              if (currentStock > 0) e.currentTarget.style.background = getButtonColor();
             }}
           >
             {getButtonContent()}

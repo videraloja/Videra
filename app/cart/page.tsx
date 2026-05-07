@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { supabase } from '../../lib/supabaseClient';
 import { useToast } from '../components/Toast';
 
@@ -29,10 +30,9 @@ interface OrderSuccessData {
   paymentMethod: string;
   pickupOption: string;
   observations: string;
-  timestamp: number; // para controle de expiração de 1h
+  timestamp: number;
 }
 
-// Função para gerar código único do pedido
 const generateOrderCode = () => {
   const prefix = 'VID';
   const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
@@ -40,7 +40,6 @@ const generateOrderCode = () => {
   return `${prefix}-${random}${timestamp}`;
 };
 
-// Funções de promoção
 const getCurrentPrice = (product: Product) => {
   if (product.on_sale && product.sale_price && product.sale_price > 0) {
     return product.sale_price;
@@ -72,7 +71,6 @@ export default function CartPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [ready, setReady] = useState(false);
-  
   const [paymentMethod, setPaymentMethod] = useState<string>('');
   const [pickupOption, setPickupOption] = useState<string>('');
   const [observations, setObservations] = useState<string>('');
@@ -83,13 +81,10 @@ export default function CartPage() {
   const [showStockModal, setShowStockModal] = useState(false);
   const [stockModalData, setStockModalData] = useState<{ adjustedItems: any[]; unavailableItems: any[] }>({ adjustedItems: [], unavailableItems: [] });
   const [isProcessing, setIsProcessing] = useState(false);
-
-  // 🆕 Estado para tela de sucesso
   const [orderSuccess, setOrderSuccess] = useState<OrderSuccessData | null>(null);
 
   const { showToast, ToastContainer } = useToast();
 
-  // Persistir carrinho e produtos no localStorage
   const persistState = (nextCart: CartItem[], nextProducts: Product[]) => {
     setCart(nextCart);
     setProducts(nextProducts);
@@ -102,7 +97,6 @@ export default function CartPage() {
     window.dispatchEvent(new Event('cart-updated'));
   };
 
-  // 🆕 Persistir estado de sucesso no sessionStorage (para sobreviver a reload)
   const persistOrderSuccess = (data: OrderSuccessData | null) => {
     setOrderSuccess(data);
     if (data) {
@@ -112,13 +106,10 @@ export default function CartPage() {
     }
   };
 
-  // 🆕 Limpar pedido (após 1 hora ou por ação do usuário)
   const clearOrderSuccess = () => {
     persistOrderSuccess(null);
-    // Opcional: se quiser limpar carrinho também, mas o botão "limpar carrinho" já faz isso
   };
 
-  // 🆕 Timer automático para limpar a tela de sucesso após 1 hora
   useEffect(() => {
     if (orderSuccess && orderSuccess.timestamp) {
       const now = Date.now();
@@ -135,13 +126,11 @@ export default function CartPage() {
     }
   }, [orderSuccess]);
 
-  // 🆕 Recuperar estado de sucesso ao carregar a página
   useEffect(() => {
     const savedSuccess = sessionStorage.getItem('orderSuccess');
     if (savedSuccess) {
       try {
         const data = JSON.parse(savedSuccess) as OrderSuccessData;
-        // Verificar se ainda está dentro do prazo de 1 hora
         if (Date.now() - data.timestamp < 60 * 60 * 1000) {
           setOrderSuccess(data);
         } else {
@@ -162,23 +151,23 @@ export default function CartPage() {
       const { data: freshProducts, error } = await supabase
         .from('products')
         .select('*');
-      
+
       if (error) {
         console.error('Erro ao buscar produtos:', error);
       }
-      
+
       const updatedProducts = (freshProducts as Product[]) || [];
-      
+
       localStorage.setItem('products', JSON.stringify(updatedProducts));
       setProducts(updatedProducts);
-      
+
       const savedCart = localStorage.getItem('cart');
       let currentCart: CartItem[] = [];
-      
+
       if (savedCart) {
         try {
           currentCart = JSON.parse(savedCart);
-          
+
           currentCart = currentCart.map(cartItem => {
             const freshProduct = updatedProducts.find(p => p.id === cartItem.id);
             if (freshProduct) {
@@ -195,7 +184,7 @@ export default function CartPage() {
             }
             return cartItem;
           });
-          
+
           setCart(currentCart);
           localStorage.setItem('cart', JSON.stringify(currentCart));
         } catch {
@@ -306,7 +295,6 @@ export default function CartPage() {
       return p;
     });
     persistState([], nextProducts);
-    // Se estava na tela de sucesso, limpa também
     if (orderSuccess) clearOrderSuccess();
     setTimeout(() => {
       window.dispatchEvent(new Event('cartStateChanged'));
@@ -352,32 +340,29 @@ export default function CartPage() {
     setShowPickupModal(true);
   };
 
-  // 🆕 Função para criar reservas (via RPC, como já usado)
   const createReservations = async (orderId: string, cartItems: CartItem[]) => {
     const itemsForReservation = cartItems.map(item => ({
       product_id: item.id,
       quantity: item.quantity
     }));
-    
+
     const { error } = await supabase.rpc('create_reservations', {
       p_order_id: orderId,
       p_items: itemsForReservation
     });
-    
+
     if (error) {
       console.error('Erro ao criar reservas:', error);
       throw error;
     }
-    
+
     console.log(`✅ Reservas criadas para ${cartItems.length} produtos`);
   };
 
-  // 🆕 Processar pedido sem limpar carrinho, apenas gerar dados de sucesso
   const processOrder = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
 
-    // 1. Verificar estoque disponível (RPC)
     const productIds = cart.map(i => i.id);
     const { data: stockData, error: stockError } = await supabase.rpc('get_available_stock', {
       p_product_ids: productIds
@@ -424,7 +409,6 @@ export default function CartPage() {
       return;
     }
 
-    // 2. Criar pedido via RPC
     const orderCode = generateOrderCode();
     const { data: orderResult, error: orderError } = await supabase.rpc('create_order', {
       p_order_code: orderCode,
@@ -443,7 +427,6 @@ export default function CartPage() {
 
     const orderId = orderResult.id;
 
-    // 3. Criar reservas
     try {
       await createReservations(orderId, cart);
     } catch (err) {
@@ -454,7 +437,6 @@ export default function CartPage() {
       return;
     }
 
-    // 4. Inserir itens do pedido
     const itemsPayload = cart.map((item) => ({
       order_id: orderId,
       product_id: item.id,
@@ -474,14 +456,13 @@ export default function CartPage() {
       return;
     }
 
-    // 5. Montar mensagem do WhatsApp
     const total = cart.reduce((s, i) => s + getCurrentPrice(i) * i.quantity, 0);
     const lines = cart.map((i) => {
       const price = getCurrentPrice(i);
       const hasPromo = hasPromotion(i);
       const priceFormatted = `R$ ${price.toFixed(2).replace(".", ",")}`;
       const quantityText = `${i.quantity} ${i.quantity === 1 ? 'uni' : 'uni'}`;
-      
+
       if (hasPromo) {
         const originalPriceFormatted = `R$ ${getOriginalPrice(i).toFixed(2).replace(".", ",")}`;
         return `• ${i.name} — ${originalPriceFormatted} por ${priceFormatted}\n  ${quantityText}`;
@@ -506,7 +487,6 @@ Aguarde enquanto processamos seu pedido : )
     const phone = '5592986446677';
     const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 
-    // 🆕 Salvar dados de sucesso antes de tentar redirecionar
     const successData: OrderSuccessData = {
       orderCode,
       message,
@@ -519,20 +499,16 @@ Aguarde enquanto processamos seu pedido : )
     };
     persistOrderSuccess(successData);
 
-    // Tentar redirecionar automaticamente
     try {
       const newWindow = window.open(whatsappUrl, '_blank');
       if (!newWindow) {
-        // Se bloqueado, o usuário verá a tela de sucesso e poderá copiar manualmente
         console.warn('Pop-up bloqueado, redirecionamento manual necessário');
       }
     } catch (e) {
       console.error('Erro ao abrir WhatsApp:', e);
     }
 
-    // Não limpar carrinho! Apenas mostrar tela de sucesso.
     setIsProcessing(false);
-    
   };
 
   const handleSendOrder = async () => {
@@ -556,7 +532,7 @@ Aguarde enquanto processamos seu pedido : )
 
   const confirmStockAdjustments = () => {
     const { adjustedItems, unavailableItems } = stockModalData;
-    
+
     const updatedCart = cart.map(item => {
       const adjusted = adjustedItems.find(a => a.name === item.name);
       if (adjusted) {
@@ -568,12 +544,12 @@ Aguarde enquanto processamos seu pedido : )
       }
       return item;
     }).filter(item => item !== null) as CartItem[];
-    
+
     let updatedProducts = [...products];
     for (const item of cart) {
       const adjusted = adjustedItems.find(a => a.name === item.name);
       const isRemoved = unavailableItems.find(u => u.name === item.name);
-      
+
       if (adjusted) {
         const diff = item.quantity - adjusted.newQty;
         updatedProducts = updatedProducts.map(p =>
@@ -585,19 +561,18 @@ Aguarde enquanto processamos seu pedido : )
         );
       }
     }
-    
+
     persistState(updatedCart, updatedProducts);
     window.dispatchEvent(new Event('cart-updated'));
     window.dispatchEvent(new Event('storage'));
     window.dispatchEvent(new CustomEvent('cartStateChanged'));
-    
+
     setShowStockModal(false);
     setStockModalData({ adjustedItems: [], unavailableItems: [] });
   };
 
   const total = cart.reduce((s, i) => s + getCurrentPrice(i) * i.quantity, 0);
 
-  // 🆕 Função para copiar mensagem
   const copyOrderMessage = () => {
     if (orderSuccess) {
       navigator.clipboard.writeText(orderSuccess.message);
@@ -605,12 +580,10 @@ Aguarde enquanto processamos seu pedido : )
     }
   };
 
-  // 🆕 Função para voltar ao carrinho (mantém os itens)
   const backToCart = () => {
-    clearOrderSuccess(); // apenas esconde a tela de sucesso, carrinho permanece
+    clearOrderSuccess();
   };
 
-  // 🆕 Tela de sucesso (renderizada quando orderSuccess existe)
   if (orderSuccess) {
     return (
       <div className="cart-page" style={{ minHeight: '100vh', padding: '2rem 1rem' }}>
@@ -686,8 +659,6 @@ Aguarde enquanto processamos seu pedido : )
                  Limpar Carrinho
               </button>
             </div>
-
-            
           </div>
         </div>
         <ToastContainer />
@@ -695,7 +666,6 @@ Aguarde enquanto processamos seu pedido : )
     );
   }
 
-  // Loading state
   if (!ready) {
     return (
       <>
@@ -717,7 +687,6 @@ Aguarde enquanto processamos seu pedido : )
     );
   }
 
-  // Empty cart state
   if (cart.length === 0) {
     return (
       <div className="cart-page" style={{ minHeight: '100vh', padding: '2rem 1rem' }}>
@@ -757,11 +726,9 @@ Aguarde enquanto processamos seu pedido : )
     );
   }
 
-  // Renderização normal do carrinho (igual ao original, com pequenos ajustes)
   return (
     <div className="cart-page">
       <div className="cart-container">
-        {/* Header */}
         <div className="cart-header">
           <button 
             onClick={() => {
@@ -784,7 +751,6 @@ Aguarde enquanto processamos seu pedido : )
           </div>
         </div>
 
-        {/* Cart Items */}
         <div className="cart-items">
           {cart.map((item) => {
             const promotionActive = hasPromotion(item);
@@ -794,7 +760,13 @@ Aguarde enquanto processamos seu pedido : )
             return (
               <div key={item.id} className="cart-item">
                 <div className="item-image">
-                  <img src={item.image_url} alt={item.name} />
+                  <Image
+                    src={item.image_url || '/placeholder.png'}
+                    alt={item.name}
+                    fill
+                    sizes="100px"
+                    style={{ objectFit: 'cover' }}
+                  />
                 </div>
                 <div className="item-details">
                   <h3>{item.name}</h3>
@@ -826,7 +798,6 @@ Aguarde enquanto processamos seu pedido : )
           })}
         </div>
 
-        {/* Footer com opções adicionais */}
         <div className="cart-footer">
           <div className="footer-info">
             <div className="total-section">
@@ -835,7 +806,6 @@ Aguarde enquanto processamos seu pedido : )
             </div>
           </div>
 
-          {/* Forma de Pagamento */}
           <div className="options-section">
             <label className="section-label"> Forma de Pagamento</label>
             <div className="options-group">
@@ -845,7 +815,6 @@ Aguarde enquanto processamos seu pedido : )
             </div>
           </div>
 
-          {/* Opção de Retirada */}
           <div className="options-section">
             <label className="section-label"> Retirada</label>
             <div className="options-group">
@@ -855,7 +824,6 @@ Aguarde enquanto processamos seu pedido : )
             {paymentMethod === 'dinheiro' && <p className="disabled-warning" style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.5rem' }}>⚠️ Opção indisponível para pagamento em dinheiro</p>}
           </div>
 
-          {/* ENDEREÇO */}
           <div className="store-address-section">
             <div className="address-card">
               <div className="address-icon">🗺️</div>
@@ -870,7 +838,6 @@ Aguarde enquanto processamos seu pedido : )
             </div>
           </div>
 
-          {/* Observações */}
           <div className="options-section">
             <label className="section-label">✏️ Observações (opcional)</label>
             <textarea value={observations} onChange={(e) => setObservations(e.target.value)} placeholder="Ex: Horário para retirada, informações adicionais, etc..." className="observations-input" rows={3} />
@@ -886,7 +853,6 @@ Aguarde enquanto processamos seu pedido : )
         </div>
       </div>
 
-      {/* Modais existentes (Crédito, Pickup, Dinheiro, etc.) - manter exatamente como estavam */}
       {showCreditModal && (
         <div className="modal-overlay" onClick={() => setShowCreditModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -964,7 +930,6 @@ Aguarde enquanto processamos seu pedido : )
       <ToastContainer />
 
       <style jsx>{`
-        /* TODOS OS ESTILOS ORIGINAIS (mantidos) */
         .cart-page {
           min-height: 100vh;
           background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
@@ -1004,8 +969,8 @@ Aguarde enquanto processamos seu pedido : )
         .cart-items { padding: 1rem 2rem; }
         .cart-item { display: flex; align-items: center; gap: 1.5rem; padding: 1.5rem 0; border-bottom: 1px solid #f0f0f0; transition: background 0.2s; }
         .cart-item:hover { background: #fafafa; margin: 0 -1rem; padding: 1.5rem 1rem; }
-        .item-image { width: 100px; height: 100px; flex-shrink: 0; background: #f9f9f9; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        .item-image img { width: 100%; height: 100%; object-fit: cover; }
+        .item-image { width: 100px; height: 100px; flex-shrink: 0; background: #f9f9f9; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05); position: relative; }
+        .item-image img { display: none; } /* Oculta tag img se existir, pois usamos next/image */
         .item-details { flex: 1; }
         .item-details h3 { font-size: 1.1rem; font-weight: 600; margin: 0 0 0.5rem 0; color: #1f2937; }
         .item-price { font-size: 1rem; font-weight: 500; margin: 0 0 1rem 0; }
