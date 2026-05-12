@@ -1,4 +1,4 @@
-// hooks/useThemeColors.ts - VERSÃO OTIMIZADA (SEM LOOP, SEM LOGS EXCESSIVOS)
+// hooks/useThemeColors.ts - VERSÃO FINAL (SEM IMAGEM PADRÃO, OTIMIZADO)
 'use client';
 
 import { useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -7,7 +7,7 @@ import { PageThemeContext } from '../app/contexts/PageThemeContext';
 import { ThemeConfig, ComponentStyles, ProductCardStyles } from '../app/types';
 import { getEffectiveTheme } from '@/app/lib/themeService';
 
-// CONSTANTES DE EMERGÊNCIA (inalteradas)
+// CONSTANTES DE EMERGÊNCIA (sem backgroundImage fixo)
 const emergencyColors = {
   primary: '#7c3aed',
   secondary: '#f1f5f9',
@@ -15,7 +15,6 @@ const emergencyColors = {
   background: '#ffffff',
   text: '#1f2937',
   cardBg: '#ffffff',
-  headerBg: '#ffffff',
   success: '#10b981',
   warning: '#f59e0b',
   error: '#ef4444'
@@ -74,12 +73,6 @@ const emergencyComponentStyles: ComponentStyles = {
   }
 };
 
-const defaultBackgroundImage = {
-  url: 'https://images.unsplash.com/photo-1607082350899-7e105aa886ae?w=1200&h=400&fit=crop',
-  overlayColor: '#000000',
-  opacity: 0.3
-};
-
 export const useThemeColors = () => {
   const themeContext = useContext(ThemeContext);
   const pageThemeContext = useContext(PageThemeContext);
@@ -113,7 +106,6 @@ export const useThemeColors = () => {
     const currentPage = pageThemeContext?.currentPageId || window.location.pathname;
     const now = Date.now();
 
-    // Se já buscou há menos de 2 segundos e não é forçado, ignora
     if (!forceRefresh && lastFetchedPage.current === currentPage && now - lastFetchTime.current < 2000) {
       return;
     }
@@ -129,7 +121,6 @@ export const useThemeColors = () => {
 
       if (theme) {
         const themeId = theme.id + (theme.updatedAt || '');
-        // Só atualiza estado se o tema realmente mudou
         if (previousThemeId.current !== themeId) {
           previousThemeId.current = themeId;
           setEffectiveTheme(theme);
@@ -137,7 +128,6 @@ export const useThemeColors = () => {
         }
       }
     } catch (error) {
-      // Silencioso em produção, apenas log de emergência se necessário
       if (process.env.NODE_ENV === 'development') {
         console.error('Erro ao buscar tema:', error);
       }
@@ -155,15 +145,12 @@ export const useThemeColors = () => {
 
     if (currentPage.startsWith('/admin')) return;
 
-    // Limpa polling anterior
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
     }
 
-    // Busca inicial
     fetchEffectiveTheme();
 
-    // Polling a cada 10s, mas sem forçar atualização se não mudou
     pollingRef.current = setInterval(() => {
       fetchEffectiveTheme(true);
     }, 10000);
@@ -174,12 +161,9 @@ export const useThemeColors = () => {
         pollingRef.current = null;
       }
     };
-    // ATENÇÃO: dependência intencionalmente apenas [isMounted], não recria o intervalo
-    // pois pageThemeContext.currentPageId é acessado por ref ou diretamente na função.
-    // Reagimos a mudanças de página pelo efeito abaixo.
   }, [isMounted]);
 
-  // ATUALIZA QUANDO A PÁGINA MUDA (contexto de página)
+  // ATUALIZA QUANDO A PÁGINA MUDA
   useEffect(() => {
     if (isMounted && pageThemeContext?.currentPageId) {
       fetchEffectiveTheme(true);
@@ -191,13 +175,13 @@ export const useThemeColors = () => {
     fetchEffectiveTheme(true);
   }, [fetchEffectiveTheme]);
 
-  // EXTRAIR DADOS
+  // EXTRAIR DADOS – SEM FALLBACK DE IMAGEM
   const colors = effectiveTheme.colors || emergencyColors;
   const emojis = effectiveTheme.emojis || emergencyEmojis;
   const componentStyles = effectiveTheme.componentStyles || emergencyComponentStyles;
-  const backgroundImage = effectiveTheme.backgroundImage || defaultBackgroundImage;
+  const backgroundImage = effectiveTheme.backgroundImage || undefined; // sem imagem padrão
 
-  // FUNÇÕES DE ESTILO (inalteradas, mas sem logs)
+  // FUNÇÕES DE ESTILO
   const applyThemeStyles = (styles: React.CSSProperties, elementType?: string) => {
     const baseStyles = { ...styles };
     if (elementType === 'hero') {
@@ -243,7 +227,6 @@ export const useThemeColors = () => {
     return configs[category] || configs.default;
   };
 
-  // FUNÇÕES DE COMPONENTES (SEM LOGS)
   const getComponentStyles = <K extends keyof ComponentStyles>(
     component: K,
     usePageTheme: boolean = true
@@ -369,7 +352,7 @@ function createDefaultTheme(): ThemeConfig {
     colors: emergencyColors,
     emojis: emergencyEmojis,
     componentStyles: emergencyComponentStyles,
-    backgroundImage: defaultBackgroundImage
+    backgroundImage: undefined // sem imagem padrão
   };
 }
 
@@ -382,6 +365,6 @@ function createEmergencyTheme(): ThemeConfig {
     colors: emergencyColors,
     emojis: emergencyEmojis,
     componentStyles: emergencyComponentStyles,
-    backgroundImage: defaultBackgroundImage
+    backgroundImage: undefined
   };
 }

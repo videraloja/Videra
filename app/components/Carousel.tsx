@@ -36,21 +36,17 @@ export default function Carousel({
   const [isMobile, setIsMobile] = useState(false);
   const { colors } = useThemeColors();
 
-  // Detectar se é mobile
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth <= 768);
     };
-    
     checkMobile();
     window.addEventListener('resize', checkMobile);
-    
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   const scroll = (direction: 'left' | 'right') => {
     if (!carouselRef.current) return;
-    
     const scrollAmount = 280 + 16;
     carouselRef.current.scrollBy({
       left: direction === 'left' ? -scrollAmount : scrollAmount,
@@ -60,7 +56,6 @@ export default function Carousel({
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!carouselRef.current) return;
-    
     setIsDragging(true);
     setStartX(e.pageX - carouselRef.current.offsetLeft);
     setScrollLeft(carouselRef.current.scrollLeft);
@@ -69,35 +64,27 @@ export default function Carousel({
 
   const handleMouseLeave = () => {
     setIsDragging(false);
-    if (carouselRef.current) {
-      carouselRef.current.style.cursor = 'grab';
-    }
+    if (carouselRef.current) carouselRef.current.style.cursor = 'grab';
   };
 
   const handleMouseUp = () => {
     setIsDragging(false);
-    if (carouselRef.current) {
-      carouselRef.current.style.cursor = 'grab';
-    }
+    if (carouselRef.current) carouselRef.current.style.cursor = 'grab';
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging || !carouselRef.current) return;
     e.preventDefault();
-    
     const x = e.pageX - carouselRef.current.offsetLeft;
     const walk = (x - startX) * 2;
     carouselRef.current.scrollLeft = scrollLeft - walk;
   };
 
-  // Auto scroll se configurado
   useEffect(() => {
     if (!config.auto_scroll || !carouselRef.current) return;
-
     const interval = setInterval(() => {
       if (carouselRef.current) {
         const maxScroll = carouselRef.current.scrollWidth - carouselRef.current.clientWidth;
-        
         if (carouselRef.current.scrollLeft >= maxScroll) {
           carouselRef.current.scrollTo({ left: 0, behavior: 'smooth' });
         } else {
@@ -105,7 +92,6 @@ export default function Carousel({
         }
       }
     }, config.auto_scroll_interval);
-
     return () => clearInterval(interval);
   }, [config.auto_scroll, config.auto_scroll_interval]);
 
@@ -113,16 +99,15 @@ export default function Carousel({
 
   return (
     <div style={{ marginBottom: '40px', position: 'relative' }}>
-      {/* Cabeçalho do Carrossel */}
+      {/* Cabeçalho */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: '16px',
         padding: '0 8px',
-        minHeight: '40px' // Altura fixa para evitar quebras
+        minHeight: '40px'
       }}>
-        {/* Título - SEM BADGE AO LADO */}
         <h3 style={{
           fontSize: '20px',
           fontWeight: config.title_font_weight || '600',
@@ -131,32 +116,20 @@ export default function Carousel({
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
-          whiteSpace: 'nowrap', // 👈 IMPEDE QUEBRA DE LINHA
+          whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
-          maxWidth: '70%' // Limita largura para caber junto com botão
+          maxWidth: '70%'
         }}>
           {categoryConfig?.icon && (
-            <span style={{ fontSize: '20px', flexShrink: 0 }}>
-              {categoryConfig.icon}
-            </span>
+            <span style={{ fontSize: '20px', flexShrink: 0 }}>{categoryConfig.icon}</span>
           )}
-          <span style={{
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap'
-          }}>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {title}
           </span>
-          {/* REMOVIDO: Badge ao lado do título */}
         </h3>
 
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '12px',
-          flexShrink: 0 // 👈 Evita compressão
-        }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
           {showViewAll && onViewAll && (
             <button
               onClick={onViewAll}
@@ -170,52 +143,22 @@ export default function Carousel({
                 fontWeight: '600',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
-                whiteSpace: 'nowrap' // 👈 Botão sem quebra
+                whiteSpace: 'nowrap'
               }}
             >
               Ver Todos
             </button>
           )}
-          
-          {/* Setas - MOSTRAR APENAS EM DESKTOP */}
           {!isMobile && config.show_arrows && products.length > 2 && (
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                onClick={() => scroll('left')}
-                style={{
-                  padding: '8px 12px',
-                  background: config.arrow_bg_color || colors.primary,
-                  color: config.arrow_text_color || 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                ◀
-              </button>
-              <button
-                onClick={() => scroll('right')}
-                style={{
-                  padding: '8px 12px',
-                  background: config.arrow_bg_color || colors.primary,
-                  color: config.arrow_text_color || 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                ▶
-              </button>
+              <button onClick={() => scroll('left')} style={{ padding: '8px 12px', background: config.arrow_bg_color || colors.primary, color: config.arrow_text_color || 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '16px', transition: 'all 0.2s ease' }}>◀</button>
+              <button onClick={() => scroll('right')} style={{ padding: '8px 12px', background: config.arrow_bg_color || colors.primary, color: config.arrow_text_color || 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '16px', transition: 'all 0.2s ease' }}>▶</button>
             </div>
           )}
         </div>
       </div>
 
-      {/* Carrossel de Produtos */}
+      {/* Container do carrossel */}
       <div
         ref={carouselRef}
         className="carousel-container-mobile"
@@ -234,8 +177,12 @@ export default function Carousel({
         onMouseMove={handleMouseMove}
       >
         {products.map((product) => (
-          <div key={product.id} style={{ flex: '0 0 auto' }}>
-            <ProductCard 
+          <div
+            key={product.id}
+            className={`carousel-item-mobile ${isMobile ? 'carousel-grid-item' : ''}`}
+            style={{ flex: '0 0 auto' }}
+          >
+            <ProductCard
               product={product}
               categoryConfig={categoryConfig}
               onAddToCart={onAddToCart}

@@ -47,10 +47,10 @@ export const carouselService = {
     }
   },
 
-  // Obter produtos mais vendidos
+  // Obter produtos mais vendidos (corrigido para Home)
   async getBestsellers(category: string, limit: number = 10): Promise<any[]> {
     try {
-      // Buscar produtos com mais vendas do mês atual
+      // Buscar vendas do mês atual
       const startOfMonth = new Date();
       startOfMonth.setDate(1);
       startOfMonth.setHours(0, 0, 0, 0);
@@ -71,11 +71,13 @@ export const carouselService = {
         salesCount[item.product_id] = (salesCount[item.product_id] || 0) + item.quantity;
       });
 
-      // Buscar produtos da categoria
-      const { data: products, error: productsError } = await supabase
-        .from('products')
-        .select('*')
-        .eq('category', category)
+      // Buscar produtos: se for 'home', não filtrar por categoria
+      let productQuery = supabase.from('products').select('*');
+      if (category && category !== 'home') {
+        productQuery = productQuery.eq('category', category);
+      }
+
+      const { data: products, error: productsError } = await productQuery
         .in('id', Object.keys(salesCount));
 
       if (productsError) {
@@ -83,11 +85,13 @@ export const carouselService = {
         return [];
       }
 
-      // Adicionar contagem de vendas e ordenar
-      const productsWithSales = (products || []).map(product => ({
-        ...product,
-        sales_count: salesCount[product.id] || 0
-      })).sort((a, b) => b.sales_count - a.sales_count)
+      // Ordenar por vendas e limitar
+      const productsWithSales = (products || [])
+        .map(product => ({
+          ...product,
+          sales_count: salesCount[product.id] || 0
+        }))
+        .sort((a, b) => b.sales_count - a.sales_count)
         .slice(0, limit);
 
       return productsWithSales;
@@ -97,13 +101,14 @@ export const carouselService = {
     }
   },
 
-  // Obter lançamentos
+  // Obter lançamentos (corrigido para Home)
   async getNewArrivals(category: string, limit: number = 10): Promise<any[]> {
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('category', category)
+      let query = supabase.from('products').select('*');
+      if (category && category !== 'home') {
+        query = query.eq('category', category);
+      }
+      const { data, error } = await query
         .order('created_at', { ascending: false })
         .limit(limit);
 
@@ -122,10 +127,8 @@ export const carouselService = {
   // Criar configurações padrão para uma página
   async createDefaultConfigs(pageSlug: string): Promise<boolean> {
     try {
-      // DETERMINAR QUAIS CONFIGURAÇÕES USAR BASEADO NA PÁGINA
       let defaultConfigs: any[] = [];
-      
-      // 🆕 CONFIGURAÇÕES PARA PÁGINA INICIAL (HOME)
+
       if (pageSlug === 'home') {
         defaultConfigs = [
           {
@@ -228,10 +231,7 @@ export const carouselService = {
             view_all_back_button_hover_text_color: '#ffffff'
           }
         ];
-      }
-      
-      // CONFIGURAÇÕES PARA POKÉMON TCG
-      else if (pageSlug === 'pokemontcg') {
+      } else if (pageSlug === 'pokemontcg') {
         defaultConfigs = [
           {
             page_slug: pageSlug,
@@ -333,10 +333,7 @@ export const carouselService = {
             view_all_back_button_hover_text_color: '#ffffff'
           }
         ];
-      }
-      
-      // CONFIGURAÇÕES PARA JOGOS DE TABULEIRO
-      else if (pageSlug === 'jogosdetabuleiro') {
+      } else if (pageSlug === 'jogosdetabuleiro') {
         defaultConfigs = [
           {
             page_slug: pageSlug,
@@ -438,10 +435,7 @@ export const carouselService = {
             view_all_back_button_hover_text_color: '#ffffff'
           }
         ];
-      }
-      
-      // CONFIGURAÇÕES PARA ACESSÓRIOS
-      else if (pageSlug === 'acessorios') {
+      } else if (pageSlug === 'acessorios') {
         defaultConfigs = [
           {
             page_slug: pageSlug,
@@ -543,10 +537,7 @@ export const carouselService = {
             view_all_back_button_hover_text_color: '#ffffff'
           }
         ];
-      }
-      
-      // CONFIGURAÇÕES PARA HOT WHEELS
-      else if (pageSlug === 'hotwheels') {
+      } else if (pageSlug === 'hotwheels') {
         defaultConfigs = [
           {
             page_slug: pageSlug,
@@ -648,16 +639,12 @@ export const carouselService = {
             view_all_back_button_hover_text_color: '#ffffff'
           }
         ];
-      }
-      
-      // PÁGINA NÃO RECONHECIDA - RETORNA VAZIO
-      else {
+      } else {
         console.log(`ℹ️ Página não reconhecida para configurações padrão: ${pageSlug}`);
         console.log(`ℹ️ As configurações devem ser criadas manualmente via SQL ou editor`);
         return false;
       }
 
-      // SE ENCONTRAMOS CONFIGURAÇÕES PARA ESTA PÁGINA, TENTA INSERIR
       if (defaultConfigs.length > 0) {
         const { error } = await supabase
           .from('carousel_configs')
