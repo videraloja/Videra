@@ -955,3 +955,14 @@ th, td {
     grid-column: span 2; /* Endereço ocupa a linha inteira no mobile */
   }
 }
+/* Remove o brilho azul e a seleção acidental em todos os elementos tocáveis */
+* {
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+a, button, input, textarea, select {
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
