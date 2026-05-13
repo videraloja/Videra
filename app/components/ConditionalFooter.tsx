@@ -1,15 +1,22 @@
-// app/components/ConditionalFooter.tsx – VERSÃO FINAL SINCRONIZADA (ESCUTA EVENTO + POLLING ATIVO)
+// app/components/ConditionalFooter.tsx – VERSÃO COM INSTAGRAM OCULTO NO MOBILE
 'use client';
 
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import { useThemeColors } from '../../hooks/useThemeColors';
 
+// Ícones SVG (estilo minimalista)
 const MapIcon = ({ color }: { color: string }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="28" height="28">
-    <path d="M12 2L2 7l10 5 10-5-10-5z" />
-    <path d="M2 17l10 5 10-5" />
-    <path d="M2 12l10 5 10-5" />
+    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+    <circle cx="12" cy="10" r="3" />
+  </svg>
+);
+
+const EmailIcon = ({ color }: { color: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="28" height="28">
+    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+    <polyline points="22,6 12,13 2,6" />
   </svg>
 );
 
@@ -19,11 +26,11 @@ const ChatIcon = () => (
   </svg>
 );
 
-const CameraIcon = () => (
+const InstagramIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="#E4405F" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="28" height="28">
-    <rect x="2" y="5" width="20" height="16" rx="3" />
-    <circle cx="12" cy="13" r="3" />
-    <path d="M7 5h10l1-2H6l1 2z" />
+    <rect x="2" y="2" width="20" height="20" rx="5" />
+    <circle cx="12" cy="12" r="5" />
+    <circle cx="17.5" cy="6.5" r="1.5" fill="currentColor" stroke="none" />
   </svg>
 );
 
@@ -31,10 +38,9 @@ export default function ConditionalFooter() {
   const pathname = usePathname();
   if (['/cart'].includes(pathname)) return null;
 
-  const { colors, refreshTheme, forceRefreshTheme } = useThemeColors();
+  const { colors, forceRefreshTheme } = useThemeColors();
   const pathnameRef = useRef(pathname);
 
-  // Sempre que o pathname mudar, força a atualização do tema imediatamente
   useEffect(() => {
     if (pathnameRef.current !== pathname) {
       pathnameRef.current = pathname;
@@ -42,7 +48,6 @@ export default function ConditionalFooter() {
     }
   }, [pathname, forceRefreshTheme]);
 
-  // Escuta o evento theme-changed (disparado pelo PageThemeContext ao alterar tema de página)
   useEffect(() => {
     const handleThemeChanged = () => {
       forceRefreshTheme();
@@ -54,54 +59,88 @@ export default function ConditionalFooter() {
   const footerBg = colors.background;
   const textColor = colors.text;
   const primaryColor = colors.primary;
-  const mutedColor = colors.text + '90';
+  const mutedColor = colors.text + '99';
+  const borderColor = colors.secondary;
 
   return (
     <footer style={{
       background: footerBg,
       borderTop: `3px solid ${primaryColor}`,
       marginTop: 'auto',
-      padding: '48px 20px 32px',
+      padding: '48px 20px 24px',
       color: textColor,
       fontFamily: 'system-ui, -apple-system, sans-serif',
     }}>
-      <div className="footer-grid-premium" style={{ maxWidth: '900px', margin: '0 auto' }}>
-        {/* Endereço */}
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ marginBottom: '12px' }}>
-            <MapIcon color={primaryColor} />
-          </div>
-          <h4 style={{
-            fontSize: '11px',
-            fontWeight: '600',
-            letterSpacing: '1px',
-            textTransform: 'uppercase',
-            color: mutedColor,
-            margin: '0 0 12px'
-          }}>
-            Endereço
-          </h4>
+      <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+        {/* Frase da loja */}
+        <div style={{
+          textAlign: 'center',
+          marginBottom: '40px',
+          padding: '0 20px 32px',
+          borderBottom: `1px solid ${borderColor}`,
+        }}>
           <p style={{
-            fontSize: '14px',
+            fontSize: '18px',
+            fontWeight: '500',
             lineHeight: '1.6',
             color: textColor,
+            opacity: 0.9,
             margin: 0,
-            opacity: 0.9
+            letterSpacing: '0.2px',
           }}>
-            Rua Áurea Graciano, 15<br />
-            Col. Santo Antônio<br />
-            Manaus – AM<br />
-            69093-045
+            Pokémon TCG, Board Games, Acessórios e Hot Wheels —<br />tudo original e lacrado. Do jeito que o colecionador gosta!
           </p>
         </div>
 
-        {/* WhatsApp */}
-        <div style={{ textAlign: 'center' }}>
-          <a href="https://wa.me/5592986446677" target="_blank" rel="noopener noreferrer"
-            style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
-          >
+        {/* Grid de contatos */}
+        <div
+          className="footer-grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+            gap: '32px',
+            marginBottom: '40px',
+          }}
+        >
+          {/* Endereço (ocupa sempre 1 coluna) */}
+          <div className="footer-item footer-address" style={{ textAlign: 'center' }}>
             <div style={{ marginBottom: '12px' }}>
-              <ChatIcon />
+              <MapIcon color={primaryColor} />
+            </div>
+            <h4 style={{
+              fontSize: '11px',
+              fontWeight: '600',
+              letterSpacing: '1px',
+              textTransform: 'uppercase',
+              color: mutedColor,
+              margin: '0 0 12px'
+            }}>
+              Endereço
+            </h4>
+            <a
+              href="https://www.google.com/maps/place/Videra+Loja+virtual/@-3.0340442,-60.0101189,20.16z/data=!4m6!3m5!1s0x926c1b372da27575:0x4daf1b91802bc5e5!8m2!3d-3.0340946!4d-60.0102163!16s%2Fg%2F11lcmykf0m?entry=ttu&g_ep=EgoyMDI2MDQwNS4wIKXMDSoASAFQAw%3D%3D"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ textDecoration: 'none', color: textColor, display: 'block' }}
+            >
+              <p style={{
+                fontSize: '14px',
+                lineHeight: '1.6',
+                margin: 0,
+                opacity: 0.9
+              }}>
+                Rua Áurea Graciano, 15<br />
+                Col. Santo Antônio<br />
+                Manaus – AM<br />
+                69093-045
+              </p>
+            </a>
+          </div>
+
+          {/* E‑mail */}
+          <div className="footer-item" style={{ textAlign: 'center' }}>
+            <div style={{ marginBottom: '12px' }}>
+              <EmailIcon color={primaryColor} />
             </div>
             <h4 style={{
               fontSize: '11px',
@@ -111,46 +150,98 @@ export default function ConditionalFooter() {
               color: mutedColor,
               margin: '0 0 8px'
             }}>
-              WhatsApp
+              E‑mail
             </h4>
-            <p style={{ fontSize: '14px', fontWeight: '500', color: textColor }}>(92) 98644-6677</p>
-          </a>
+            <a
+              href="mailto:videraloja@gmail.com"
+              style={{
+                textDecoration: 'none',
+                color: textColor,
+                fontSize: '14px',
+                fontWeight: '500',
+                opacity: 0.9,
+              }}
+            >
+              videraloja@gmail.com
+            </a>
+          </div>
+
+          {/* WhatsApp */}
+          <div className="footer-item" style={{ textAlign: 'center' }}>
+            <a href="https://wa.me/5592986446677" target="_blank" rel="noopener noreferrer"
+              style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
+            >
+              <div style={{ marginBottom: '12px' }}>
+                <ChatIcon />
+              </div>
+              <h4 style={{
+                fontSize: '11px',
+                fontWeight: '600',
+                letterSpacing: '1px',
+                textTransform: 'uppercase',
+                color: mutedColor,
+                margin: '0 0 8px'
+              }}>
+                WhatsApp
+              </h4>
+              <p style={{ fontSize: '14px', fontWeight: '500', color: textColor }}>(92) 98644-6677</p>
+            </a>
+          </div>
+
+          {/* Instagram – oculto no mobile */}
+          <div className="footer-item footer-instagram" style={{ textAlign: 'center' }}>
+            <a href="https://www.instagram.com/videra_lojavirtual" target="_blank" rel="noopener noreferrer"
+              style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
+            >
+              <div style={{ marginBottom: '12px' }}>
+                <InstagramIcon />
+              </div>
+              <h4 style={{
+                fontSize: '11px',
+                fontWeight: '600',
+                letterSpacing: '1px',
+                textTransform: 'uppercase',
+                color: mutedColor,
+                margin: '0 0 8px'
+              }}>
+                Instagram
+              </h4>
+              <p style={{ fontSize: '14px', fontWeight: '500', color: textColor }}>@videra_lojavirtual</p>
+            </a>
+          </div>
         </div>
 
-        {/* Instagram */}
-        <div style={{ textAlign: 'center' }}>
-          <a href="https://www.instagram.com/videra_lojavirtual?igsh=bzBoYmFpanVvM2N5" target="_blank" rel="noopener noreferrer"
-            style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
-          >
-            <div style={{ marginBottom: '12px' }}>
-              <CameraIcon />
-            </div>
-            <h4 style={{
-              fontSize: '11px',
-              fontWeight: '600',
-              letterSpacing: '1px',
-              textTransform: 'uppercase',
-              color: mutedColor,
-              margin: '0 0 8px'
-            }}>
-              Instagram
-            </h4>
-            <p style={{ fontSize: '14px', fontWeight: '500', color: textColor }}>@videra_lojavirtual</p>
-          </a>
+        {/* CNPJ e Copyright */}
+        <div style={{
+          textAlign: 'center',
+          paddingTop: '24px',
+          borderTop: `1px solid ${borderColor}`,
+          fontSize: '12px',
+          color: mutedColor,
+          letterSpacing: '0.3px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+        }}>
+          <span>CNPJ: 58.756.836/0001-09</span>
+          <span>© {new Date().getFullYear()} Videra — Todos os direitos reservados.</span>
         </div>
       </div>
 
-      <div style={{
-        textAlign: 'center',
-        marginTop: '40px',
-        paddingTop: '20px',
-        borderTop: `1px solid ${colors.secondary}`,
-        fontSize: '12px',
-        color: mutedColor,
-        letterSpacing: '0.3px'
-      }}>
-        © {new Date().getFullYear()} Videra — Todos os direitos reservados.
-      </div>
+      {/* Estilos responsivos */}
+      <style jsx>{`
+        @media (max-width: 640px) {
+          .footer-grid {
+            grid-template-columns: 1fr 1fr !important;
+          }
+          .footer-address {
+            grid-column: 1 / -1; /* ocupar toda a largura em cima */
+          }
+          .footer-instagram {
+            display: none; /* remover Instagram no mobile */
+          }
+        }
+      `}</style>
     </footer>
   );
 }

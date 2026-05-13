@@ -1,4 +1,4 @@
-// app/pokemontcg/page.tsx - VERSÃO OTIMIZADA (FILTRO ESGOTADOS + CÓDIGO LIMPO)
+// app/pokemontcg/page.tsx - VERSÃO OTIMIZADA (SEM EMOJIS NOS TÍTULOS E BOTÕES)
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -21,14 +21,11 @@ export default function PokemonTCGPage() {
   const { addToCart: addToCartGlobal } = useCartContext();
   const { syncedProducts } = useAvailableStock(products);
 
-  // ✅ Produtos com estoque > 0 (esgotados ocultos)
   const availableProducts = useMemo(() => syncedProducts.filter(p => p.stock > 0), [syncedProducts]);
 
-  // Estados para filtros
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
 
-  // Estados para carrosséis
   const [carouselConfigs, setCarouselConfigs] = useState<CarouselConfig[]>([]);
   const [bestsellers, setBestsellers] = useState<Product[]>([]);
   const [newArrivals, setNewArrivals] = useState<Product[]>([]);
@@ -37,17 +34,12 @@ export default function PokemonTCGPage() {
   const [carouselsLoading, setCarouselsLoading] = useState(false);
   const [currentConfig, setCurrentConfig] = useState<CarouselConfig | null>(null);
 
-  // ✅ Arrays filtrados por estoque (para carrosséis e "Ver todos")
   const filteredBestsellers = useMemo(() => bestsellers.filter(p => p.stock > 0), [bestsellers]);
   const filteredNewArrivals = useMemo(() => newArrivals.filter(p => p.stock > 0), [newArrivals]);
 
-  // Hook de tema
   const { colors, emojis, applyThemeStyles, getShadow, getCategoryConfig } = useThemeColors();
-
-  // Hook de filtros
   const { filterPokemon, getPokemonCollections } = useCategoryFilters();
 
-  // Sincronizar estoque dos carrosséis com syncedProducts
   useEffect(() => {
     if (syncedProducts.length > 0) {
       setBestsellers(prev => {
@@ -67,7 +59,6 @@ export default function PokemonTCGPage() {
     }
   }, [syncedProducts]);
 
-  // Função para sincronizar estoque com carrinho
   const syncProductsWithCart = (products: Product[]): Product[] => {
     const savedCart = localStorage.getItem('cart');
     let cartItems: CartItem[] = [];
@@ -87,7 +78,6 @@ export default function PokemonTCGPage() {
     });
   };
 
-  // Função para alternar filtros
   const handleFilterToggle = (filterId: string) => {
     setActiveFilters(prev => {
       if (prev.includes(filterId)) {
@@ -98,7 +88,6 @@ export default function PokemonTCGPage() {
     });
   };
 
-  // Função para selecionar coleção específica
   const handleCollectionSelect = (collectionName: string) => {
     const collectionId = collectionName
       .toLowerCase()
@@ -109,14 +98,12 @@ export default function PokemonTCGPage() {
     handleFilterToggle(collectionFilterId);
   };
 
-  // Produtos filtrados via useMemo (sem debugs)
   const filteredProducts = useMemo(() => {
     if (products.length === 0) return [];
     if (activeFilters.length === 0) return products;
     return filterPokemon(products, activeFilters);
   }, [products, activeFilters, filterPokemon]);
 
-  // Coleções Pokémon para a barra de filtros
   const pokemonCollections = useMemo(() => {
     if (products.length === 0) return [];
     return getPokemonCollections(products);
@@ -140,7 +127,6 @@ export default function PokemonTCGPage() {
     addToCartGlobal(product);
   };
 
-  // Carregar produtos Pokémon
   useEffect(() => {
     const load = async () => {
       try {
@@ -169,7 +155,6 @@ export default function PokemonTCGPage() {
     load();
   }, []);
 
-  // Carregar carrosséis (dados reais) – mesmo padrão da Home
   useEffect(() => {
     const loadCarousels = async () => {
       if (!ready) return;
@@ -182,7 +167,6 @@ export default function PokemonTCGPage() {
         const { getProductsWithAvailableStock } = await import('@/lib/productService');
         const productsWithStock = await getProductsWithAvailableStock();
 
-        // Mais vendidos (categoria pokemon – o serviço filtra por categoria)
         const best = await carouselService.getBestsellers('pokemon', 10);
         const syncedBest = best.map(product => {
           const stockInfo = productsWithStock.find(p => p.id === product.id);
@@ -191,7 +175,6 @@ export default function PokemonTCGPage() {
         });
         setBestsellers(syncedBest);
 
-        // Lançamentos (categoria pokemon)
         const arrivals = await carouselService.getNewArrivals('pokemon', 10);
         const syncedArrivals = arrivals.map(product => {
           const stockInfo = productsWithStock.find(p => p.id === product.id);
@@ -209,16 +192,13 @@ export default function PokemonTCGPage() {
     loadCarousels();
   }, [ready]);
 
-  // Estado de busca
   const [searchTerm, setSearchTerm] = useState('');
   const handleSearch = (term: string) => {
     setSearchTerm(term);
   };
 
-  // Produtos filtrados por busca e filtros
   const getFinalFilteredProducts = useMemo(() => {
     let result = filteredProducts;
-    // Remover esgotados
     result = result.filter(p => p.stock > 0);
     if (searchTerm.trim()) {
       result = result.filter(product =>
@@ -238,7 +218,7 @@ export default function PokemonTCGPage() {
     <div style={{ minHeight: '100vh', background: colors.background, color: colors.text }}>
       <Header onSearch={handleSearch} searchTerm={searchTerm} />
 
-      <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '40px 20px' }}>
+      <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '0px 20px' }}>
         {!ready && (
           <div style={{ textAlign: 'center', padding: '80px 20px' }}>
             <div style={{ fontSize: '64px', marginBottom: '16px', animation: 'pulse 2s infinite' }}>{emojis.search}</div>
@@ -250,7 +230,6 @@ export default function PokemonTCGPage() {
           <>
             <HeroSectionWrapper showHero={!hasActiveSearch && !showAllProducts} />
 
-            {/* Barra de filtros */}
             {!showAllProducts && (
               <FiltersBar
                 category="pokemon"
@@ -263,12 +242,11 @@ export default function PokemonTCGPage() {
               />
             )}
 
-            {/* Resultados da busca/filtros */}
             {hasActiveSearch && !showAllProducts && (
               <section style={{ marginBottom: '40px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', padding: '0 20px' }}>
                   <h2 style={{ fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: '700', color: colors.text, display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ fontSize: '28px' }}>{emojis.search}</span>
+                    <span style={{ fontSize: '28px' }}>{}</span>
                     Resultados
                     {activeFilters.length > 0 && (
                       <span style={{ background: colors.primary, color: 'white', padding: '4px 12px', borderRadius: '12px', fontSize: '14px', fontWeight: '600' }}>
@@ -282,7 +260,7 @@ export default function PokemonTCGPage() {
                 {finalFilteredProducts.length > 0 ? (
                   <div className="product-grid-container" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px', padding: '20px 0' }}>
                     {finalFilteredProducts.map((product) => (
-                      <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} categoryConfig={{ color: colors.primary, icon: '🎴', badgeText: 'POKÉMON' }} />
+                      <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} categoryConfig={{ color: colors.primary, icon: '', badgeText: 'POKÉMON' }} />
                     ))}
                   </div>
                 ) : (
@@ -297,12 +275,11 @@ export default function PokemonTCGPage() {
               </section>
             )}
 
-            {/* Modos de exibição: Grid ou Carrosséis */}
             {showAllProducts ? (
               <div>
                 <div className="view-all-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', padding: '0 20px' }}>
                   <h2 className="view-all-title" style={{ fontSize: `${currentConfig?.view_all_title_font_size || 28}px`, fontWeight: currentConfig?.view_all_title_font_weight || '700', color: currentConfig?.view_all_title_color || colors.text, display: 'flex', alignItems: 'center', gap: '12px', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '70%' }}>
-                    <span style={{ flexShrink: 0 }}>{viewAllType === 'all' ? '📦' : viewAllType === 'bestsellers' ? '🔥' : '🆕'}</span>
+                    <span style={{ flexShrink: 0 }}>{viewAllType === 'all' ? '' : viewAllType === 'bestsellers' ? '🔥' : ''}</span>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {viewAllType === 'all' && 'Todos os Produtos'}
                       {viewAllType === 'bestsellers' && 'Mais Vendidos'}
@@ -320,12 +297,11 @@ export default function PokemonTCGPage() {
                 <div className="product-grid-container" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px', padding: '20px' }}>
                   {(viewAllType === 'all' ? availableProducts : viewAllType === 'bestsellers' ? filteredBestsellers : filteredNewArrivals)
                     .map((product) => (
-                      <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} categoryConfig={{ color: colors.primary, icon: '🎴', badgeText: 'POKÉMON' }} />
+                      <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} categoryConfig={{ color: colors.primary, icon: '', badgeText: 'POKÉMON' }} />
                     ))}
                 </div>
               </div>
             ) : (
-              // Modo carrosséis (quando não há busca/filtros ativos)
               !hasActiveSearch && (
                 <section>
                   {carouselsLoading && (
@@ -355,7 +331,7 @@ export default function PokemonTCGPage() {
                       }}
                       showViewAll={availableProducts.length > 0}
                       onViewAll={() => { setViewAllType('all'); setShowAllProducts(true); handleCarouselSelect('all'); }}
-                      categoryConfig={{ color: colors.primary, icon: '🎴', badgeText: 'POKÉMON' }}
+                      categoryConfig={{ color: colors.primary, icon: '', badgeText: 'POKÉMON' }}
                       onAddToCart={handleAddToCart}
                     />
 
@@ -401,7 +377,7 @@ export default function PokemonTCGPage() {
                       }}
                       showViewAll={filteredNewArrivals.length > 0}
                       onViewAll={() => { setViewAllType('new_arrivals'); setShowAllProducts(true); handleCarouselSelect('new_arrivals'); }}
-                      categoryConfig={{ color: colors.primary, icon: '🆕', badgeText: 'NEW' }}
+                      categoryConfig={{ color: colors.primary, icon: '', badgeText: 'NEW' }}
                       onAddToCart={handleAddToCart}
                     />
                   </div>

@@ -286,7 +286,7 @@ export default function HomePage() {
                   }}
                   showViewAll={availableProducts.length > 0}
                   onViewAll={() => { setViewAllType('all'); setShowAllProducts(true); handleCarouselSelect('all'); }}
-                  categoryConfig={getCategoryConfig('default')}
+                  categoryConfig={{ color: colors.primary, icon: '', badgeText: '' }}
                   onAddToCart={handleAddToCart}
                 />
 
@@ -309,7 +309,7 @@ export default function HomePage() {
                   }}
                   showViewAll={filteredBestsellers.length > 0}
                   onViewAll={() => { setViewAllType('bestsellers'); setShowAllProducts(true); handleCarouselSelect('bestsellers'); }}
-                  categoryConfig={getCategoryConfig('default')}
+                  categoryConfig={{ color: colors.primary, icon: '🔥', badgeText: 'TOP' }}
                   onAddToCart={handleAddToCart}
                 />
 
@@ -332,7 +332,7 @@ export default function HomePage() {
                   }}
                   showViewAll={filteredNewArrivals.length > 0}
                   onViewAll={() => { setViewAllType('new_arrivals'); setShowAllProducts(true); handleCarouselSelect('new_arrivals'); }}
-                  categoryConfig={getCategoryConfig('default')}
+                  categoryConfig={{ color: colors.primary, icon: '', badgeText: '' }}
                   onAddToCart={handleAddToCart}
                 />
               </div>

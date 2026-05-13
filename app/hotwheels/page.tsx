@@ -205,7 +205,7 @@ export default function HotWheelsPage() {
                 {filteredProducts.length > 0 ? (
                   <div className="product-grid-container" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px', padding: '20px 0' }}>
                     {filteredProducts.map((product) => (
-                      <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} categoryConfig={{ color: colors.primary, icon: '🏎️', badgeText: 'HOT WHEELS' }} />
+                      <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} categoryConfig={{ color: colors.primary, icon: '', badgeText: 'HOT WHEELS' }} />
                     ))}
                   </div>
                 ) : (
@@ -223,7 +223,7 @@ export default function HotWheelsPage() {
               <div>
                 <div className="view-all-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', padding: '0 20px' }}>
                   <h2 className="view-all-title" style={{ fontSize: `${currentConfig?.view_all_title_font_size || 28}px`, fontWeight: currentConfig?.view_all_title_font_weight || '700', color: currentConfig?.view_all_title_color || colors.text, display: 'flex', alignItems: 'center', gap: '12px', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '70%' }}>
-                    <span style={{ flexShrink: 0 }}>{viewAllType === 'all' ? '📦' : viewAllType === 'bestsellers' ? '🔥' : '🆕'}</span>
+                    <span style={{ flexShrink: 0 }}>{viewAllType === 'all' ? '📦' : viewAllType === 'bestsellers' ? '🔥' : ''}</span>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {viewAllType === 'all' && 'Todos os Modelos'}
                       {viewAllType === 'bestsellers' && 'Mais Vendidos'}
@@ -236,7 +236,7 @@ export default function HotWheelsPage() {
                 </div>
                 <div className="product-grid-container" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px', padding: '20px' }}>
                   {(viewAllType === 'all' ? availableProducts : viewAllType === 'bestsellers' ? filteredBestsellers : filteredNewArrivals).map((product) => (
-                    <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} categoryConfig={{ color: colors.primary, icon: '🏎️', badgeText: 'HOT WHEELS' }} />
+                    <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} categoryConfig={{ color: colors.primary, icon: '', badgeText: 'HOT WHEELS' }} />
                   ))}
                 </div>
               </div>
@@ -270,7 +270,7 @@ export default function HotWheelsPage() {
                       }}
                       showViewAll={availableProducts.length > 0}
                       onViewAll={() => { setViewAllType('all'); setShowAllProducts(true); handleCarouselSelect('all'); }}
-                      categoryConfig={{ color: colors.primary, icon: '🏎️', badgeText: 'HOT WHEELS' }}
+                      categoryConfig={{ color: colors.primary, icon: '', badgeText: 'HOT WHEELS' }}
                       onAddToCart={handleAddToCart}
                     />
 
@@ -316,7 +316,7 @@ export default function HotWheelsPage() {
                       }}
                       showViewAll={filteredNewArrivals.length > 0}
                       onViewAll={() => { setViewAllType('new_arrivals'); setShowAllProducts(true); handleCarouselSelect('new_arrivals'); }}
-                      categoryConfig={{ color: colors.primary, icon: '🆕', badgeText: 'NEW' }}
+                      categoryConfig={{ color: colors.primary, icon: '', badgeText: 'NEW' }}
                       onAddToCart={handleAddToCart}
                     />
                   </div>

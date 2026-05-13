@@ -19,9 +19,9 @@ interface CarouselEditorProps {
 ];
 
 const CAROUSEL_TYPES = [
-  { value: 'all', label: 'Todos os Produtos', icon: '📦' },
+  { value: 'all', label: 'Todos os Produtos', icon: '' },
   { value: 'bestsellers', label: 'Mais Vendidos', icon: '🔥' },
-  { value: 'new_arrivals', label: 'Lançamentos', icon: '🆕' }
+  { value: 'new_arrivals', label: 'Lançamentos', icon: '' }
 ];
 
 export default function CarouselEditor({ pageSlug, onClose }: CarouselEditorProps) {

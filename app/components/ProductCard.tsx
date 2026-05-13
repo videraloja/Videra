@@ -86,7 +86,7 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
   const getButtonContent = () => {
     if (currentStock === 0) return 'Esgotado';
     if (isAdded) return `✓ Adicionado (${quantityInCart})`;
-    return `${config.icon} Adicionar ao Carrinho`;
+    return `Adicionar ao Carrinho`;
   };
 
   const getButtonColor = () => {

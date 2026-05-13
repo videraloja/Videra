@@ -232,7 +232,7 @@ export default function JogosTabuleiroPage() {
     <div style={{ minHeight: '100vh', background: colors.background, color: colors.text }}>
       <Header onSearch={setSearchTerm} searchTerm={searchTerm} />
 
-      <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '40px 20px' }}>
+      <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '0px 20px' }}>
         {!ready && (
           <div style={{ textAlign: 'center', padding: '80px 20px' }}>
             <div style={{ fontSize: '64px', marginBottom: '16px', animation: 'pulse 2s infinite' }}>{emojis.search}</div>
@@ -262,7 +262,7 @@ export default function JogosTabuleiroPage() {
               <section style={{ marginBottom: '40px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', padding: '0 20px' }}>
                   <h2 style={{ fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: '700', color: colors.text, display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ fontSize: '28px' }}>{emojis.search}</span>
+                    <span style={{ fontSize: '28px' }}>{}</span>
                     Resultados
                     {activeFilters.length > 0 && (
                       <span style={{ background: colors.primary, color: 'white', padding: '4px 12px', borderRadius: '12px', fontSize: '14px', fontWeight: '600' }}>
@@ -276,7 +276,7 @@ export default function JogosTabuleiroPage() {
                 {getFilteredProducts.length > 0 ? (
                   <div className="product-grid-container" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px', padding: '20px 0' }}>
                     {getFilteredProducts.map((product) => (
-                      <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} categoryConfig={{ color: colors.primary, icon: '🎲', badgeText: 'TABULEIRO' }} />
+                      <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} categoryConfig={{ color: colors.primary, icon: '', badgeText: 'TABULEIRO' }} />
                     ))}
                   </div>
                 ) : (
@@ -297,7 +297,7 @@ export default function JogosTabuleiroPage() {
               <div>
                 <div className="view-all-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', padding: '0 20px' }}>
                   <h2 className="view-all-title" style={{ fontSize: `${currentConfig?.view_all_title_font_size || 28}px`, fontWeight: currentConfig?.view_all_title_font_weight || '700', color: currentConfig?.view_all_title_color || colors.text, display: 'flex', alignItems: 'center', gap: '12px', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '70%' }}>
-                    <span style={{ flexShrink: 0 }}>{viewAllType === 'all' ? '📦' : viewAllType === 'bestsellers' ? '🔥' : '🆕'}</span>
+                    <span style={{ flexShrink: 0 }}>{viewAllType === 'all' ? '📦' : viewAllType === 'bestsellers' ? '🔥' : ''}</span>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {viewAllType === 'all' && 'Todos os Jogos'}
                       {viewAllType === 'bestsellers' && 'Mais Vendidos'}
@@ -310,7 +310,7 @@ export default function JogosTabuleiroPage() {
                 </div>
                 <div className="product-grid-container" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px', padding: '20px' }}>
                   {(viewAllType === 'all' ? availableProducts : viewAllType === 'bestsellers' ? filteredBestsellers : filteredNewArrivals).map((product) => (
-                    <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} categoryConfig={{ color: colors.primary, icon: '🎲', badgeText: 'TABULEIRO' }} />
+                    <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} categoryConfig={{ color: colors.primary, icon: '', badgeText: 'TABULEIRO' }} />
                   ))}
                 </div>
               </div>
@@ -344,7 +344,7 @@ export default function JogosTabuleiroPage() {
                       }}
                       showViewAll={availableProducts.length > 0}
                       onViewAll={() => { setViewAllType('all'); setShowAllProducts(true); handleCarouselSelect('all'); }}
-                      categoryConfig={{ color: colors.primary, icon: '🎲', badgeText: 'TABULEIRO' }}
+                      categoryConfig={{ color: colors.primary, icon: '', badgeText: 'TABULEIRO' }}
                       onAddToCart={handleAddToCart}
                     />
 
@@ -390,7 +390,7 @@ export default function JogosTabuleiroPage() {
                       }}
                       showViewAll={filteredNewArrivals.length > 0}
                       onViewAll={() => { setViewAllType('new_arrivals'); setShowAllProducts(true); handleCarouselSelect('new_arrivals'); }}
-                      categoryConfig={{ color: colors.primary, icon: '🆕', badgeText: 'NEW' }}
+                      categoryConfig={{ color: colors.primary, icon: '', badgeText: 'NEW' }}
                       onAddToCart={handleAddToCart}
                     />
                   </div>
