@@ -323,7 +323,7 @@ export default function FiltersBar({
               right: 0,
               bottom: 0,
               width: '32px',
-              background: 'linear-gradient(to right, transparent, #f8fafc)',
+              background: 'linear-gradient(to right, transparent, #cbd5e1)',
               pointerEvents: 'none',
               zIndex: 1,
               display: 'none', // controlado por CSS media query
