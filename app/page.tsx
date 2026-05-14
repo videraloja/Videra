@@ -212,7 +212,7 @@ export default function HomePage() {
     <div style={{ minHeight: '100vh', background: colors.background, color: colors.text }}>
       <Header onSearch={setSearchTerm} searchTerm={searchTerm} />
 
-      <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '40px 20px' }}>
+      <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '0px 20px' }}>
         {!ready && (
           <div style={{ textAlign: 'center', padding: '80px 20px' }}>
             <div style={{ fontSize: '64px', marginBottom: '16px', animation: 'pulse 2s infinite' }}>{emojis.category}</div>

@@ -1,4 +1,4 @@
-// app/components/FiltersBar.tsx – SETA NO CANTO, ESPAÇO MÍNIMO
+// app/components/FiltersBar.tsx – INDICADOR DE SCROLL LATERAL NO MOBILE
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -143,16 +143,17 @@ export default function FiltersBar({
       marginBottom: '24px',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     }}>
-      {/* CONTAINER PRINCIPAL (espaço mínimo extra só para a seta) */}
+      {/* CONTAINER PRINCIPAL (com espaço para a seta e indicador de scroll) */}
       <div
         className="filters-bar-container"
         style={{
           background: '#f8fafc',
           border: '1px solid #e2e8f0',
           borderRadius: '12px',
-          padding: '12px 12px 22px 12px', // só o suficiente para o símbolo
+          padding: '12px 12px 22px 12px',
           boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
           position: 'relative',
+          overflow: 'hidden', // para o gradiente não vazar
         }}
       >
         {/* LINHA DE CHIPS (recolhido) */}
@@ -163,8 +164,9 @@ export default function FiltersBar({
               display: 'flex',
               gap: '10px',
               overflowX: 'auto',
-              paddingBottom: '4px', // reduzido
+              paddingBottom: '4px',
               alignItems: 'center',
+              position: 'relative',
             }}
           >
             {filtersConfig.map((filter) => {
@@ -311,7 +313,25 @@ export default function FiltersBar({
           </div>
         )}
 
-        {/* SETA "▾" ABSOLUTA, SEM FUNDO, NO CANTO INFERIOR DIREITO, ESPAÇO MÍNIMO */}
+        {/* INDICADOR DE SCROLL (GRADIENTE NO CANTO DIREITO) – visível apenas no mobile com chips */}
+        {!gridExpanded && (
+          <div
+            className="fade-right-indicator"
+            style={{
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              bottom: 0,
+              width: '32px',
+              background: 'linear-gradient(to right, transparent, #f8fafc)',
+              pointerEvents: 'none',
+              zIndex: 1,
+              display: 'none', // controlado por CSS media query
+            }}
+          />
+        )}
+
+        {/* SETA "▾" ABSOLUTA, SEM FUNDO, NO CANTO INFERIOR DIREITO */}
         <button
           onClick={() => setGridExpanded(!gridExpanded)}
           style={{
@@ -327,7 +347,7 @@ export default function FiltersBar({
             transition: 'transform 0.2s ease',
             transform: gridExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
             lineHeight: 1,
-            zIndex: 1,
+            zIndex: 2,
             opacity: 0.7,
           }}
           title={gridExpanded ? 'Recolher' : 'Expandir'}
@@ -435,7 +455,7 @@ export default function FiltersBar({
                   gap: '8px'
                 }}
               >
-                 Aplicar {tempSelectedCollections.length > 0 ? `(${tempSelectedCollections.length})` : ''}
+                ✅ Aplicar {tempSelectedCollections.length > 0 ? `(${tempSelectedCollections.length})` : ''}
               </button>
             </div>
           </div>
@@ -448,7 +468,11 @@ export default function FiltersBar({
           to { opacity: 1; transform: scale(1); }
         }
 
+        /* Mobile: indicador de scroll visível */
         @media (max-width: 768px) {
+          .fade-right-indicator {
+            display: block !important;
+          }
           .filters-chips-scroll {
             justify-content: flex-start !important;
             overflow-x: auto;
