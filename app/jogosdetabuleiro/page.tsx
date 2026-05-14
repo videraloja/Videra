@@ -14,6 +14,7 @@ import { Product, CartItem, CarouselConfig } from '../types';
 import { useCartContext } from '../contexts/CartContext';
 import HeroSectionWrapper from '../components/HeroSectionWrapper';
 import { useAvailableStock } from '@/hooks/useAvailableStock';
+import Image from 'next/image';
 
 export default function JogosTabuleiroPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -232,7 +233,7 @@ export default function JogosTabuleiroPage() {
     <div style={{ minHeight: '100vh', background: colors.background, color: colors.text }}>
       <Header onSearch={setSearchTerm} searchTerm={searchTerm} />
 
-      <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '0px 20px' }}>
+      <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '40px 20px' }}>
         {!ready && (
           <div style={{ textAlign: 'center', padding: '80px 20px' }}>
             <div style={{ fontSize: '64px', marginBottom: '16px', animation: 'pulse 2s infinite' }}>{emojis.search}</div>
@@ -281,7 +282,22 @@ export default function JogosTabuleiroPage() {
                   </div>
                 ) : (
                   <div style={applyThemeStyles({ textAlign: 'center', padding: '80px 20px', background: colors.cardBg, borderRadius: '20px', boxShadow: getShadow('medium') }, 'card')}>
-                    <div style={{ fontSize: '64px', marginBottom: '16px' }}>{emojis.search}</div>
+                    <Image
+  src="/icones/detetive-pikachu.png"
+  alt="Nenhum produto encontrado"
+  width={120}
+  height={120}
+  unoptimized
+  style={{ marginBottom: '16px', objectFit: 'contain' }}
+  onError={(e) => {
+    const target = e.currentTarget;
+    target.style.display = 'none';
+    // Mostra um emoji de lupa como fallback
+    const fallback = document.getElementById('fallback-emoji');
+    if (fallback) fallback.style.display = 'block';
+  }}
+/>
+<span id="fallback-emoji" style={{ fontSize: '64px', marginBottom: '16px', display: 'none' }}>🔍</span>
                     <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px', color: colors.text }}>Nenhum jogo encontrado</h3>
                     <p style={{ fontSize: '16px', color: '#6b7280', marginBottom: '24px' }}>Tente ajustar sua busca ou remover alguns filtros.</p>
                     <button onClick={clearAllFilters} style={{ padding: '12px 24px', background: colors.primary, color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}>

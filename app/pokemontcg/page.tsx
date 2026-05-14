@@ -14,6 +14,7 @@ import { useCartContext } from '../contexts/CartContext';
 import { useCategoryFilters } from '../../hooks/useCategoryFilters';
 import HeroSectionWrapper from '../components/HeroSectionWrapper';
 import { useAvailableStock } from '@/hooks/useAvailableStock';
+import Image from 'next/image';
 
 export default function PokemonTCGPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -265,10 +266,25 @@ export default function PokemonTCGPage() {
                   </div>
                 ) : (
                   <div style={applyThemeStyles({ textAlign: 'center', padding: '80px 20px', background: colors.cardBg, borderRadius: '20px', boxShadow: getShadow('medium') }, 'card')}>
-                    <div style={{ fontSize: '64px', marginBottom: '16px' }}>{emojis.search}</div>
+                    <Image
+  src="/icones/detetive-pikachu.png"
+  alt="Nenhum produto encontrado"
+  width={120}
+  height={120}
+  unoptimized
+  style={{ marginBottom: '16px', objectFit: 'contain' }}
+  onError={(e) => {
+    const target = e.currentTarget;
+    target.style.display = 'none';
+    // Mostra um emoji de lupa como fallback
+    const fallback = document.getElementById('fallback-emoji');
+    if (fallback) fallback.style.display = 'block';
+  }}
+/>
+<span id="fallback-emoji" style={{ fontSize: '64px', marginBottom: '16px', display: 'none' }}>🔍</span>
                     <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px', color: colors.text }}>Nenhum produto encontrado</h3>
                     <p style={{ fontSize: '16px', color: '#6b7280', marginBottom: '24px', maxWidth: '400px', margin: '0 auto' }}>
-                      {searchTerm ? `Nenhum resultado para "${searchTerm}" com os filtros atuais.` : 'Nenhum produto corresponde aos filtros selecionados.'}
+                      {searchTerm ? `Nem o detetive Pikachu foi capaz de encontrar resultados para "${searchTerm}".` : 'Nenhum produto corresponde aos filtros selecionados.'}
                     </p>
                   </div>
                 )}

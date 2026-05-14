@@ -1,4 +1,4 @@
-// app/page.tsx - VERSÃO FINAL OTIMIZADA (DADOS REAIS, SEM FALLBACKS)
+// app/page.tsx - VERSÃO FINAL OTIMIZADA (DETETIVE PIKACHU, GRID 2X2, SEM LUPAS)
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -12,6 +12,7 @@ import HeroSectionWrapper from './components/HeroSectionWrapper';
 import { carouselService } from './lib/carouselService';
 import { useCartContext } from './contexts/CartContext';
 import { useAvailableStock } from '@/hooks/useAvailableStock';
+import Image from 'next/image';
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -47,7 +48,7 @@ export default function HomePage() {
         });
         return updated;
       });
-      
+
       setBestsellers(prev => {
         const updated = prev.map(product => {
           const synced = syncedProducts.find(p => p.id === product.id);
@@ -55,7 +56,7 @@ export default function HomePage() {
         });
         return updated;
       });
-      
+
       setNewArrivals(prev => {
         const updated = prev.map(product => {
           const synced = syncedProducts.find(p => p.id === product.id);
@@ -66,7 +67,7 @@ export default function HomePage() {
     }
   }, [syncedProducts]);
 
-  const { colors, emojis, applyThemeStyles, getShadow, getCategoryConfig } = useThemeColors();
+  const { colors, applyThemeStyles, getShadow, getCategoryConfig } = useThemeColors();
 
   // Função para sincronizar estoque com carrinho
   const syncProductsWithCart = (productsList: Product[]): Product[] => {
@@ -122,20 +123,19 @@ export default function HomePage() {
   useEffect(() => {
     const loadCarousels = async () => {
       if (!ready) return;
-      
+
       setCarouselsLoading(true);
       try {
         const configs = await carouselService.getCarouselConfigs('home');
         setCarouselConfigs(configs);
-        
+
         if (configs.length > 0) {
           setCurrentConfig(configs[0]);
         }
-        
+
         const { getProductsWithAvailableStock } = await import('@/lib/productService');
         const productsWithStock = await getProductsWithAvailableStock();
-        
-        // Mais vendidos: agora a categoria 'home' faz busca global, retornando vendas reais de qualquer categoria
+
         const best = await carouselService.getBestsellers('home', 10);
         const syncedBest = best.map(product => {
           const stockInfo = productsWithStock.find(p => p.id === product.id);
@@ -143,8 +143,7 @@ export default function HomePage() {
           return { ...product, stock: availableStock };
         });
         setBestsellers(syncedBest);
-        
-        // Lançamentos: idem, busca global
+
         const arrivals = await carouselService.getNewArrivals('home', 10);
         const syncedArrivals = arrivals.map(product => {
           const stockInfo = productsWithStock.find(p => p.id === product.id);
@@ -152,7 +151,7 @@ export default function HomePage() {
           return { ...product, stock: availableStock };
         });
         setNewArrivals(syncedArrivals);
-        
+
       } catch (error) {
         console.error('Erro ao carregar carrosséis:', error);
       } finally {
@@ -165,18 +164,18 @@ export default function HomePage() {
 
   const handleAddToCart = (product: Product) => {
     const productId = String(product.id);
-    
+
     const findCurrentStock = (): number => {
       const inProducts = products.find(p => String(p.id) === productId);
       const inBestsellers = bestsellers.find(p => String(p.id) === productId);
       const inNewArrivals = newArrivals.find(p => String(p.id) === productId);
-      
+
       return inProducts?.stock || inBestsellers?.stock || inNewArrivals?.stock || product.stock;
     };
-    
+
     const currentStock = findCurrentStock();
     if (currentStock <= 0) return;
-    
+
     addToCartGlobal(product);
   };
 
@@ -215,7 +214,7 @@ export default function HomePage() {
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '0px 20px' }}>
         {!ready && (
           <div style={{ textAlign: 'center', padding: '80px 20px' }}>
-            <div style={{ fontSize: '64px', marginBottom: '16px', animation: 'pulse 2s infinite' }}>{emojis.category}</div>
+            <div style={{ fontSize: '64px', marginBottom: '16px', animation: 'pulse 2s infinite' }}>📁</div>
             <p style={{ fontSize: '18px', color: colors.text, opacity: 0.7 }}>Carregando produtos...</p>
           </div>
         )}
@@ -234,20 +233,33 @@ export default function HomePage() {
                 alignItems: 'center',
                 gap: '12px'
               }}>
-                <span style={{ fontSize: '28px' }}>{emojis.search}</span>
                 Resultados para &quot;{searchTerm}&quot;
               </h2>
             </div>
 
             {filteredProducts.length > 0 ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px', padding: '20px' }}>
+              <div className="product-grid-container" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px', padding: '20px' }}>
                 {filteredProducts.map((product) => (
                   <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} categoryConfig={getCategoryConfig(product.category || 'default')} />
                 ))}
               </div>
             ) : (
               <div style={applyThemeStyles({ textAlign: 'center', padding: '80px 20px', background: colors.cardBg, borderRadius: '20px', boxShadow: getShadow('small') }, 'card')}>
-                <div style={{ fontSize: '64px', marginBottom: '16px' }}>{emojis.search}</div>
+                <Image
+                  src="/icones/detetive-pikachu.png"
+                  alt="Nenhum produto encontrado"
+                  width={120}
+                  height={120}
+                  unoptimized
+                  style={{ marginBottom: '16px', objectFit: 'contain' }}
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    target.style.display = 'none';
+                    const fallback = document.getElementById('fallback-emoji');
+                    if (fallback) fallback.style.display = 'block';
+                  }}
+                />
+                <span id="fallback-emoji" style={{ fontSize: '64px', marginBottom: '16px', display: 'none' }}>🔍</span>
                 <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px', color: colors.text }}>Nenhum produto encontrado</h3>
                 <p style={{ fontSize: '16px', color: colors.text, opacity: 0.7 }}>Tente ajustar os termos da busca ou explorar nossas categorias.</p>
               </div>
@@ -341,11 +353,6 @@ export default function HomePage() {
               <div>
                 <div className="view-all-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', padding: '0 20px' }}>
                   <h2 className="view-all-title" style={{ fontSize: currentConfig?.view_all_title_font_size || 28, fontWeight: currentConfig?.view_all_title_font_weight || '700', color: currentConfig?.view_all_title_color || colors.text, display: 'flex', alignItems: 'center', gap: '12px', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '70%' }}>
-                    <span style={{ flexShrink: 0 }}>
-                      {viewAllType === 'all' && ''}
-                      {viewAllType === 'bestsellers' && ''}
-                      {viewAllType === 'new_arrivals' && ''}
-                    </span>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {viewAllType === 'all' && 'Todos os Produtos'}
                       {viewAllType === 'bestsellers' && 'Mais Vendidos'}
@@ -371,6 +378,12 @@ export default function HomePage() {
         @keyframes pulse {
           0%, 100% { transform: scale(1); }
           50% { transform: scale(1.1); }
+        }
+
+        @media (max-width: 640px) {
+          .product-grid-container {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
         }
       `}</style>
     </div>

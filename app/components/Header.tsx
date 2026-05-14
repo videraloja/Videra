@@ -1,4 +1,4 @@
-// components/Header.tsx – ÍCONES POR IMAGEM + INSTAGRAM ABAIXO DO LOGO
+// components/Header.tsx – ÍCONES POR IMAGEM + INSTAGRAM + BUSCA EXPANSÍVEL (CORRIGIDA, NÃO SOBREPÕE)
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -152,13 +152,14 @@ export default function Header({ onSearch, searchTerm = '', hideSearch = false }
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
   const [isMounted, setIsMounted] = useState(false);
   const [showHours, setShowHours] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
 
   const navContainerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const { colors, applyThemeStyles, getCategoryConfig, theme } = useThemeColors();
-
   const [storeStatus, setStoreStatus] = useState({ open: false, currentDay: '', currentTime: '' });
 
   const updateStoreStatus = useCallback(() => {
@@ -173,6 +174,13 @@ export default function Header({ onSearch, searchTerm = '', hideSearch = false }
     const interval = setInterval(updateStoreStatus, 60000);
     return () => clearInterval(interval);
   }, [isMounted, updateStoreStatus]);
+
+  // Foco automático no input ao abrir a busca
+  useEffect(() => {
+    if (showSearch && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [showSearch]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -255,6 +263,13 @@ export default function Header({ onSearch, searchTerm = '', hideSearch = false }
   const clearSearch = () => {
     setLocalSearchTerm('');
     if (onSearch) onSearch('');
+  };
+
+  const toggleSearch = () => {
+    if (showSearch) {
+      clearSearch();
+    }
+    setShowSearch(!showSearch);
   };
 
   if (!isMounted) {
@@ -408,16 +423,17 @@ export default function Header({ onSearch, searchTerm = '', hideSearch = false }
         </div>
       )}
 
-      {/* Barra de navegação */}
+      {/* Barra de navegação + busca expansível */}
       <nav style={applyThemeStyles({
         background: colors.background,
         borderBottom: `1px solid ${colors.secondary}`,
         padding: isScrolled ? '12px 0' : '16px 0',
         boxShadow: isScrolled ? `0 4px 20px ${colors.primary}15` : 'none',
         transition: 'all 0.3s ease',
-        zIndex: 100
+        zIndex: 100,
+        position: 'relative',
       }, 'header')}>
-        <div ref={navContainerRef} className="nav-buttons-container">
+        <div ref={navContainerRef} className="nav-buttons-container" style={{ position: 'relative', alignItems: 'center' }}>
           {NICHO_LINKS.map((niche) => {
             const nicheConfig = getCategoryConfig(niche.id);
             const isActive = activeNiche === niche.id;
@@ -432,9 +448,7 @@ export default function Header({ onSearch, searchTerm = '', hideSearch = false }
                     color: isActive ? 'white' : colors.text,
                     border: isActive ? 'none' : `1px solid ${colors.secondary}`,
                   }, isActive ? 'button-primary' : 'button-secondary'),
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
+                  display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0,
                 }}
                 onClick={saveScrollPosition}
               >
@@ -443,42 +457,66 @@ export default function Header({ onSearch, searchTerm = '', hideSearch = false }
               </Link>
             );
           })}
+
+          {/* Botão de busca (lupa) – aparece apenas se hideSearch for false */}
+          {!hideSearch && (
+            <button onClick={toggleSearch}
+              aria-label="Buscar"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: showSearch ? colors.primary : 'transparent',
+                border: showSearch ? 'none' : `1px solid ${colors.secondary}`,
+                borderRadius: '50%',
+                width: '40px', height: '40px',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                flexShrink: 0,
+                marginLeft: '8px',
+              }}
+            >
+              <SearchIconImg />
+            </button>
+          )}
         </div>
       </nav>
 
-      {/* Barra de busca */}
-      {!hideSearch && (
-        <section style={applyThemeStyles({ padding: '24px 20px', background: colors.background, borderBottom: `1px solid ${colors.secondary}` }, 'header')}>
+      {/* Campo de busca expansível – agora em fluxo normal, fora do nav */}
+      {showSearch && !hideSearch && (
+        <div style={{
+          background: colors.background,
+          borderBottom: `1px solid ${colors.secondary}`,
+          padding: '12px 20px',
+          boxShadow: `0 4px 12px ${colors.primary}10`,
+          zIndex: 99,
+        }}>
           <div style={{ maxWidth: '600px', margin: '0 auto', position: 'relative' }}>
-            <form onSubmit={(e) => { e.preventDefault(); const input = e.currentTarget.querySelector('input'); if(input) input.blur(); if(onSearch && localSearchTerm.trim()) onSearch(localSearchTerm.trim()); }} style={{ width: '100%' }}>
-              <input
-                type="text"
-                placeholder={searchPlaceholder}
-                value={localSearchTerm}
-                onChange={handleSearchChange}
-                style={applyThemeStyles({
-                  width: '100%',
-                  padding: '16px 20px 16px 48px',
-                  border: `2px solid ${colors.secondary}`,
-                  borderRadius: '50px',
-                  fontSize: '16px',
-                  background: colors.cardBg,
-                  color: colors.text,
-                  boxShadow: `0 2px 10px ${colors.primary}10`,
-                  transition: 'all 0.2s ease'
-                }, 'filter')}
-                onFocus={(e) => { e.target.style.borderColor = colors.primary; }}
-                onBlur={(e) => { e.target.style.borderColor = colors.secondary; }}
-              />
-              <div style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
-                <SearchIconImg />
-              </div>
-              {localSearchTerm && (
-                <button type="button" onClick={clearSearch} style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
-              )}
-            </form>
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder={searchPlaceholder}
+              value={localSearchTerm}
+              onChange={handleSearchChange}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur(); if (onSearch) onSearch(localSearchTerm.trim()); } }}
+              style={applyThemeStyles({
+                width: '100%',
+                padding: '12px 20px 12px 40px',
+                border: `2px solid ${colors.primary}`,
+                borderRadius: '50px',
+                fontSize: '15px',
+                background: colors.cardBg,
+                color: colors.text,
+                boxShadow: `0 2px 10px ${colors.primary}20`,
+              }, 'filter')}
+            />
+            <div style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
+              <SearchIconImg />
+            </div>
+            {localSearchTerm && (
+              <button type="button" onClick={clearSearch}
+                style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+            )}
           </div>
-        </section>
+        </div>
       )}
     </>
   );

@@ -12,6 +12,7 @@ import { Product, CartItem, CarouselConfig } from '../types';
 import { useCartContext } from '../contexts/CartContext';
 import HeroSectionWrapper from '../components/HeroSectionWrapper';
 import { useAvailableStock } from '@/hooks/useAvailableStock';
+import Image from 'next/image';
 
 export default function HotWheelsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -197,7 +198,7 @@ export default function HotWheelsPage() {
               <section style={{ marginBottom: '40px' }}>
                 <div style={{ marginBottom: '24px', padding: '0 20px' }}>
                   <h2 style={{ fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: '700', color: colors.text, display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ fontSize: '28px' }}>{emojis.search}</span>
+                    <span style={{ fontSize: '28px' }}>{}</span>
                     Resultados para &quot;{searchTerm}&quot;
                   </h2>
                 </div>
@@ -210,9 +211,24 @@ export default function HotWheelsPage() {
                   </div>
                 ) : (
                   <div style={applyThemeStyles({ textAlign: 'center', padding: '80px 20px', background: colors.cardBg, borderRadius: '20px', boxShadow: getShadow('medium') }, 'card')}>
-                    <div style={{ fontSize: '64px', marginBottom: '16px' }}>{emojis.search}</div>
+                    <Image
+  src="/icones/detetive-pikachu.png"
+  alt="Nenhum produto encontrado"
+  width={120}
+  height={120}
+  unoptimized
+  style={{ marginBottom: '16px', objectFit: 'contain' }}
+  onError={(e) => {
+    const target = e.currentTarget;
+    target.style.display = 'none';
+    // Mostra um emoji de lupa como fallback
+    const fallback = document.getElementById('fallback-emoji');
+    if (fallback) fallback.style.display = 'block';
+  }}
+/>
+<span id="fallback-emoji" style={{ fontSize: '64px', marginBottom: '16px', display: 'none' }}>🔍</span>
                     <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px', color: colors.text }}>Nenhum Hot Wheels encontrado</h3>
-                    <p style={{ fontSize: '16px', color: '#6b7280' }}>Tente ajustar os termos da busca.</p>
+                    <p style={{ fontSize: '16px', color: '#6b7280' }}>O detetive Pikachu não foi capaz de encontrar resultados.</p>
                   </div>
                 )}
               </section>
