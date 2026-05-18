@@ -1,4 +1,4 @@
-// components/Header.tsx – ÍCONES POR IMAGEM + INSTAGRAM + BUSCA EXPANSÍVEL (CORRIGIDA, NÃO SOBREPÕE)
+// components/Header.tsx – ÍCONES POR IMAGEM + INSTAGRAM + BUSCA NO INÍCIO DA NAVEGAÇÃO
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -8,7 +8,6 @@ import { usePathname } from 'next/navigation';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import './header.css';
 
-// Mapeamento das imagens – basta colocar os arquivos na pasta /public/icones/
 const NICHO_ICONS = {
   home: '/icones/inicio.png',
   pokemontcg: '/icones/pokemon.png',
@@ -19,7 +18,6 @@ const NICHO_ICONS = {
 
 const SEARCH_ICON = '/icones/lupa.png';
 
-// Fallback SVG caso a imagem não exista (enquanto você prepara os arquivos)
 const FallbackIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5">
     <rect x="3" y="3" width="18" height="18" rx="3" />
@@ -34,19 +32,11 @@ const FallbackSearchIcon = () => (
   </svg>
 );
 
-// Componente que exibe a imagem personalizada, ou fallback se ela ainda não existir
 const NavIcon = ({ src, alt }: { src: string; alt: string }) => {
   const [hasError, setHasError] = useState(false);
   if (!src || hasError) return <FallbackIcon />;
   return (
-    <Image
-      src={src}
-      alt={alt}
-      width={20}
-      height={20}
-      style={{ objectFit: 'contain' }}
-      onError={() => setHasError(true)}
-    />
+    <Image src={src} alt={alt} width={20} height={20} style={{ objectFit: 'contain' }} onError={() => setHasError(true)} />
   );
 };
 
@@ -54,18 +44,10 @@ const SearchIconImg = () => {
   const [hasError, setHasError] = useState(false);
   if (hasError) return <FallbackSearchIcon />;
   return (
-    <Image
-      src={SEARCH_ICON}
-      alt="Buscar"
-      width={20}
-      height={20}
-      style={{ objectFit: 'contain' }}
-      onError={() => setHasError(true)}
-    />
+    <Image src={SEARCH_ICON} alt="Buscar" width={20} height={20} style={{ objectFit: 'contain' }} onError={() => setHasError(true)} />
   );
 };
 
-// Ícone do Instagram com fallback SVG
 const InstagramIcon = () => {
   const [hasError, setHasError] = useState(false);
   if (hasError) {
@@ -78,14 +60,7 @@ const InstagramIcon = () => {
     );
   }
   return (
-    <Image
-      src="/icones/instagram.png"
-      alt="Instagram"
-      width={18}
-      height={18}
-      style={{ objectFit: 'contain' }}
-      onError={() => setHasError(true)}
-    />
+    <Image src="/icones/instagram.png" alt="Instagram" width={18} height={18} style={{ objectFit: 'contain' }} onError={() => setHasError(true)} />
   );
 };
 
@@ -103,7 +78,6 @@ interface HeaderProps {
   hideSearch?: boolean;
 }
 
-// Horários de funcionamento
 const BUSINESS_HOURS = {
   monday: { open: '08:00', close: '21:00' },
   tuesday: { open: '08:00', close: '18:00' },
@@ -115,13 +89,7 @@ const BUSINESS_HOURS = {
 };
 
 const DAY_NAMES: Record<number, string> = {
-  0: 'Domingo',
-  1: 'Segunda',
-  2: 'Terça',
-  3: 'Quarta',
-  4: 'Quinta',
-  5: 'Sexta',
-  6: 'Sábado'
+  0: 'Domingo', 1: 'Segunda', 2: 'Terça', 3: 'Quarta', 4: 'Quinta', 5: 'Sexta', 6: 'Sábado'
 };
 
 function getCurrentDayAndTime() {
@@ -129,8 +97,7 @@ function getCurrentDayAndTime() {
   const day = now.getDay();
   const hours = now.getHours().toString().padStart(2, '0');
   const minutes = now.getMinutes().toString().padStart(2, '0');
-  const currentTime = `${hours}:${minutes}`;
-  return { day, currentTime };
+  return { day, currentTime: `${hours}:${minutes}` };
 }
 
 function isStoreOpen(day: number, currentTime: string): boolean {
@@ -140,9 +107,7 @@ function isStoreOpen(day: number, currentTime: string): boolean {
 }
 
 function getDayKey(day: number): keyof typeof BUSINESS_HOURS {
-  const keys: (keyof typeof BUSINESS_HOURS)[] = [
-    'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'
-  ];
+  const keys: (keyof typeof BUSINESS_HOURS)[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
   return keys[day];
 }
 
@@ -164,8 +129,7 @@ export default function Header({ onSearch, searchTerm = '', hideSearch = false }
 
   const updateStoreStatus = useCallback(() => {
     const { day, currentTime } = getCurrentDayAndTime();
-    const open = isStoreOpen(day, currentTime);
-    setStoreStatus({ open, currentDay: DAY_NAMES[day], currentTime });
+    setStoreStatus({ open: isStoreOpen(day, currentTime), currentDay: DAY_NAMES[day], currentTime });
   }, []);
 
   useEffect(() => {
@@ -175,7 +139,6 @@ export default function Header({ onSearch, searchTerm = '', hideSearch = false }
     return () => clearInterval(interval);
   }, [isMounted, updateStoreStatus]);
 
-  // Foco automático no input ao abrir a busca
   useEffect(() => {
     if (showSearch && searchInputRef.current) {
       searchInputRef.current.focus();
@@ -184,8 +147,7 @@ export default function Header({ onSearch, searchTerm = '', hideSearch = false }
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (popupRef.current && !popupRef.current.contains(e.target as Node) &&
-          triggerRef.current && !triggerRef.current.contains(e.target as Node)) {
+      if (popupRef.current && !popupRef.current.contains(e.target as Node) && triggerRef.current && !triggerRef.current.contains(e.target as Node)) {
         setShowHours(false);
       }
     };
@@ -240,8 +202,7 @@ export default function Header({ onSearch, searchTerm = '', hideSearch = false }
 
   const saveScrollPosition = () => {
     if (navContainerRef.current && window.innerWidth <= 768) {
-      const scrollPosition = navContainerRef.current.scrollLeft;
-      sessionStorage.setItem('navScrollPosition', scrollPosition.toString());
+      sessionStorage.setItem('navScrollPosition', navContainerRef.current.scrollLeft.toString());
     }
   };
 
@@ -305,97 +266,21 @@ export default function Header({ onSearch, searchTerm = '', hideSearch = false }
 
         {/* Indicador Aberto/Fechado */}
         <div style={{ position: 'absolute', top: '16px', left: '16px', zIndex: 20 }}>
-          <button
-            ref={triggerRef}
-            onClick={() => setShowHours(!showHours)}
-            aria-label="Horários de funcionamento"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: 'rgba(0, 0, 0, 0.45)',
-              backdropFilter: 'blur(12px)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              borderRadius: '40px',
-              padding: '6px 14px',
-              color: 'white',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: '600',
-              transition: 'all 0.25s ease',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            <span style={{
-              display: 'inline-block',
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              background: storeStatus.open ? '#10b981' : '#ef4444',
-              boxShadow: `0 0 0 3px ${storeStatus.open ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`
-            }} />
+          <button ref={triggerRef} onClick={() => setShowHours(!showHours)} aria-label="Horários de funcionamento"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0, 0, 0, 0.45)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '40px', padding: '6px 14px', color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: '600', transition: 'all 0.25s ease', boxShadow: '0 4px 16px rgba(0,0,0,0.2)', whiteSpace: 'nowrap' }}>
+            <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: storeStatus.open ? '#10b981' : '#ef4444', boxShadow: `0 0 0 3px ${storeStatus.open ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}` }} />
             <span>{storeStatus.open ? 'Aberto' : 'Fechado'}</span>
-            <span style={{
-              transition: 'transform 0.3s ease',
-              transform: showHours ? 'rotate(180deg)' : 'rotate(0deg)',
-              fontSize: '12px'
-            }}>
-              ▾
-            </span>
+            <span style={{ transition: 'transform 0.3s ease', transform: showHours ? 'rotate(180deg)' : 'rotate(0deg)', fontSize: '12px' }}>▾</span>
           </button>
         </div>
 
-        {/* Logo centralizado + Instagram */}
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          zIndex: 10,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '12px'
-        }}>
+        {/* Logo + Instagram */}
+        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
           <Link href="/">
-            <img
-              src="/logo.png"
-              alt="Videra"
-              style={{
-                width: isScrolled ? '80px' : '100px',
-                height: isScrolled ? '80px' : '100px',
-                borderRadius: '50%',
-                border: `4px solid rgba(255,255,255,0.8)`,
-                boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-                transition: 'all 0.3s ease',
-                cursor: 'pointer'
-              }}
-            />
+            <img src="/logo.png" alt="Videra" style={{ width: isScrolled ? '80px' : '100px', height: isScrolled ? '80px' : '100px', borderRadius: '50%', border: '4px solid rgba(255,255,255,0.8)', boxShadow: '0 8px 32px rgba(0,0,0,0.3)', transition: 'all 0.3s ease', cursor: 'pointer' }} />
           </Link>
-
-          {/* Link do Instagram */}
-          <a
-            href="https://www.instagram.com/videra_lojavirtual"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              color: 'white',
-              textDecoration: 'none',
-              fontFamily: 'inherit',
-              fontSize: '13px',
-              fontWeight: '600',
-              letterSpacing: '0.3px',
-              opacity: 0.9,
-              transition: 'opacity 0.2s',
-              lineHeight: 1
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.9'; }}
-          >
+          <a href="https://www.instagram.com/videra_lojavirtual" target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'white', textDecoration: 'none', fontFamily: 'inherit', fontSize: '13px', fontWeight: '600', letterSpacing: '0.3px', opacity: 0.9, transition: 'opacity 0.2s', lineHeight: 1 }}
+            onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }} onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.9'; }}>
             <InstagramIcon />
             <span>@videra_lojavirtual</span>
           </a>
@@ -434,31 +319,7 @@ export default function Header({ onSearch, searchTerm = '', hideSearch = false }
         position: 'relative',
       }, 'header')}>
         <div ref={navContainerRef} className="nav-buttons-container" style={{ position: 'relative', alignItems: 'center' }}>
-          {NICHO_LINKS.map((niche) => {
-            const nicheConfig = getCategoryConfig(niche.id);
-            const isActive = activeNiche === niche.id;
-            return (
-              <Link
-                key={niche.id}
-                href={niche.path}
-                className={`nav-button ${isActive ? 'nav-button-active' : ''}`}
-                style={{
-                  ...applyThemeStyles({
-                    background: isActive ? nicheConfig.color : 'transparent',
-                    color: isActive ? 'white' : colors.text,
-                    border: isActive ? 'none' : `1px solid ${colors.secondary}`,
-                  }, isActive ? 'button-primary' : 'button-secondary'),
-                  display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0,
-                }}
-                onClick={saveScrollPosition}
-              >
-                <NavIcon src={niche.icon} alt={niche.name} />
-                <span className="nav-button-text">{niche.name}</span>
-              </Link>
-            );
-          })}
-
-          {/* Botão de busca (lupa) – aparece apenas se hideSearch for false */}
+          {/* Lupa agora é o primeiro item */}
           {!hideSearch && (
             <button onClick={toggleSearch}
               aria-label="Buscar"
@@ -471,12 +332,33 @@ export default function Header({ onSearch, searchTerm = '', hideSearch = false }
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
                 flexShrink: 0,
-                marginLeft: '8px',
+                marginRight: '8px',
               }}
             >
               <SearchIconImg />
             </button>
           )}
+
+          {NICHO_LINKS.map((niche) => {
+            const nicheConfig = getCategoryConfig(niche.id);
+            const isActive = activeNiche === niche.id;
+            return (
+              <Link key={niche.id} href={niche.path}
+                className={`nav-button ${isActive ? 'nav-button-active' : ''}`}
+                style={{
+                  ...applyThemeStyles({
+                    background: isActive ? nicheConfig.color : 'transparent',
+                    color: isActive ? 'white' : colors.text,
+                    border: isActive ? 'none' : `1px solid ${colors.secondary}`,
+                  }, isActive ? 'button-primary' : 'button-secondary'),
+                  display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0,
+                }}
+                onClick={saveScrollPosition}>
+                <NavIcon src={niche.icon} alt={niche.name} />
+                <span className="nav-button-text">{niche.name}</span>
+              </Link>
+            );
+          })}
         </div>
       </nav>
 

@@ -1,4 +1,4 @@
-// app/components/FiltersBar.tsx – INDICADOR DE SCROLL LATERAL NO MOBILE
+// app/components/FiltersBar.tsx – BOTÃO "COLEÇÕES" ATIVO COM FILTROS DE COLEÇÃO
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -110,9 +110,11 @@ export default function FiltersBar({
 
   const handleApplySelections = () => {
     if (onCollectionSelect) {
+      // Remove todas as coleções atuais
       activeFilters.filter(f => f.startsWith('colecao:')).forEach(filter => {
         onFilterToggle(filter);
       });
+      // Adiciona as novas seleções
       tempSelectedCollections.forEach(collection => {
         onCollectionSelect(collection);
       });
@@ -138,12 +140,14 @@ export default function FiltersBar({
     return boardGameColors[filterId] || '#3b82f6';
   };
 
+  // Verifica se o botão "Coleções" deve ficar ativo
+  const isCollectionActive = activeFilters.some(f => f.startsWith('colecao:'));
+
   return (
     <div style={{
       marginBottom: '24px',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     }}>
-      {/* CONTAINER PRINCIPAL (com espaço para a seta e indicador de scroll) */}
       <div
         className="filters-bar-container"
         style={{
@@ -153,10 +157,9 @@ export default function FiltersBar({
           padding: '12px 12px 22px 12px',
           boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
           position: 'relative',
-          overflow: 'hidden', // para o gradiente não vazar
+          overflow: 'hidden',
         }}
       >
-        {/* LINHA DE CHIPS (recolhido) */}
         {!gridExpanded && (
           <div
             className="filters-chips-scroll"
@@ -170,7 +173,8 @@ export default function FiltersBar({
             }}
           >
             {filtersConfig.map((filter) => {
-              const isActive = activeFilters.includes(filter.id);
+              // Para o botão "Coleções", considera ativo se houver qualquer filtro de coleção
+              const isActive = filter.id === 'colecoes' ? isCollectionActive : activeFilters.includes(filter.id);
               const filterColor = getFilterColor(filter.id);
               const showImage = filter.imageUrl && !failedImages.has(filter.id);
 
@@ -229,7 +233,6 @@ export default function FiltersBar({
           </div>
         )}
 
-        {/* GRID EXPANDIDO */}
         {gridExpanded && (
           <div
             className="filters-grid-expanded"
@@ -241,7 +244,7 @@ export default function FiltersBar({
             }}
           >
             {filtersConfig.map((filter) => {
-              const isActive = activeFilters.includes(filter.id);
+              const isActive = filter.id === 'colecoes' ? isCollectionActive : activeFilters.includes(filter.id);
               const filterColor = getFilterColor(filter.id);
               const showImage = filter.imageUrl && !failedImages.has(filter.id);
 
@@ -313,7 +316,7 @@ export default function FiltersBar({
           </div>
         )}
 
-        {/* INDICADOR DE SCROLL (GRADIENTE NO CANTO DIREITO) – visível apenas no mobile com chips */}
+        {/* Gradiente indicador de scroll */}
         {!gridExpanded && (
           <div
             className="fade-right-indicator"
@@ -323,15 +326,15 @@ export default function FiltersBar({
               right: 0,
               bottom: 0,
               width: '32px',
-              background: 'linear-gradient(to right, transparent, #cbd5e1)',
+              background: 'linear-gradient(to right, transparent, #e2e8f0)',
               pointerEvents: 'none',
               zIndex: 1,
-              display: 'none', // controlado por CSS media query
+              display: 'none',
             }}
           />
         )}
 
-        {/* SETA "▾" ABSOLUTA, SEM FUNDO, NO CANTO INFERIOR DIREITO */}
+        {/* Seta de expansão */}
         <button
           onClick={() => setGridExpanded(!gridExpanded)}
           style={{
@@ -356,7 +359,7 @@ export default function FiltersBar({
         </button>
       </div>
 
-      {/* POPUP DE COLEÇÕES (sem ✓) */}
+      {/* Popup de coleções */}
       {showCollectionsPopup && collections.length > 0 && (
         <div style={{
           position: 'fixed',
@@ -468,7 +471,6 @@ export default function FiltersBar({
           to { opacity: 1; transform: scale(1); }
         }
 
-        /* Mobile: indicador de scroll visível */
         @media (max-width: 768px) {
           .fade-right-indicator {
             display: block !important;

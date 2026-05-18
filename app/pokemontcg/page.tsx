@@ -216,7 +216,7 @@ export default function PokemonTCGPage() {
   const hasActiveSearch = searchTerm.length > 0 || activeFilters.length > 0;
 
   return (
-    <div style={{ minHeight: '100vh', background: colors.background, color: colors.text }}>
+    <div style={{ background: colors.background, color: colors.text }}>
       <Header onSearch={handleSearch} searchTerm={searchTerm} />
 
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '0px 20px' }}>

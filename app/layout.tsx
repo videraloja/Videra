@@ -1,4 +1,4 @@
-// app/layout.tsx - FOOTER COM HORÁRIO + MOBILE LADO A LADO
+// app/layout.tsx – CORREÇÃO DO ESPAÇO BRANCO (FLEX LAYOUT)
 import "./globals.css";
 import React from "react";
 import FloatingCartButton from "./components/floatingcartbutton";
@@ -50,7 +50,9 @@ export default function RootLayout({
         padding: 0,
         minHeight: '100vh',
         background: 'var(--bg-primary)',
-        color: 'var(--text-primary)'
+        color: 'var(--text-primary)',
+        display: 'flex',
+        flexDirection: 'column',
       }}>
         <ThemeProvider>
           <AuthProvider>
@@ -58,7 +60,10 @@ export default function RootLayout({
               <CartProvider>
                 <PageThemeProvider>
                   <ThemeEffects />
-                  <main>{children}</main>
+                  {/* Conteúdo principal expande para empurrar o rodapé */}
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+  {children}
+</div>
                   <FloatingCartButton />
                   <ConditionalFooter />
                 </PageThemeProvider>
