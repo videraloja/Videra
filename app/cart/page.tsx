@@ -40,24 +40,16 @@ const generateOrderCode = () => {
   return `${prefix}-${random}${timestamp}`;
 };
 
-const getCurrentPrice = (product: Product) => {
-  if (product.on_sale && product.sale_price && product.sale_price > 0) {
-    return product.sale_price;
-  }
-  if (product.sale_price && product.sale_price > 0 && product.sale_price < product.price) {
-    return product.sale_price;
-  }
-  return product.price;
+const hasPromotion = (product: Product) => {
+  const isSaleActive = product.on_sale && product.sale_price && product.sale_price > 0;
+  const isPriceLower = product.sale_price && product.sale_price > 0 && product.sale_price < product.price;
+  return !!(isSaleActive || isPriceLower);
 };
 
-const hasPromotion = (product: Product) => {
-  if (product.on_sale && product.sale_price && product.sale_price > 0) {
-    return true;
-  }
-  if (product.sale_price && product.sale_price > 0 && product.sale_price < product.price) {
-    return true;
-  }
-  return false;
+const getCurrentPrice = (product: Product) => {
+  return hasPromotion(product) && product.sale_price && product.sale_price > 0 
+    ? product.sale_price 
+    : product.price;
 };
 
 const getOriginalPrice = (product: Product) => {

@@ -24,7 +24,7 @@ interface FilterItem {
 interface FiltersBarProps {
   category: 'pokemon' | 'board-games';
   activeFilters: string[];
-  onFilterToggle: (filter: string) => void;
+  onFilterToggle: (filter: string | null) => void; // Modificado para aceitar null para limpar todos
   collections?: string[];
   onCollectionSelect?: (collection: string) => void;
   isExpanded: boolean;
@@ -103,27 +103,20 @@ export default function FiltersBar({
   };
 
   const handleTempToggle = (collection: string) => {
-    setTempSelectedCollections(prev =>
-      prev.includes(collection) ? prev.filter(c => c !== collection) : [...prev, collection]
-    );
-  };
+    if (onCollectionSelect && onFilterToggle) {
+      const collectionId = normalizeCollectionId(collection);
+      const filterId = `colecao:${collectionId}`;
 
-  const handleApplySelections = () => {
-    if (onCollectionSelect) {
-      // Remove todas as coleções atuais
-      activeFilters.filter(f => f.startsWith('colecao:')).forEach(filter => {
-        onFilterToggle(filter);
-      });
-      // Adiciona as novas seleções
-      tempSelectedCollections.forEach(collection => {
-        onCollectionSelect(collection);
-      });
+      if (activeFilters.includes(filterId)) {
+        // Se já estiver ativo, desativa (limpa todos os filtros)
+        onFilterToggle(null);
+      } else {
+        // Se não estiver ativo, ativa (limpa todos e aplica este)
+        onFilterToggle(null); // Limpa os filtros existentes primeiro
+        onCollectionSelect(collection); // Isso chamará onFilterToggle com a nova coleção
+      }
     }
     setShowCollectionsPopup(false);
-  };
-
-  const handleClearSelections = () => {
-    setTempSelectedCollections([]);
   };
 
   const getFilterColor = (filterId: string) => {
@@ -421,45 +414,6 @@ export default function FiltersBar({
                   </button>
                 );
               })}
-            </div>
-
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button
-                onClick={handleClearSelections}
-                disabled={tempSelectedCollections.length === 0}
-                style={{
-                  padding: '12px 16px',
-                  background: 'transparent',
-                  border: '1px solid #e5e7eb',
-                  color: tempSelectedCollections.length === 0 ? '#9ca3af' : '#dc2626',
-                  borderRadius: '12px',
-                  fontWeight: '600',
-                  flex: 1,
-                  cursor: tempSelectedCollections.length === 0 ? 'not-allowed' : 'pointer',
-                  opacity: tempSelectedCollections.length === 0 ? 0.5 : 1
-                }}
-              >
-                Limpar
-              </button>
-              <button
-                onClick={handleApplySelections}
-                style={{
-                  padding: '12px 16px',
-                  background: '#10b981',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '12px',
-                  fontWeight: '600',
-                  flex: 2,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px'
-                }}
-              >
-                ✅ Aplicar {tempSelectedCollections.length > 0 ? `(${tempSelectedCollections.length})` : ''}
-              </button>
             </div>
           </div>
         </div>

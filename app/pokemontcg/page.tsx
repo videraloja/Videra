@@ -79,12 +79,13 @@ export default function PokemonTCGPage() {
     });
   };
 
-  const handleFilterToggle = (filterId: string) => {
+  // Modificado para seleção única e suporte a limpeza (null)
+  const handleFilterToggle = (filterId: string | null) => {
     setActiveFilters(prev => {
-      if (prev.includes(filterId)) {
-        return prev.filter(f => f !== filterId);
+      if (filterId === null || prev.includes(filterId)) {
+        return [];
       } else {
-        return [...prev, filterId];
+        return [filterId];
       }
     });
   };

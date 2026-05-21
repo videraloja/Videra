@@ -89,10 +89,14 @@ export default function JogosTabuleiroPage() {
   };
 
   // Manipulação de filtros
-  const toggleFilter = (filterId: string) => {
-    setActiveFilters(prev =>
-      prev.includes(filterId) ? prev.filter(f => f !== filterId) : [...prev, filterId]
-    );
+  const toggleFilter = (filterId: string | null) => {
+    setActiveFilters(prev => {
+      if (filterId === null || prev.includes(filterId)) {
+        return []; // Se filterId for null (para limpar tudo) ou o filtro já estiver ativo, limpa todos
+      } else {
+        return [filterId]; // Ativa apenas o novo filtro
+      }
+    });
   };
 
   const handleCollectionSelect = (collectionName: string) => {
