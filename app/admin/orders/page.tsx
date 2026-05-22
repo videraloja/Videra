@@ -37,10 +37,33 @@ function OrdersContent() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [orderItems, setOrderItems] = useState<Record<string, OrderItem[]>>({});
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pendente' | 'pago' | 'cancelado'>('all');
-  const [monthFilter, setMonthFilter] = useState<string>('all');
-  const [dateFilter, setDateFilter] = useState<string>('');
-  const [searchTerm, setSearchTerm] = useState<string>('');
+  
+  // 🆕 Inicializa os estados dos filtros a partir do localStorage
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pendente' | 'pago' | 'cancelado'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('ordersStatusFilter') as 'all' | 'pendente' | 'pago' | 'cancelado') || 'all';
+    }
+    return 'all';
+  });
+  const [monthFilter, setMonthFilter] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('ordersMonthFilter') || 'all';
+    }
+    return 'all';
+  });
+  const [dateFilter, setDateFilter] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('ordersDateFilter') || '';
+    }
+    return '';
+  });
+  const [searchTerm, setSearchTerm] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('ordersSearchTerm') || '';
+    }
+    return '';
+  });
+
   
   // 🆕 Estado para reservas ativas
   const [activeReservations, setActiveReservations] = useState<Map<string, Reservation>>(new Map());
@@ -85,6 +108,34 @@ function OrdersContent() {
 
     loadOrders();
   }, []);
+
+// 🆕 Efeitos para salvar os filtros no localStorage sempre que mudarem
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ordersStatusFilter', statusFilter);
+    }
+  }, [statusFilter]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ordersMonthFilter', monthFilter);
+    }
+  }, [monthFilter]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ordersDateFilter', dateFilter);
+    }
+  }, [dateFilter]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ordersSearchTerm', searchTerm);
+    }
+  }, [searchTerm]);
+
+
+
 
 const loadReservations = async (ordersList: Order[]) => {
   const orderIds = ordersList.map(o => o.id);
@@ -623,6 +674,9 @@ if (searchTerm !== '') {
               const statusColor = getStatusColor(order.status);
               const reservation = getReservationColor(order.id);
               
+              // Calcula o número do pedido: o último da lista (mais antigo) será o 1
+              const sequenceNumber = ordersForList.length - index;
+
               return (
                 <div
                   key={order.id}
@@ -652,6 +706,9 @@ if (searchTerm !== '') {
                   }}>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 14, fontWeight: 800, color: '#7c3aed', background: 'var(--bg-secondary)', padding: '2px 8px', borderRadius: '6px', border: '1px solid var(--border-color)', minWidth: '40px', textAlign: 'center' }}>
+                          #{sequenceNumber}
+                        </span>
                         <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
                           🏷️ {order.order_code}
                         </h3>

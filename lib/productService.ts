@@ -10,6 +10,9 @@ export interface ProductWithAvailableStock {
   on_sale?: boolean | null | undefined;
   image_url: string;
   category?: string;
+  created_at: string;
+  supplier_code?: string;
+  cost_price?: number;
   stock: number;
   available_stock: number;
   [key: string]: any;

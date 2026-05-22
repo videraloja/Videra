@@ -168,23 +168,10 @@ function OrderDetailsContent() {
 
     console.log("⚙️ Iniciando mudança de status para:", newStatus);
 
-    // 1️⃣ Se for PAGO, validar reserva e estoque usando RPCs
+    // 1️⃣ Se for PAGO, validar estoque disponível
     if (newStatus === "pago") {
-      // 🔒 VALIDAÇÃO 1: Verificar se a reserva ainda está ativa via RPC
-      const { data: reservationCheck, error: rpcResError } = await supabase.rpc(
-        "check_active_reservation",
-        { p_order_id: id }
-      );
-
-      if (rpcResError || !reservationCheck?.active) {
-        console.error("Erro ao verificar reserva via RPC:", rpcResError);
-        alert(
-          "❌ Não é possível marcar como PAGO: a reserva deste pedido expirou ou não foi encontrada. O cliente precisa fazer um novo pedido."
-        );
-        return;
-      }
-
-            // 🔒 VALIDAÇÃO 2: Verificar estoque disponível (excluindo reservas deste pedido)
+      // 🔒 VALIDAÇÃO: Verificar estoque disponível (excluindo reservas deste pedido)
+      // Removida a trava de reserva expirada para permitir processar pedidos atrasados.
       const productIds = items.map((item) => item.products?.id).filter(Boolean);
       if (productIds.length === 0) {
         alert("Erro: pedido sem produtos válidos.");
