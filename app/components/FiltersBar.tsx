@@ -212,6 +212,7 @@ export default function FiltersBar({
                         alt={filter.name}
                         width={24}
                         height={24}
+                        unoptimized
                         style={{ objectFit: 'contain' }}
                         onError={() => handleImageError(filter.id)}
                       />
@@ -288,6 +289,7 @@ export default function FiltersBar({
                         alt={filter.name}
                         width={48}
                         height={48}
+                        unoptimized
                         style={{ objectFit: 'contain' }}
                         onError={() => handleImageError(filter.id)}
                       />

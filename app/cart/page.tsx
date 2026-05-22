@@ -757,6 +757,7 @@ Aguarde enquanto processamos seu pedido : )
                     alt={item.name}
                     fill
                     sizes="100px"
+                    unoptimized
                     style={{ objectFit: 'cover' }}
                   />
                 </div>

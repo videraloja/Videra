@@ -157,6 +157,7 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
           sizes="280px"
           style={{ objectFit: 'cover' }}
           priority={false}
+          unoptimized
         />
       </div>
 
