@@ -18,6 +18,8 @@ interface Product {
   category?: string;
   product_type?: string;
   collection?: string;
+  on_sale?: boolean;
+  sale_price?: number;
 }
 
 // 🆕 TIPOS PARA FILTROS
@@ -403,6 +405,18 @@ function ProductsContent() {
                     </h3>
                     {getCategoryBadge(product.category)}
                     {product.category === 'pokemon' && getTypeBadge(product.product_type)}
+                    {product.on_sale && (
+                      <span style={{ 
+                        background: '#fef2f2', 
+                        color: '#dc2626', 
+                        padding: '2px 6px', 
+                        borderRadius: '8px', 
+                        fontSize: '10px', 
+                        fontWeight: '600' 
+                      }}>
+                        🔥 PROMO
+                      </span>
+                    )}
                   </div>
                   
                   <div style={{ 
@@ -414,7 +428,15 @@ function ProductsContent() {
                     marginBottom: '4px'
                   }}>
                     <span>
-                      <strong>Preço:</strong> R$ {product.price.toFixed(2)}
+                      <strong>Preço:</strong>{' '}
+                      {product.on_sale && product.sale_price ? (
+                        <>
+                          <span style={{ textDecoration: 'line-through', fontSize: '12px', marginRight: '6px', opacity: 0.7 }}>R$ {product.price.toFixed(2)}</span>
+                          <span style={{ color: '#dc2626', fontWeight: 700 }}>R$ {product.sale_price.toFixed(2)}</span>
+                        </>
+                      ) : (
+                        `R$ ${product.price.toFixed(2)}`
+                      )}
                     </span>
                     <span>
                       <strong>Estoque:</strong> {product.stock}
