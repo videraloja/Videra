@@ -35,13 +35,38 @@ function ProductsContent() {
   const [loading, setLoading] = useState(true);
   
   // 🆕 ESTADOS PARA FILTROS
-  const [filters, setFilters] = useState<Filters>({
-    category: '',
-    searchTerm: ""
+  const [filters, setFilters] = useState<Filters>(() => {
+    if (typeof window !== 'undefined') {
+      return {
+        category: sessionStorage.getItem('adminProductsCategory') || '',
+        searchTerm: sessionStorage.getItem('adminProductsSearch') || ''
+      };
+    }
+    return { category: '', searchTerm: "" };
   });
+
+  // 🆕 Salvar filtros para manter a lista igual ao voltar
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('adminProductsCategory', filters.category);
+      sessionStorage.setItem('adminProductsSearch', filters.searchTerm);
+    }
+  }, [filters]);
 
   useEffect(() => {
     loadProducts();
+  }, []);
+
+  // 🆕 ATUALIZAÇÃO AUTOMÁTICA: Recarrega os produtos quando a página fica visível.
+  // Isso garante que as edições feitas em outra tela apareçam ao voltar.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadProducts();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
   const loadProducts = async () => {

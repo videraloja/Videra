@@ -108,7 +108,7 @@ function NewProductContent() {
       if (error) throw error;
 
       alert("Produto adicionado com sucesso!");
-      router.push("/admin/products");
+      router.back();
       
     } catch (error) {
       console.error("Erro ao adicionar produto:", error);
@@ -428,6 +428,7 @@ function NewProductContent() {
                 step="0.01"
                 style={inputStyle}
                 placeholder="0.00"
+                onWheel={(e) => e.currentTarget.blur()}
               />
             </div>
             <div>
@@ -443,6 +444,7 @@ function NewProductContent() {
                 min="0"
                 style={inputStyle}
                 placeholder="0"
+                onWheel={(e) => e.currentTarget.blur()}
               />
             </div>
           </div>
@@ -474,6 +476,7 @@ function NewProductContent() {
                 step="0.01"
                 style={inputStyle}
                 placeholder="0.00"
+                onWheel={(e) => e.currentTarget.blur()}
               />
             </div>
           </div>

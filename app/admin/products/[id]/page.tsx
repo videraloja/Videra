@@ -217,7 +217,7 @@ function EditProductContent() {
       if (error) throw error;
 
       alert("Produto atualizado com sucesso!");
-      router.push("/admin/products");
+      router.back();
       
     } catch (error) {
       console.error("Erro ao atualizar produto:", error);
@@ -497,6 +497,7 @@ function EditProductContent() {
                     min="0"
                     step="0.01"
                     style={smallInputStyle}
+                    onWheel={(e) => e.currentTarget.blur()}
                   />
                 </div>
 
@@ -517,6 +518,7 @@ function EditProductContent() {
                     min="0"
                     step="0.01"
                     style={smallInputStyle}
+                    onWheel={(e) => e.currentTarget.blur()}
                   />
                 </div>
 
@@ -562,6 +564,7 @@ function EditProductContent() {
                       opacity: 0.7
                     }}
                     disabled={formData.on_sale}
+                    onWheel={(e) => e.currentTarget.blur()}
                   />
                   <small style={{ 
                     color: 'var(--text-secondary)', 
@@ -590,6 +593,7 @@ function EditProductContent() {
                   min="0"
                   step="0.01"
                   style={inputStyle}
+                  onWheel={(e) => e.currentTarget.blur()}
                 />
               </div>
             )}
@@ -845,6 +849,7 @@ function EditProductContent() {
               required
               min="0"
               style={inputStyle}
+              onWheel={(e) => e.currentTarget.blur()}
             />
           </div>
 
@@ -874,6 +879,7 @@ function EditProductContent() {
                 min="0"
                 step="0.01"
                 style={inputStyle}
+                onWheel={(e) => e.currentTarget.blur()}
               />
             </div>
           </div>

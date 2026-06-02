@@ -362,6 +362,7 @@ function FilterEditor({ filters, onFiltersChange }: FilterEditorProps) {
               borderRadius: '6px',
               fontSize: '14px'
             }}
+            onWheel={(e) => e.currentTarget.blur()}
           />
         </div>
 
@@ -457,6 +458,7 @@ function FilterEditor({ filters, onFiltersChange }: FilterEditorProps) {
               borderRadius: '6px',
               fontSize: '14px'
             }}
+            onWheel={(e) => e.currentTarget.blur()}
           />
         </div>
       </div>
@@ -493,6 +495,7 @@ function FilterEditor({ filters, onFiltersChange }: FilterEditorProps) {
               borderRadius: '6px',
               fontSize: '14px'
             }}
+            onWheel={(e) => e.currentTarget.blur()}
           />
         </div>
         

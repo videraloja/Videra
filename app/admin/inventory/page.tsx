@@ -49,9 +49,14 @@ function InventoryContent() {
   const [searchTerm, setSearchTerm] = useState("");
   const [lowStockFilter, setLowStockFilter] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [exportMonth, setExportMonth] = useState(() => {
+  // 🆕 Estados para seleção de período de exportação
+  const [exportStartDate, setExportStartDate] = useState(() => {
     const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  });
+  const [exportEndDate, setExportEndDate] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
   });
 
   // Estados para o Histórico (Logs)
@@ -170,9 +175,17 @@ function InventoryContent() {
   const exportToDistributor = async () => {
     try {
       setLoading(true);
-      const [year, month] = exportMonth.split('-').map(Number);
-      const startDate = new Date(year, month - 1, 1).toISOString();
-      const endDate = new Date(year, month, 0, 23, 59, 59).toISOString();
+      
+      if (!exportStartDate || !exportEndDate) {
+        alert("Por favor, selecione as datas de início e fim.");
+        return;
+      }
+      // Data de início no começo do dia (00:00:00)
+      const startDate = new Date(exportStartDate).toISOString();
+      // Data de fim no final do dia (23:59:59)
+      const endDateObj = new Date(exportEndDate);
+      endDateObj.setUTCHours(23, 59, 59, 999);
+      const endDate = endDateObj.toISOString();
 
       // 1. Buscar todos os movimentos do mês selecionado
       const { data: logsData, error: logsError } = await supabase
@@ -331,11 +344,11 @@ function InventoryContent() {
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Bate_Estoque_Videra");
       
-      XLSX.writeFile(workbook, `Videra_Conferencia_Estoque_${exportMonth}.xlsx`);
+      const fileName = `Videra_Conferencia_Estoque_${exportStartDate}_a_${exportEndDate}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
       alert("✅ Relatório de conferência gerado com sucesso!");
     } catch (error) {
       console.error("Erro ao exportar:", error);
-      alert("Erro ao gerar documento de estoque");
     } finally {
       setLoading(false);
     }
@@ -529,35 +542,43 @@ function InventoryContent() {
         alignItems: "center",
         flexWrap: "wrap",
         gap: 16
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      }}> 
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>Mês da Conferência</label>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>Data de Início</label>
             <input 
-              type="month" 
-              value={exportMonth}
-              onChange={(e) => setExportMonth(e.target.value)}
+              type="date" 
+              value={exportStartDate}
+              onChange={(e) => setExportStartDate(e.target.value)}
+              style={{ padding: '8px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+            />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>Data de Fim</label>
+            <input 
+              type="date" 
+              value={exportEndDate}
+              onChange={(e) => setExportEndDate(e.target.value)}
               style={{ padding: '8px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
             />
           </div>
           <button
             onClick={exportToDistributor}
-            style={{ background: "#059669", color: "white", padding: "10px 20px", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, display: "flex", alignItems: "center", gap: 8, marginTop: 18 }}
+            style={{ background: "#059669", color: "white", padding: "10px 20px", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, display: "flex", alignItems: "center", gap: 8, height: '41px' }}
           >
-            📄 Gerar Relatório p/ Distribuidor
+            📄 Gerar Relatório
           </button>
         </div>
         <p style={{ fontSize: 12, color: 'var(--text-secondary)', maxWidth: '300px', margin: 0 }}>
-          💡 Este relatório gera um Excel com entradas e saídas do mês para bater com o fornecedor.
+          💡 Gere um Excel com as movimentações do período para conferir com o fornecedor.
         </p>
       </div>
 
       <div style={{ 
         background: "var(--bg-card)", 
         padding: 20, 
-        borderRadius: 8, 
+        borderRadius: 8,
         boxShadow: "var(--shadow)",
-        marginBottom: 24,
         border: "1px solid var(--border-color)",
         display: "flex",
         gap: 16,
