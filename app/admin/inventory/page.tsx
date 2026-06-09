@@ -24,6 +24,8 @@ interface Product {
   potential_profit?: number;
   monthly_sales?: number;
   monthly_entries?: number;
+  on_sale?: boolean | null;
+  sale_price?: number | null;
 }
 
 interface Reservation {
@@ -118,15 +120,19 @@ function InventoryContent() {
       const entriesMap = new Map<number, number>();
       entriesThisMonth?.forEach(e => entriesMap.set(e.product_id, (entriesMap.get(e.product_id) || 0) + e.quantity_changed));
 
-      const enrichedProducts = productsWithStock.map(p => ({
-        ...p,
-        reserved_qty: resMap.get(p.id) || 0,
-        monthly_sales: salesMap.get(p.id) || 0,
-        monthly_entries: entriesMap.get(p.id) || 0,
-        // Margem de lucro: ((Venda - Custo) / Venda) * 100 (Trava para preço > 0)
-        margin: p.cost_price && p.price > 0 ? (((p.price - p.cost_price) / p.price) * 100).toFixed(1) : null,
-        potential_profit: p.cost_price ? (p.price - p.cost_price) * p.stock : 0
-      }));
+      const enrichedProducts = productsWithStock.map(p => {
+        const currentPrice = p.on_sale && p.sale_price && p.sale_price > 0 ? p.sale_price : p.price;
+        
+        return {
+          ...p,
+          reserved_qty: resMap.get(p.id) || 0,
+          monthly_sales: salesMap.get(p.id) || 0,
+          monthly_entries: entriesMap.get(p.id) || 0,
+          // Margem de lucro: ((Venda - Custo) / Venda) * 100 (Trava para preço > 0)
+          margin: p.cost_price && currentPrice > 0 ? (((currentPrice - p.cost_price) / currentPrice) * 100).toFixed(1) : null,
+          potential_profit: p.cost_price ? (currentPrice - p.cost_price) * p.stock : 0
+        };
+      });
 
       setProducts(enrichedProducts);
     } catch (error) {
@@ -359,12 +365,21 @@ function InventoryContent() {
   // Estatísticas
   const totalProducts = filteredProducts.length;
   const totalStock = filteredProducts.reduce((sum, p) => sum + p.stock, 0);
-  const totalValue = filteredProducts.reduce((sum, p) => sum + (p.stock * p.price), 0);
+  const totalValue = filteredProducts.reduce((sum, p) => {
+    const currentPrice = p.on_sale && p.sale_price && p.sale_price > 0 ? p.sale_price : p.price;
+    return sum + (p.stock * currentPrice);
+  }, 0);
   const totalInventoryValue = filteredProducts.reduce((sum, p) => sum + (p.stock * (p.cost_price || 0)), 0);
-  const totalPotentialSales = filteredProducts.reduce((sum, p) => sum + (p.stock * p.price), 0);
+  const totalPotentialSales = filteredProducts.reduce((sum, p) => {
+    const currentPrice = p.on_sale && p.sale_price && p.sale_price > 0 ? p.sale_price : p.price;
+    return sum + (p.stock * currentPrice);
+  }, 0);
   const lowStockCount = filteredProducts.filter(p => p.stock <= 10).length;
   const totalMonthlySales = filteredProducts.reduce((sum, p) => sum + (p.monthly_sales || 0), 0);
-  const totalMonthlyRevenue = filteredProducts.reduce((sum, p) => sum + ((p.monthly_sales || 0) * p.price), 0);
+  const totalMonthlyRevenue = filteredProducts.reduce((sum, p) => {
+    const currentPrice = p.on_sale && p.sale_price && p.sale_price > 0 ? p.sale_price : p.price;
+    return sum + ((p.monthly_sales || 0) * currentPrice);
+  }, 0);
   const outOfStockCount = filteredProducts.filter(p => p.stock === 0).length;
 
   const totalPotentialProfit = totalPotentialSales - totalInventoryValue;
@@ -724,7 +739,16 @@ function InventoryContent() {
 
                   {/* Indicadores Financeiros */}
                   <div style={{ flex: 0.8, fontSize: 13 }}>
-                    <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Venda: R$ {product.price.toFixed(2)}</div>
+                    <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                      Venda: {product.on_sale && product.sale_price && product.sale_price > 0 ? (
+                        <>
+                          <span style={{ textDecoration: 'line-through', fontSize: '11px', color: 'var(--text-secondary)', marginRight: '4px' }}>R$ {product.price.toFixed(2)}</span>
+                          <span style={{ color: '#dc2626' }}>R$ {product.sale_price.toFixed(2)}</span>
+                        </>
+                      ) : (
+                        `R$ ${product.price.toFixed(2)}`
+                      )}
+                    </div>
                     {product.cost_price && (
                       <>
                         <div style={{ color: 'var(--text-secondary)', fontSize: 11 }}>Custo: R$ {product.cost_price.toFixed(2)}</div>

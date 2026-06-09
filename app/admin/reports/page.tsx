@@ -31,8 +31,16 @@ function ReportsContent() {
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     
-    setStartDate(firstDay.toISOString().split('T')[0]);
-    setEndDate(lastDay.toISOString().split('T')[0]);
+    // Formatar mantendo o fuso horário local para evitar pulos de data
+    const formatDate = (date: Date) => {
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    };
+
+    setStartDate(formatDate(firstDay));
+    setEndDate(formatDate(lastDay));
   }, []);
 
   const generateReport = async () => {
@@ -44,12 +52,16 @@ function ReportsContent() {
     setLoading(true);
 
     try {
+      // Converter as datas locais selecionadas para o formato ISO (UTC)
+      const startDateTime = new Date(`${startDate}T00:00:00`).toISOString();
+      const endDateTime = new Date(`${endDate}T23:59:59.999`).toISOString();
+
       const { data: orders, error: ordersError } = await supabase
         .from("orders")
         .select("id, created_at")
         .eq("status", "pago")
-        .gte("created_at", `${startDate}T00:00:00`)
-        .lte("created_at", `${endDate}T23:59:59`);
+        .gte("created_at", startDateTime)
+        .lte("created_at", endDateTime);
 
       if (ordersError) throw ordersError;
 
