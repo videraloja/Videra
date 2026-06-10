@@ -22,7 +22,9 @@ export const getProductsWithAvailableStock = async (): Promise<ProductWithAvaila
   // 1. Buscar todos os produtos
   const { data: products, error } = await supabase
     .from('products')
-    .select('*');
+    .select('*')
+    .order('updated_at', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false });
   
   if (error) {
     console.error('Erro ao buscar produtos:', error);

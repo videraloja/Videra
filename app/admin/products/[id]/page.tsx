@@ -206,7 +206,8 @@ function EditProductContent() {
         // 🆕 DADOS DE PROMOÇÃO
         on_sale: formData.on_sale,
         original_price: formData.on_sale && formData.original_price ? parseFloat(formData.original_price) : null,
-        sale_price: formData.on_sale && formData.sale_price ? parseFloat(formData.sale_price) : null
+        sale_price: formData.on_sale && formData.sale_price ? parseFloat(formData.sale_price) : null,
+        updated_at: new Date().toISOString()
       };
 
       const { error } = await supabase

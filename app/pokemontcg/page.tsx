@@ -136,6 +136,7 @@ export default function PokemonTCGPage() {
           .from('products')
           .select('*')
           .eq('category', 'pokemon')
+          .order('updated_at', { ascending: false, nullsFirst: false })
           .order('created_at', { ascending: false });
 
         if (error) {

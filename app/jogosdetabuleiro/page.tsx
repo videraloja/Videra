@@ -158,6 +158,7 @@ export default function JogosTabuleiroPage() {
           .from('products')
           .select('*')
           .eq('category', 'board-games')
+          .order('updated_at', { ascending: false, nullsFirst: false })
           .order('created_at', { ascending: false });
 
         if (error) {

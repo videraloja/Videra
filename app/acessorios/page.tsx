@@ -112,6 +112,7 @@ export default function AcessoriosPage() {
           .from('products')
           .select('*')
           .eq('category', 'acessorios')
+          .order('updated_at', { ascending: false, nullsFirst: false })
           .order('created_at', { ascending: false });
 
         if (error) {

@@ -112,6 +112,7 @@ export default function HotWheelsPage() {
           .from('products')
           .select('*')
           .eq('category', 'hot-wheels')
+          .order('updated_at', { ascending: false, nullsFirst: false })
           .order('created_at', { ascending: false });
 
         if (error) {
