@@ -363,19 +363,20 @@ const handleAddToCart = (product: Product) => {
         <div style={{
           position: 'relative',
           zIndex: 3,
-          maxWidth: '800px',
+          maxWidth: '900px',
           margin: '0 auto',
-          padding: '100px 20px',
+          padding: '60px 20px 100px',
           textAlign: 'center',
           color: 'white'
         }}>
           {page.title && (
             <h1 style={{
-              fontSize: 'clamp(2.5rem, 5vw, 4rem)',
+              fontSize: 'clamp(2rem, 6vw, 4.5rem)',
               fontWeight: '900',
-              marginBottom: '20px',
-              lineHeight: '1.1',
-              textShadow: '0 2px 10px rgba(0,0,0,0.3)',
+              letterSpacing: '-0.02em',
+              marginBottom: '24px',
+              lineHeight: '1.2',
+              textShadow: '-2px -2px 0 rgba(0,0,0,0.8), 2px -2px 0 rgba(0,0,0,0.8), -2px 2px 0 rgba(0,0,0,0.8), 2px 2px 0 rgba(0,0,0,0.8), 0 8px 25px rgba(0,0,0,0.8), 0 4px 10px rgba(0,0,0,0.9)',
               whiteSpace: 'pre-wrap'
             }}>
               {page.title}
@@ -384,12 +385,12 @@ const handleAddToCart = (product: Product) => {
           
           {page.description && (
             <p style={{
-              fontSize: 'clamp(1.1rem, 2vw, 1.5rem)',
-              opacity: '0.95',
-              maxWidth: '600px',
+              fontSize: 'clamp(1.05rem, 3vw, 1.35rem)',
+              fontWeight: '600',
+              maxWidth: '750px',
               margin: '0 auto',
               lineHeight: '1.6',
-              textShadow: '0 1px 5px rgba(0,0,0,0.3)',
+              textShadow: '-1px -1px 0 rgba(0,0,0,0.8), 1px -1px 0 rgba(0,0,0,0.8), -1px 1px 0 rgba(0,0,0,0.8), 1px 1px 0 rgba(0,0,0,0.8), 0 4px 15px rgba(0,0,0,0.8), 0 2px 4px rgba(0,0,0,1)',
               whiteSpace: 'pre-wrap'
             }}>
               {page.description}
