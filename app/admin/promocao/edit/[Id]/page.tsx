@@ -834,6 +834,7 @@ function EditPromotionalPageContent() {
   const [isActive, setIsActive] = useState(true);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [showOverlay, setShowOverlay] = useState(true);
   const [activeTab, setActiveTab] = useState<'info' | 'filters' | 'products' | 'appearance'>('info');
 
   // Adicione esta função no componente EditPromotionalPageContent (após os states):
@@ -893,6 +894,7 @@ const handleImageUpload = async (file: File) => {
       setIsActive(currentPage.is_active);
       setStartDate(currentPage.start_date?.split('T')[0] || '');
       setEndDate(currentPage.end_date?.split('T')[0] || '');
+      setShowOverlay((currentPage as any).show_overlay !== false); // Padrão true
     } catch (error) {
       console.error('Erro ao carregar página:', error);
       alert('Erro ao carregar página');
@@ -902,24 +904,20 @@ const handleImageUpload = async (file: File) => {
   };
 
   const handleSave = async () => {
-    if (!title.trim()) {
-      alert('Digite um título para a página');
-      return;
-    }
-
     setSaving(true);
     try {
-      const pageData: Partial<PromotionalPage> = {
-        title,
+      const pageData: any = {
+        title: title || "",
         slug,
-        description: description || undefined,
-        hero_image_url: heroImageUrl || undefined,
+        description: description || "",
+        hero_image_url: heroImageUrl || "",
         filters,
         product_ids: productIds,
-        theme_id: themeId,
+        theme_id: themeId || null,
         is_active: isActive,
-        start_date: startDate ? `${startDate}T00:00:00Z` : undefined,
-        end_date: endDate ? `${endDate}T23:59:59Z` : undefined
+        start_date: startDate ? `${startDate}T00:00:00Z` : null,
+        end_date: endDate ? `${endDate}T23:59:59Z` : null,
+        show_overlay: showOverlay
       };
 
       const updatedPage = await promotionalPagesService.updatePage(pageId, pageData);
@@ -1105,7 +1103,7 @@ const handleImageUpload = async (file: File) => {
               <div style={{ display: 'grid', gap: '20px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
-                    Título da Página *
+                    Título da Página (opcional)
                   </label>
                   <input
                     type="text"
@@ -1260,6 +1258,22 @@ const handleImageUpload = async (file: File) => {
     />
   </div>
 </div>
+    
+    {/* Overlay Toggle */}
+    <div style={{ marginTop: '16px', background: '#f9fafb', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+        <input
+          type="checkbox"
+          checked={showOverlay}
+          onChange={(e) => setShowOverlay(e.target.checked)}
+          style={{ width: '16px', height: '16px' }}
+        />
+        <span style={{ fontSize: '14px', fontWeight: '500' }}>
+          Ativar overlay escuro sobre a imagem
+        </span>
+      </label>
+      <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px', marginLeft: '24px' }}>Deixa a imagem ligeiramente mais escura para facilitar a leitura de textos brancos por cima da imagem. Desative se a imagem já for escura ou se não houver texto sobre ela.</p>
+    </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   <div>

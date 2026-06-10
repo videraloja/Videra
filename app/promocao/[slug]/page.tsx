@@ -322,16 +322,18 @@ const handleAddToCart = (product: Product) => {
         marginBottom: '60px',
         overflow: 'hidden'
       }}>
-        {/* Overlay escuro SIMPLES */}
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          zIndex: 2
-        }} />
+        {/* Overlay escuro SIMPLES (Controlado via painel) */}
+        {(page as any).show_overlay !== false && (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            zIndex: 2
+          }} />
+        )}
         
         {page.hero_image_url ? (
           <div style={{
@@ -367,15 +369,17 @@ const handleAddToCart = (product: Product) => {
           textAlign: 'center',
           color: 'white'
         }}>
-          <h1 style={{
-            fontSize: 'clamp(2.5rem, 5vw, 4rem)',
-            fontWeight: '900',
-            marginBottom: '20px',
-            lineHeight: '1.1',
-            textShadow: '0 2px 10px rgba(0,0,0,0.3)'
-          }}>
-            {page.title}
-          </h1>
+          {page.title && (
+            <h1 style={{
+              fontSize: 'clamp(2.5rem, 5vw, 4rem)',
+              fontWeight: '900',
+              marginBottom: '20px',
+              lineHeight: '1.1',
+              textShadow: '0 2px 10px rgba(0,0,0,0.3)'
+            }}>
+              {page.title}
+            </h1>
+          )}
           
           {page.description && (
             <p style={{

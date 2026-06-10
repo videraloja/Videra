@@ -55,8 +55,8 @@ export default function PromotionalPageManager() {
 
   // Criar nova página
   const handleCreatePage = async () => {
-    if (!newPage.title.trim()) {
-      alert('Digite um título para a página');
+    if (!newPage.title.trim() && !newPage.slug.trim()) {
+      alert('Digite um título ou um slug para a página');
       return;
     }
 
@@ -75,7 +75,7 @@ export default function PromotionalPageManager() {
       
       const pageData = {
         slug,
-        title: newPage.title,
+        title: newPage.title || '',
         description: newPage.description,
         filters: {},
         product_ids: [],
@@ -534,7 +534,7 @@ export default function PromotionalPageManager() {
                   color: '#374151',
                   marginBottom: '8px'
                 }}>
-                  Título da Página *
+                  Título da Página (opcional)
                 </label>
                 <input
                   type="text"
@@ -567,7 +567,7 @@ export default function PromotionalPageManager() {
                   color: '#374151',
                   marginBottom: '8px'
                 }}>
-                  Slug (URL) *
+                  Slug (URL) {newPage.title ? '*' : '(Obrigatório se sem título)'}
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ color: '#6b7280', fontSize: '14px' }}>/promocao/</span>
@@ -644,17 +644,17 @@ export default function PromotionalPageManager() {
             <div style={{ display: 'flex', gap: '12px' }}>
               <button
                 onClick={handleCreatePage}
-                disabled={!newPage.title.trim()}
+                disabled={!newPage.title.trim() && !newPage.slug.trim()}
                 style={{
                   flex: 1,
                   padding: '12px 16px',
-                  background: !newPage.title.trim() ? '#9ca3af' : '#10b981',
+                  background: (!newPage.title.trim() && !newPage.slug.trim()) ? '#9ca3af' : '#10b981',
                   color: 'white',
                   border: 'none',
                   borderRadius: '6px',
                   fontSize: '14px',
                   fontWeight: '500',
-                  cursor: !newPage.title.trim() ? 'not-allowed' : 'pointer'
+                  cursor: (!newPage.title.trim() && !newPage.slug.trim()) ? 'not-allowed' : 'pointer'
                 }}
               >
                 ✅ Criar e Configurar
