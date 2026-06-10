@@ -1204,8 +1204,8 @@ const handleImageUpload = async (file: File) => {
       onChange={(e) => {
         const file = e.target.files?.[0];
         if (file) {
-          if (file.size > 5 * 1024 * 1024) {
-            alert('❌ A imagem deve ter no máximo 5MB');
+          if (file.size > 15 * 1024 * 1024) {
+            alert('❌ A imagem deve ter no máximo 15MB');
             return;
           }
           handleImageUpload(file);
@@ -1234,7 +1234,7 @@ const handleImageUpload = async (file: File) => {
       Clique para selecionar uma imagem (JPG, PNG, WebP)
     </p>
     <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>
-      Tamanho máximo: 5MB | Recomendado: 1920x600px
+      Tamanho máximo: 15MB | Recomendado: 1920x600px
     </p>
   </div>
   

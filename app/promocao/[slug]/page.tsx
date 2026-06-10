@@ -375,7 +375,8 @@ const handleAddToCart = (product: Product) => {
               fontWeight: '900',
               marginBottom: '20px',
               lineHeight: '1.1',
-              textShadow: '0 2px 10px rgba(0,0,0,0.3)'
+              textShadow: '0 2px 10px rgba(0,0,0,0.3)',
+              whiteSpace: 'pre-wrap'
             }}>
               {page.title}
             </h1>
@@ -388,7 +389,8 @@ const handleAddToCart = (product: Product) => {
               maxWidth: '600px',
               margin: '0 auto',
               lineHeight: '1.6',
-              textShadow: '0 1px 5px rgba(0,0,0,0.3)'
+              textShadow: '0 1px 5px rgba(0,0,0,0.3)',
+              whiteSpace: 'pre-wrap'
             }}>
               {page.description}
             </p>
@@ -417,20 +419,7 @@ const handleAddToCart = (product: Product) => {
             gap: '12px',
             color: pageStyles.textColor
           }}>
-            <span style={{ fontSize: '28px' }}>
-              {page.theme?.emojis?.search || emojis?.search || '🎯'}
-            </span>
             Produtos em destaque
-            <span style={{
-              background: pageStyles.primaryColor,
-              color: 'white',
-              padding: '4px 12px',
-              borderRadius: '12px',
-              fontSize: '14px',
-              fontWeight: '600'
-            }}>
-              {products.length} itens
-            </span>
           </h2>
         </div>
 
