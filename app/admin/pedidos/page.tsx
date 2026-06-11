@@ -71,8 +71,10 @@ function PedidosContent() {
       color: 'var(--text-primary)',
       minHeight: '100vh'
     }}>
-      <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
-      <p>Carregando pedidos...</p>
+      <div className="global-loading-container">
+        <div className="global-spinner"></div>
+        <p className="global-loading-text">Carregando pedidos...</p>
+      </div>
     </div>
   );
 

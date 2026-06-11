@@ -24,9 +24,9 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         justifyContent: 'center',
         color: 'var(--text-primary)'
       }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
-          <p>Verificando acesso...</p>
+        <div className="global-loading-container">
+          <div className="global-spinner"></div>
+          <p className="global-loading-text">Verificando acesso...</p>
         </div>
       </div>
     );

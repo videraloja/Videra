@@ -263,9 +263,9 @@ export default function CarouselEditor({ pageSlug, onClose }: CarouselEditorProp
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
-          <p>Carregando configurações...</p>
+        <div className="global-loading-container" style={{ padding: '40px' }}>
+          <div className="global-spinner"></div>
+          <p className="global-loading-text">Carregando configurações...</p>
         </div>
       ) : (
         <>

@@ -58,7 +58,12 @@ function ProductSelector({ selectedIds, onSelectionChange }: ProductSelectorProp
   };
 
   if (loading) {
-    return <div>Carregando produtos...</div>;
+    return (
+      <div className="global-loading-container" style={{ padding: '40px' }}>
+        <div className="global-spinner"></div>
+        <p className="global-loading-text">Carregando produtos...</p>
+      </div>
+    );
   }
 
   return (
@@ -272,9 +277,9 @@ function FilterEditor({ filters, onFiltersChange }: FilterEditorProps) {
   const renderPokemonFilters = () => {
     if (loading) {
       return (
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <div style={{ fontSize: '24px', marginBottom: '12px' }}>⏳</div>
-          <p style={{ color: '#6b7280' }}>Carregando opções de filtro...</p>
+        <div className="global-loading-container" style={{ padding: '40px' }}>
+          <div className="global-spinner"></div>
+          <p className="global-loading-text">Carregando opções de filtro...</p>
         </div>
       );
     }
@@ -401,9 +406,9 @@ function FilterEditor({ filters, onFiltersChange }: FilterEditorProps) {
   const renderBoardGamesFilters = () => {
     if (loading) {
       return (
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <div style={{ fontSize: '24px', marginBottom: '12px' }}>⏳</div>
-          <p>Carregando opções de filtro...</p>
+        <div className="global-loading-container" style={{ padding: '40px' }}>
+          <div className="global-spinner"></div>
+          <p className="global-loading-text">Carregando opções de filtro...</p>
         </div>
       );
     }
@@ -720,7 +725,12 @@ function ThemeSelector({ selectedThemeId, onThemeSelect }: ThemeSelectorProps) {
   };
 
   if (loading) {
-    return <div>Carregando temas...</div>;
+    return (
+      <div className="global-loading-container" style={{ padding: '40px' }}>
+        <div className="global-spinner"></div>
+        <p className="global-loading-text">Carregando temas...</p>
+      </div>
+    );
   }
 
   return (
@@ -951,9 +961,9 @@ const handleImageUpload = async (file: File) => {
 
   if (loading) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center' }}>
-        <div style={{ fontSize: '32px', marginBottom: '16px' }}>⏳</div>
-        <p>Carregando página...</p>
+      <div className="global-loading-container">
+        <div className="global-spinner"></div>
+        <p className="global-loading-text">Carregando página...</p>
       </div>
     );
   }

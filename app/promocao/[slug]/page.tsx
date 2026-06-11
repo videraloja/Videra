@@ -228,28 +228,9 @@ const handleAddToCart = (product: Product) => {
         color: colors.text
       }}>
         <Header hideSearch={true} />
-        <div style={{ 
-          textAlign: 'center', 
-          padding: '100px 20px' 
-        }}>
-          <div style={{ 
-            fontSize: '64px', 
-            marginBottom: '16px',
-            animation: 'pulse 2s infinite'
-          }}>🎨</div>
-          <p style={{ 
-            fontSize: '18px', 
-            color: '#6b7280',
-            marginBottom: '8px'
-          }}>
-            Carregando promoção...
-          </p>
-          <p style={{ 
-            fontSize: '14px', 
-            color: '#9ca3af'
-          }}>
-            {slug}
-          </p>
+        <div className="global-loading-container" style={{ padding: '100px 20px' }}>
+          <div className="global-spinner" style={{ borderTopColor: colors.primary }}></div>
+          <p className="global-loading-text" style={{ fontSize: '18px' }}>Carregando...</p>
         </div>
       </div>
     );
@@ -316,10 +297,8 @@ const handleAddToCart = (product: Product) => {
       <Header hideSearch={true} />
 
       {/* 🎨 HERO SIMPLIFICADO */}
-      <section style={{
+      <section className="promo-hero-section" style={{
         position: 'relative',
-        minHeight: '400px',
-        marginBottom: '60px',
         overflow: 'hidden'
       }}>
         {/* Overlay escuro SIMPLES (Controlado via painel) */}
@@ -360,23 +339,20 @@ const handleAddToCart = (product: Product) => {
         )}
         
         {/* Conteúdo do hero */}
-        <div style={{
+        <div className="promo-hero-content" style={{
           position: 'relative',
           zIndex: 3,
           maxWidth: '900px',
           margin: '0 auto',
-          padding: '60px 20px 100px',
           textAlign: 'center',
           color: 'white'
         }}>
           {page.title && (
-            <h1 style={{
-              fontSize: 'clamp(2rem, 6vw, 4.5rem)',
+            <h1 className="promo-title" style={{
               fontWeight: '900',
               letterSpacing: '-0.02em',
-              marginBottom: '24px',
               lineHeight: '1.2',
-              textShadow: '-2px -2px 0 rgba(0,0,0,0.8), 2px -2px 0 rgba(0,0,0,0.8), -2px 2px 0 rgba(0,0,0,0.8), 2px 2px 0 rgba(0,0,0,0.8), 0 8px 25px rgba(0,0,0,0.8), 0 4px 10px rgba(0,0,0,0.9)',
+              textShadow: '0 4px 15px rgba(0,0,0,0.5)',
               whiteSpace: 'pre-wrap'
             }}>
               {page.title}
@@ -384,13 +360,12 @@ const handleAddToCart = (product: Product) => {
           )}
           
           {page.description && (
-            <p style={{
-              fontSize: 'clamp(1.05rem, 3vw, 1.35rem)',
+            <p className="promo-desc" style={{
               fontWeight: '600',
               maxWidth: '750px',
               margin: '0 auto',
               lineHeight: '1.6',
-              textShadow: '-1px -1px 0 rgba(0,0,0,0.8), 1px -1px 0 rgba(0,0,0,0.8), -1px 1px 0 rgba(0,0,0,0.8), 1px 1px 0 rgba(0,0,0,0.8), 0 4px 15px rgba(0,0,0,0.8), 0 2px 4px rgba(0,0,0,1)',
+              textShadow: '0 2px 10px rgba(0,0,0,0.5)',
               whiteSpace: 'pre-wrap'
             }}>
               {page.description}
@@ -505,6 +480,11 @@ const handleAddToCart = (product: Product) => {
           50% {
             opacity: 0.5;
           }
+        }
+
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
         }
 
         @media (max-width: 640px) {

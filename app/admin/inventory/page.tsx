@@ -421,7 +421,10 @@ function InventoryContent() {
         color: 'var(--text-primary)',
         minHeight: '100vh'
       }}>
-        <p>Carregando estoque...</p>
+        <div className="global-loading-container">
+          <div className="global-spinner"></div>
+          <p className="global-loading-text">Carregando estoque...</p>
+        </div>
       </div>
     );
   }
@@ -878,7 +881,10 @@ function InventoryContent() {
             </div>
 
             {loadingLogs ? (
-              <p style={{ textAlign: 'center', padding: 40 }}>Carregando histórico...</p>
+              <div className="global-loading-container" style={{ padding: 40 }}>
+                <div className="global-spinner"></div>
+                <p className="global-loading-text">Carregando histórico...</p>
+              </div>
             ) : logs.length === 0 ? (
               <div style={{ textAlign: 'center', padding: 40, background: 'var(--bg-secondary)', borderRadius: 8 }}>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>

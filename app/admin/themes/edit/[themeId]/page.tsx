@@ -186,15 +186,9 @@ export default function EditThemePage() {
   // 🔧 Loading state
   if (isLoading) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center' }}>
-        <div style={{ 
-          fontSize: '48px', 
-          marginBottom: '16px',
-          animation: 'pulse 2s infinite' 
-        }}>⏳</div>
-        <div style={{ fontSize: '18px', color: '#6b7280', marginBottom: '8px' }}>
-          Carregando tema...
-        </div>
+      <div className="global-loading-container">
+        <div className="global-spinner"></div>
+        <p className="global-loading-text">Carregando tema...</p>
         <div style={{ fontSize: '14px', color: '#9ca3af' }}>
           ID: {themeId}
         </div>

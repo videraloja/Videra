@@ -184,9 +184,9 @@ export default function HotWheelsPage() {
 
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '0px 20px' }}>
         {!ready && (
-          <div style={{ textAlign: 'center', padding: '80px 20px' }}>
-            <div style={{ fontSize: '64px', marginBottom: '16px', animation: 'pulse 2s infinite' }}>{emojis.search}</div>
-            <p style={{ fontSize: '18px', color: '#6b7280' }}>Carregando Hot Wheels...</p>
+          <div className="global-loading-container" style={{ padding: '80px 20px' }}>
+            <div className="global-spinner" style={{ borderTopColor: colors.primary }}></div>
+            <p className="global-loading-text" style={{ fontSize: '18px', color: colors.text }}>Carregando Hot Wheels...</p>
           </div>
         )}
 
@@ -261,9 +261,9 @@ export default function HotWheelsPage() {
               !hasActiveSearch && (
                 <section>
                   {carouselsLoading && (
-                    <div style={{ textAlign: 'center', padding: '40px 20px', marginBottom: '32px' }}>
-                      <div style={{ fontSize: '48px', marginBottom: '16px', animation: 'pulse 1.5s infinite' }}>🎠</div>
-                      <p style={{ fontSize: '16px', color: '#6b7280' }}>Carregando carrosséis...</p>
+                    <div className="global-loading-container" style={{ padding: '40px 20px', marginBottom: '32px' }}>
+                      <div className="global-spinner" style={{ borderTopColor: colors.primary }}></div>
+                      <p className="global-loading-text">Carregando carrosséis...</p>
                     </div>
                   )}
 

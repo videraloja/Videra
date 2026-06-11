@@ -668,9 +668,9 @@ Aguarde enquanto processamos seu pedido : )
         `}</style>
         <div className="cart-page">
           <div className="cart-container">
-            <div className="cart-loading">
-              <div className="loading-spinner"></div>
-              <p>Carregando carrinho...</p>
+            <div className="global-loading-container" style={{ padding: '4rem 2rem' }}>
+              <div className="global-spinner" style={{ borderTopColor: '#dc2626' }}></div>
+              <p className="global-loading-text">Carregando carrinho...</p>
             </div>
           </div>
           <ToastContainer />

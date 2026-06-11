@@ -966,3 +966,86 @@ a, button, input, textarea, select {
   -webkit-user-select: none;
   user-select: none;
 }
+
+/* ===== PROMOÇÃO HERO BANNER RESPONSIVO ===== */
+.promo-hero-section {
+  min-height: 400px;
+  margin-bottom: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.promo-hero-content {
+  padding: 60px 20px;
+  width: 100%;
+}
+
+.promo-title {
+  font-size: clamp(2rem, 6vw, 4.5rem);
+  margin-bottom: 24px;
+}
+
+.promo-desc {
+  font-size: clamp(1.05rem, 3vw, 1.35rem);
+}
+
+@media (max-width: 768px) {
+  .promo-hero-section {
+    min-height: 160px !important;
+    margin-bottom: 24px !important;
+  }
+  
+  .promo-hero-content {
+    padding: 30px 16px !important;
+  }
+  
+  .promo-title {
+    font-size: 26px !important;
+    margin-bottom: 12px !important;
+  }
+  
+  .promo-desc {
+    font-size: 14px !important;
+    line-height: 1.4 !important;
+  }
+}
+
+/* ===== GLOBAL LOADING SPINNER ===== */
+.global-loading-container {
+  text-align: center;
+  padding: 60px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.global-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-color, #e5e7eb);
+  border-top-color: var(--accent-color, #3b82f6);
+  border-radius: 50%;
+  animation: global-spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+.global-loading-text {
+  font-size: 16px;
+  color: var(--text-secondary, #6b7280);
+  font-weight: 500;
+  animation: global-pulse 2s infinite;
+  margin: 0;
+}
+
+@keyframes global-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes global-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}

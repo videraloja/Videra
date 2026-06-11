@@ -214,9 +214,9 @@ export default function HomePage() {
 
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '0px 20px' }}>
         {!ready && (
-          <div style={{ textAlign: 'center', padding: '80px 20px' }}>
-            <div style={{ fontSize: '64px', marginBottom: '16px', animation: 'pulse 2s infinite' }}>📁</div>
-            <p style={{ fontSize: '18px', color: colors.text, opacity: 0.7 }}>Carregando produtos...</p>
+          <div className="global-loading-container" style={{ padding: '80px 20px' }}>
+            <div className="global-spinner" style={{ borderTopColor: colors.primary }}></div>
+            <p className="global-loading-text" style={{ fontSize: '18px', color: colors.text }}>Carregando produtos...</p>
           </div>
         )}
 
@@ -272,9 +272,9 @@ export default function HomePage() {
         {!hasActiveSearch && (
           <>
             {carouselsLoading && (
-              <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-                <div style={{ fontSize: '48px', marginBottom: '16px', animation: 'pulse 1.5s infinite' }}>🎠</div>
-                <p style={{ fontSize: '16px', color: '#6b7280' }}>Carregando carrosséis...</p>
+              <div className="global-loading-container" style={{ padding: '40px 20px' }}>
+                <div className="global-spinner" style={{ borderTopColor: colors.primary }}></div>
+                <p className="global-loading-text">Carregando carrosséis...</p>
               </div>
             )}
 

@@ -245,9 +245,9 @@ export default function PromotionalPageManager() {
         </div>
 
         {loading ? (
-          <div style={{ padding: '60px 20px', textAlign: 'center' }}>
-            <div style={{ fontSize: '32px', marginBottom: '16px' }}>⏳</div>
-            <p style={{ color: '#6b7280', fontSize: '16px' }}>Carregando páginas...</p>
+          <div className="global-loading-container" style={{ padding: '60px 20px' }}>
+            <div className="global-spinner"></div>
+            <p className="global-loading-text">Carregando páginas...</p>
           </div>
         ) : pages.length === 0 ? (
           <div style={{ padding: '60px 20px', textAlign: 'center' }}>

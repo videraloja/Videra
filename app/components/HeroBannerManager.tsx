@@ -632,9 +632,9 @@ export default function HeroBannerManager() {
 
         {/* Lista de banners */}
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px', animation: 'pulse 2s infinite' }}>🖼️</div>
-            <p style={{ color: '#6b7280', fontSize: '16px' }}>Carregando banners...</p>
+          <div className="global-loading-container" style={{ padding: '60px 20px' }}>
+            <div className="global-spinner"></div>
+            <p className="global-loading-text">Carregando banners...</p>
           </div>
         ) : heroBanners.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px' }}>

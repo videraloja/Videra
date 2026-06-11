@@ -333,8 +333,10 @@ function EditProductContent() {
         minHeight: '100vh',
         textAlign: 'center'
       }}>
-        <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
-        <p>Carregando produto...</p>
+        <div className="global-loading-container">
+          <div className="global-spinner"></div>
+          <p className="global-loading-text">Carregando produto...</p>
+        </div>
       </div>
     );
   }
