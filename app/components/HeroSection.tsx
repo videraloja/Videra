@@ -199,7 +199,8 @@ export default function HeroSection({
         .hero-section {
           position: relative;
           width: 100%;
-          margin-bottom: 40px;
+          margin-top: 24px;
+          margin-bottom: 24px;
           overflow: hidden;
           cursor: grab;
           border-radius: 24px;
@@ -235,7 +236,8 @@ export default function HeroSection({
           .hero-section {
             height: 400px;
             border-radius: 20px;
-            margin-bottom: 32px;
+            margin-top: 20px;
+            margin-bottom: 20px;
           }
         }
 
@@ -244,7 +246,8 @@ export default function HeroSection({
           .hero-section {
             height: 400px;
             border-radius: 16px;
-            margin-bottom: 24px;
+            margin-top: 16px;
+            margin-bottom: 16px;
           }
         }
 
@@ -253,7 +256,8 @@ export default function HeroSection({
           .hero-section {
             height: 350px;
             border-radius: 12px;
-            margin-bottom: 20px;
+            margin-top: 12px;
+            margin-bottom: 12px;
           }
         }
 

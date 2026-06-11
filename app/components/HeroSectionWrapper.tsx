@@ -17,14 +17,7 @@ export default function HeroSectionWrapper({
   }
 
   return (
-    <div 
-      className={className}
-      style={{
-        marginBottom: '40px',
-        borderRadius: '24px',
-        overflow: 'hidden'
-      }}
-    >
+    <div className={className}>
       <HeroSection 
         autoPlay={true}
         showDots={true}
