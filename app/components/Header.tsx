@@ -271,10 +271,10 @@ export default function Header({ onSearch, searchTerm = '', hideSearch = false }
           <Link href="/">
             <img src="/logo.png" alt="Videra" style={{ width: isScrolled ? '80px' : '100px', height: isScrolled ? '80px' : '100px', borderRadius: '50%', border: '4px solid rgba(255,255,255,0.8)', boxShadow: '0 8px 32px rgba(0,0,0,0.3)', transition: 'all 0.3s ease', cursor: 'pointer' }} />
           </Link>
-          <a href="https://www.instagram.com/videra_lojavirtual" target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'white', textDecoration: 'none', fontFamily: 'inherit', fontSize: '13px', fontWeight: '600', letterSpacing: '0.3px', opacity: 0.9, transition: 'opacity 0.2s', lineHeight: 1 }}
+          <a href="https://www.instagram.com/viderastore" target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'white', textDecoration: 'none', fontFamily: 'inherit', fontSize: '13px', fontWeight: '600', letterSpacing: '0.3px', opacity: 0.9, transition: 'opacity 0.2s', lineHeight: 1 }}
             onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }} onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.9'; }}>
             <InstagramIcon />
-            <span>@videra_lojavirtual</span>
+            <span>@viderastore</span>
           </a>
         </div>
       </header>
