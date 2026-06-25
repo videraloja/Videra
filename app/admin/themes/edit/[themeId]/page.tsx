@@ -19,7 +19,8 @@ export default function EditThemePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasAttemptedLoad, setHasAttemptedLoad] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [uploadingDesktop, setUploadingDesktop] = useState(false);
+  const [uploadingMobile, setUploadingMobile] = useState(false);
 
   // 🔧 CORREÇÃO COMPLETA: useEffect sem loop
   useEffect(() => {
@@ -76,11 +77,12 @@ export default function EditThemePage() {
   };
 
   // 🆕 🆕 🆕 FUNÇÃO PARA UPLOAD DE IMAGEM
-  const handleImageUpload = useCallback(async (file: File) => {
+  const handleImageUpload = useCallback(async (file: File, type: 'desktop' | 'mobile') => {
     if (!editorState.draftTheme) return;
     
     try {
-      setUploading(true);
+      if (type === 'desktop') setUploadingDesktop(true);
+      else setUploadingMobile(true);
       
       // Validar tipo de arquivo
       const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
@@ -127,7 +129,11 @@ export default function EditThemePage() {
       console.log('🔗 URL pública:', publicUrl);
       
       // Atualizar tema com a nova imagem
-      handleUpdateProperty('backgroundImage.url', publicUrl);
+      if (type === 'desktop') {
+        handleUpdateProperty('backgroundImage.url', publicUrl);
+      } else {
+        handleUpdateProperty('backgroundImage.mobileUrl', publicUrl);
+      }
       
       alert('✅ Imagem enviada com sucesso!');
       
@@ -135,14 +141,21 @@ export default function EditThemePage() {
       console.error('❌ Erro no upload:', err);
       alert('Erro ao enviar imagem. Tente novamente.');
     } finally {
-      setUploading(false);
+      if (type === 'desktop') setUploadingDesktop(false);
+      else setUploadingMobile(false);
     }
   }, [editorState.draftTheme, themeId]);
 
   // 🆕 🆕 🆕 FUNÇÃO PARA REMOVER IMAGEM
-  const handleRemoveImage = useCallback(() => {
-    if (confirm('Remover imagem de fundo deste tema?')) {
-      handleUpdateProperty('backgroundImage', undefined);
+  const handleRemoveImage = useCallback((type: 'desktop' | 'mobile') => {
+    const message = type === 'desktop' 
+      ? 'Remover a imagem de fundo DESKTOP deste tema?'
+      : 'Remover a imagem de fundo MOBILE deste tema?';
+
+    if (confirm(message)) {
+      const property = type === 'desktop' ? 'backgroundImage.url' : 'backgroundImage.mobileUrl';
+      // Define a URL como nula ou indefinida para remover
+      handleUpdateProperty(property, null);
     }
   }, [handleUpdateProperty]);
 
@@ -510,12 +523,12 @@ export default function EditThemePage() {
                     <div style={{ marginBottom: '20px' }}>
                       <label style={{ 
                         display: 'block', 
-                        fontSize: '14px', 
+                      fontSize: '14px',
                         color: '#6b7280',
                         marginBottom: '8px',
                         fontWeight: '500'
                       }}>
-                        Imagem Atual:
+                      Imagem Desktop Atual:
                       </label>
                       <div style={{
                         width: '100%',
@@ -541,9 +554,9 @@ export default function EditThemePage() {
                           }} />
                         )}
                       </div>
-                      <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+                  <div style={{ display: 'flex', gap: '12px' }}>
                         <button
-                          onClick={handleRemoveImage}
+                      onClick={() => handleRemoveImage('desktop')}
                           style={{
                             padding: '8px 16px',
                             background: '#fef2f2',
@@ -556,7 +569,7 @@ export default function EditThemePage() {
                             flex: 1
                           }}
                         >
-                          🗑️ Remover Imagem
+                      🗑️ Remover Imagem Desktop
                         </button>
                       </div>
                     </div>
@@ -572,7 +585,7 @@ export default function EditThemePage() {
                       <div style={{ fontSize: '48px', marginBottom: '16px', color: '#9ca3af' }}>
                         🖼️
                       </div>
-                      <p style={{ color: '#6b7280', fontSize: '16px', marginBottom: '16px' }}>
+                    <p style={{ color: '#6b7280', fontSize: '16px' }}>
                         Nenhuma imagem configurada
                       </p>
                     </div>
@@ -587,7 +600,7 @@ export default function EditThemePage() {
                       marginBottom: '8px',
                       fontWeight: '500'
                     }}>
-                      Enviar do Computador:
+                      Enviar do Computador (Desktop):
                     </label>
                     <div style={{ 
                       border: '2px dashed #7c3aed', 
@@ -603,21 +616,24 @@ export default function EditThemePage() {
                         id="file-input"
                         type="file"
                         accept="image/*"
-                        style={{ display: 'none' }}
+                        style={{ display: 'none' }} 
                         onChange={(e) => {
                           const file = e.target.files?.[0];
-                          if (file) handleImageUpload(file);
+                          if (file) handleImageUpload(file, 'desktop');
                         }}
-                        disabled={uploading}
+                        disabled={uploadingDesktop}
                       />
                       <div style={{ fontSize: '32px', marginBottom: '12px', color: '#7c3aed' }}>
                         📤
                       </div>
                       <p style={{ color: '#7c3aed', fontSize: '16px', fontWeight: '500', marginBottom: '8px' }}>
-                        {uploading ? 'Enviando...' : 'Clique para escolher uma imagem'}
+                        {uploadingDesktop ? 'Enviando...' : 'Clique para escolher uma imagem'}
                       </p>
                       <p style={{ color: '#9ca3af', fontSize: '12px' }}>
                         JPG, PNG, WebP ou GIF • Máximo 5MB
+                      </p>
+                      <p style={{ color: '#f59e0b', background: '#fffbeb', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', marginTop: '12px', border: '1px solid #fde68a' }}>
+                        <strong>Recomendado:</strong> 1920x400 pixels. Mantenha o foco da imagem no centro.
                       </p>
                     </div>
                   </div>
@@ -648,6 +664,107 @@ export default function EditThemePage() {
                     />
                     <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '8px' }}>
                       Cole a URL de uma imagem da internet
+                    </p>
+                  </div>
+                </div>
+
+                {/* 📱 UPLOAD IMAGEM MOBILE */}
+                <hr style={{ border: 'none', borderTop: '1px solid #e5e7eb', margin: '40px 0' }} />
+
+                <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: '#374151' }}>
+                  Imagem de Fundo (Mobile)
+                </h4>
+
+                {/* Preview Mobile */}
+                {backgroundImage?.mobileUrl ? (
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', fontSize: '14px', color: '#6b7280', marginBottom: '8px', fontWeight: '500' }}>
+                      Imagem Mobile Atual:
+                    </label>
+                    <div style={{
+                      width: '100%',
+                      height: '200px',
+                      backgroundImage: `url(${backgroundImage.mobileUrl})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      marginBottom: '12px'
+                    }} />
+                    <button
+                      onClick={() => handleRemoveImage('mobile')}
+                      style={{
+                        padding: '8px 16px',
+                        background: '#fef2f2',
+                        color: '#dc2626',
+                        border: '1px solid #fecaca',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        width: '100%'
+                      }}
+                    >
+                      🗑️ Remover Imagem Mobile
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ 
+                    border: '2px dashed #d1d5db', 
+                    borderRadius: '8px', 
+                    padding: '40px', 
+                    textAlign: 'center',
+                    background: '#f9fafb',
+                    marginBottom: '20px'
+                  }}>
+                    <div style={{ fontSize: '48px', marginBottom: '16px', color: '#9ca3af' }}>
+                      📱
+                    </div>
+                    <p style={{ color: '#6b7280', fontSize: '16px', marginBottom: '16px' }}>
+                      Nenhuma imagem mobile configurada
+                    </p>
+                  </div>
+                )}
+
+                {/* Upload Mobile */}
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', fontSize: '14px', color: '#6b7280', marginBottom: '8px', fontWeight: '500' }}>
+                    Enviar do Computador (Mobile):
+                  </label>
+                  <div style={{ 
+                    border: '2px dashed #7c3aed', 
+                    borderRadius: '8px', 
+                    padding: '30px', 
+                    textAlign: 'center',
+                    background: '#f8fafc',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => document.getElementById('file-input-mobile')?.click()}
+                  >
+                    <input
+                      id="file-input-mobile"
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleImageUpload(file, 'mobile');
+                      }}
+                      disabled={uploadingMobile}
+                    />
+                    <div style={{ fontSize: '32px', marginBottom: '12px', color: '#7c3aed' }}>
+                      📤
+                    </div>
+                    <p style={{ color: '#7c3aed', fontSize: '16px', fontWeight: '500', marginBottom: '8px' }}>
+                      {uploadingMobile ? 'Enviando...' : 'Clique para escolher uma imagem mobile'}
+                    </p>
+                    <p style={{ color: '#9ca3af', fontSize: '12px' }}>
+                      JPG, PNG, WebP ou GIF • Máximo 5MB
+                    </p>
+                    <p style={{ color: '#f59e0b', background: '#fffbeb', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', marginTop: '12px', border: '1px solid #fde68a' }}>
+                      <strong>Recomendado:</strong> 750x500 pixels.
                     </p>
                   </div>
                 </div>

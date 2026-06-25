@@ -111,6 +111,7 @@ export default function Header({ onSearch, searchTerm = '', hideSearch = false }
   const [showHours, setShowHours] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
 
+  const [isMobile, setIsMobile] = useState(false);
   const navContainerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
@@ -118,6 +119,16 @@ export default function Header({ onSearch, searchTerm = '', hideSearch = false }
 
   const { colors, applyThemeStyles, getCategoryConfig, theme } = useThemeColors();
   const [storeStatus, setStoreStatus] = useState({ open: false, currentDay: '', currentTime: '' });
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
 
   const updateStoreStatus = useCallback(() => {
     const { day, currentTime } = getCurrentDayAndTime();
@@ -198,7 +209,11 @@ export default function Header({ onSearch, searchTerm = '', hideSearch = false }
     }
   };
 
-  const currentBackgroundImage = theme?.backgroundImage?.url || undefined;
+  // Escolhe a imagem de fundo correta (desktop ou mobile)
+  const currentBackgroundImage = (isMobile && theme?.backgroundImage?.mobileUrl)
+    ? theme.backgroundImage.mobileUrl
+    : theme?.backgroundImage?.url || undefined;
+
 
   useEffect(() => {
     if (!isMounted) return;
