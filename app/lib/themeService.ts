@@ -1,6 +1,6 @@
 // app/lib/themeService.ts - VERSÃO OTIMIZADA (SEM LOGS, COM CACHE)
 import { supabase } from '@/lib/supabaseClient';
-import { ThemeConfig, ComponentStyles } from '@/app/types';
+import { ThemeConfig, ComponentStyles, BackgroundImage } from '@/app/types';
 
 // ============================================
 // CACHE EM MEMÓRIA (evita buscas repetidas)
@@ -179,7 +179,8 @@ export async function getThemeById(themeId: string): Promise<ThemeConfig | null>
         if (bgData && typeof bgData === 'object' && bgData !== null) {
           backgroundImage = {
             url: bgData.url || '',
-            overlayColor: bgData.overlayColor,
+            mobileUrl: (bgData as any).mobileUrl, // Adiciona a nova propriedade
+            overlayColor: (bgData as any).overlayColor,
             opacity: bgData.opacity
           };
         } else if (typeof bgData === 'string' && bgData.trim() !== '') {
@@ -187,6 +188,7 @@ export async function getThemeById(themeId: string): Promise<ThemeConfig | null>
           backgroundImage = {
             url: parsed.url || '',
             overlayColor: parsed.overlayColor,
+            mobileUrl: parsed.mobileUrl,
             opacity: parsed.opacity
           };
         }
@@ -233,6 +235,7 @@ export async function saveTheme(theme: ThemeConfig): Promise<boolean> {
       ? {
           url: theme.backgroundImage.url,
           overlayColor: theme.backgroundImage.overlayColor || null,
+          mobileUrl: theme.backgroundImage.mobileUrl || null,
           opacity: theme.backgroundImage.opacity || null
         }
       : null;

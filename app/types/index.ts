@@ -134,18 +134,20 @@ export interface ThemeConfig {
   // 🆕 NOVA PROPRIEDADE PARA EDIÇÃO GRANULAR
   componentStyles?: ComponentStyles;
   
-  // 🆕 🆕 🆕 CORREÇÃO: AGORA É backgroundImage (ÚNICA IMAGEM POR TEMA)
-  backgroundImage?: {
-    url: string;
-    overlayColor?: string;
-    opacity?: number;
-  };
+  backgroundImage?: BackgroundImage;
   
   // METADADOS DO TEMA
   isDefault?: boolean;
   isActive?: boolean;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface BackgroundImage {
+  url: string;
+  mobileUrl?: string;
+  overlayColor?: string;
+  opacity?: number;
 }
 
 // Adicione estas interfaces
