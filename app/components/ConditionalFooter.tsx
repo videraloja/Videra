@@ -190,7 +190,7 @@ export default function ConditionalFooter() {
 
           {/* Instagram – oculto no mobile */}
           <div className="footer-item footer-instagram" style={{ textAlign: 'center' }}>
-            <a href="https://www.instagram.com/videra_lojavirtual" target="_blank" rel="noopener noreferrer"
+            <a href="https://www.instagram.com/viderastore" target="_blank" rel="noopener noreferrer"
               style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
             >
               <div style={{ marginBottom: '12px' }}>
@@ -206,7 +206,7 @@ export default function ConditionalFooter() {
               }}>
                 Instagram
               </h4>
-              <p style={{ fontSize: '14px', fontWeight: '500', color: textColor }}>@videra_lojavirtual</p>
+              <p style={{ fontSize: '14px', fontWeight: '500', color: textColor }}>@viderastore</p>
             </a>
           </div>
         </div>
