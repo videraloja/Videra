@@ -809,7 +809,7 @@ Aguarde enquanto processamos seu pedido : )
           </div>
 
           <div className="options-section">
-            <label className="section-label"> Retirada</label>
+            <label className="section-label"> Método Retirada</label>
             <div className="options-group">
               <button onClick={handlePickupClick} className={`option-btn ${pickupOption === 'buscar' ? 'active' : ''}`}>Vou buscar</button>
               <button onClick={handleSendPickupClick} className={`option-btn ${pickupOption === 'mandar' ? 'active' : ''} ${paymentMethod === 'dinheiro' ? 'disabled-option' : ''}`} style={paymentMethod === 'dinheiro' ? { opacity: 0.5, cursor: 'not-allowed' } : {}} disabled={paymentMethod === 'dinheiro'}>Vou mandar buscar</button>
