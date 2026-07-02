@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { promotionalPagesService, PromotionalPage } from '@/lib/promotionalPagesService';
 import { Product, ThemeConfig } from '@/app/types';
 import Link from 'next/link';
+import { useAuth } from '@/app/contexts/AuthContext';
 import AuthGuard from '@/app/components/AuthGuard';
 
 // Componente para seleção de produtos
@@ -829,6 +830,7 @@ function ThemeSelector({ selectedThemeId, onThemeSelect }: ThemeSelectorProps) {
 function EditPromotionalPageContent() {
   const params = useParams();
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth(); // 🆕 PEGA O STATUS DA AUTENTICAÇÃO
   const pageId = params.id as string;
 
   const [page, setPage] = useState<PromotionalPage | null>(null);
@@ -894,6 +896,9 @@ const handleImageUpload = async (file: File, type: 'desktop' | 'mobile') => {
 
   useEffect(() => {
     const controller = new AbortController();
+    // 🎯 SÓ EXECUTA QUANDO A AUTENTICAÇÃO TERMINAR
+    if (authLoading || !user) return;
+
     const loadPage = async () => {
       let currentPage: PromotionalPage | null = null;
       for (let i = 0; i < 3; i++) { // Tenta 3 vezes
@@ -939,7 +944,7 @@ const handleImageUpload = async (file: File, type: 'desktop' | 'mobile') => {
     }
     loadPage();
     return () => controller.abort();
-  }, [pageId, router]);
+  }, [pageId, router, authLoading, user]); // 🆕 ADICIONA DEPENDÊNCIAS DE AUTENTICAÇÃO
 
   const handleSave = async () => {
     setSaving(true);
