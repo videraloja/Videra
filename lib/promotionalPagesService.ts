@@ -301,33 +301,20 @@ class PromotionalPagesService {
 
   // 🎯 ATUALIZAR PÁGINA (para admin)
   async updatePage(id: string, data: Partial<PromotionalPage>): Promise<PromotionalPage | null> {
-    try {      
-      // 1. Executa o update
-      const { error: updateError } = await supabase
+    try {
+      const { data: page, error } = await supabase
         .from('promotional_pages')
         .update(data)
-        .eq('id', id);
-
-      if (updateError) {
-        console.error('❌ Erro na operação de UPDATE da página:', updateError);
-        throw updateError;
-      }
-
-      // 2. Se o update foi bem sucedido, busca os dados atualizados para garantir consistência
-      const { data: page, error: fetchError } = await supabase
-        .from('promotional_pages')
-        .select('*')
         .eq('id', id)
         .select()
         .single();
 
-      if (fetchError) {
-        console.error('❌ Erro ao RE-BUSCAR a página após o update:', fetchError);
-        // Mesmo que o update tenha funcionado, não podemos confirmar. Lançar erro.
-        throw fetchError;
+      if (error) {
+        console.error('❌ Erro na operação de UPDATE da página:', error);
+        throw error;
       }
 
-      console.log('✅ Página atualizada e re-buscada com sucesso.');
+      console.log('✅ Página atualizada com sucesso.');
       return page as PromotionalPage;
     } catch (error: any) {
       console.error('❌ Erro geral na função updatePage:', error);
