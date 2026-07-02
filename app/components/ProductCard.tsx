@@ -89,7 +89,7 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
 
   const getButtonContent = () => {
     if (product.is_preorder) {
-      return currentStock > 0 ? 'Reservar na Pré-venda' : 'Esgotado';
+      return currentStock > 0 ? 'Reservar!' : 'Esgotado';
     }
     if (currentStock === 0) {
       return 'Esgotado';

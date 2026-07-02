@@ -896,8 +896,8 @@ const handleImageUpload = async (file: File, type: 'desktop' | 'mobile') => {
 
   useEffect(() => {
     const controller = new AbortController();
-    // 🎯 SÓ EXECUTA QUANDO A AUTENTICAÇÃO TERMINAR
-    if (authLoading || !user) return;
+    // 🎯 SÓ EXECUTA QUANDO A AUTENTICAÇÃO TERMINAR E O ID ESTIVER DISPONÍVEL
+    if (authLoading || !user || !pageId) return;
 
     const loadPage = async () => {
       let currentPage: PromotionalPage | null = null;
