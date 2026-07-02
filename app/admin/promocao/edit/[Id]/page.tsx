@@ -968,11 +968,27 @@ const handleImageUpload = async (file: File, type: 'desktop' | 'mobile') => {
       
       if (updatedPage) {
         alert('✅ Página salva com sucesso!');
+        // Atualiza todos os estados do formulário para refletir os dados salvos
         setPage(updatedPage);
+        setTitle(updatedPage.title);
+        setSlug(updatedPage.slug);
+        setDescription(updatedPage.description || '');
+        setHeroImageUrl(updatedPage.hero_image_url || '');
+        setHeroImageMobileUrl(updatedPage.hero_image_mobile_url || '');
+        setFilters(updatedPage.filters || {});
+        setProductIds(updatedPage.product_ids || []);
+        setThemeId(updatedPage.theme_id || undefined);
+        setIsActive(updatedPage.is_active);
+        setStartDate(updatedPage.start_date?.split('T')[0] || '');
+        setEndDate(updatedPage.end_date?.split('T')[0] || '');
+        setShowOverlay((updatedPage as any).show_overlay !== false);
+      } else {
+        // Caso o serviço retorne nulo sem um erro explícito
+        throw new Error("A atualização não retornou os dados esperados.");
       }
     } catch (error) {
       console.error('Erro ao salvar página:', error);
-      alert('❌ Erro ao salvar página');
+      alert(`❌ Erro ao salvar página: ${error instanceof Error ? error.message : 'Erro desconhecido. Verifique o console.'}`);
     } finally {
       setSaving(false);
     }
