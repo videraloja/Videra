@@ -831,7 +831,7 @@ function EditPromotionalPageContent() {
   const params = useParams();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth(); // 🆕 PEGA O STATUS DA AUTENTICAÇÃO
-  const pageId = params.id as string;
+  const pageId = params.Id as string;
 
   const [page, setPage] = useState<PromotionalPage | null>(null);
   const [loading, setLoading] = useState(true);
