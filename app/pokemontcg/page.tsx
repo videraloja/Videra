@@ -106,10 +106,7 @@ export default function PokemonTCGPage() {
     return filterPokemon(products, activeFilters);
   }, [products, activeFilters, filterPokemon]);
 
-  const pokemonCollections = useMemo(() => {
-    if (products.length === 0) return [];
-    return getPokemonCollections(products);
-  }, [products, getPokemonCollections]);
+  const pokemonCollections = useMemo(() => getPokemonCollections(availableProducts), [availableProducts, getPokemonCollections]);
 
   const handleCarouselSelect = (type: 'all' | 'bestsellers' | 'new_arrivals') => {
     const config = carouselConfigs.find(c => c.carousel_type === type);

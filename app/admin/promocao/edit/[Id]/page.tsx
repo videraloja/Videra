@@ -827,7 +827,7 @@ function ThemeSelector({ selectedThemeId, onThemeSelect }: ThemeSelectorProps) {
 function EditPromotionalPageContent() {
   const params = useParams();
   const router = useRouter();
-  const pageId = params.Id as string;
+  const pageId = params.id as string;
 
   const [page, setPage] = useState<PromotionalPage | null>(null);
   const [loading, setLoading] = useState(true);

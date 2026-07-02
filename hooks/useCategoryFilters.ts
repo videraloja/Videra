@@ -151,7 +151,22 @@ export const useCategoryFilters = () => {
       .map(p => p.collection)
       .filter((c): c is string => !!c && c.trim() !== '');
     
-    const displayNames = collectionIds.map(id => getCollectionName(id));
+    const displayNames = collectionIds.map(id => {
+      // Tenta obter o nome mapeado a partir do seu `lib/collections.ts`
+      const mappedName = getCollectionName(id);
+      
+      // Se o nome mapeado for igual ao ID (ou seja, não encontrou um nome "bonito"),
+      // nós criamos um nome legível a partir do slug.
+      // Ex: "caos-ascendente" vira "Caos Ascendente"
+      if (mappedName === id) {
+        return id
+          .split('-')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+      }
+      
+      return mappedName; // Retorna o nome bonito que já existia no seu mapeamento
+    });
     
     return [...new Set(displayNames)].sort((a, b) => a.localeCompare(b));
   }, []);

@@ -95,7 +95,18 @@ export default function HomePage() {
       try {
         const { data, error } = await supabase
           .from('products')
-          .select('*')
+          .select(`
+            id,
+            name,
+            price,
+            original_price,
+            sale_price,
+            on_sale,
+            image_url,
+            category,
+            stock,
+            collection
+          `)
           .order('updated_at', { ascending: false, nullsFirst: false })
           .order('created_at', { ascending: false });
 

@@ -12,6 +12,7 @@ function NewProductContent() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
+  const [collectionName, setCollectionName] = useState(''); // 🆕 State para o nome da coleção
   const [uploading, setUploading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -28,6 +29,20 @@ function NewProductContent() {
     tags: [] as string[] // 🆕 NOVO CAMPO
   });
   const [previewUrl, setPreviewUrl] = useState("");
+
+  // 🆕 Função para gerar slug a partir do nome da coleção
+  const generateSlug = (text: string) => {
+    if (!text) return '';
+    return text
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^\w\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .trim();
+  };
 
   // Função para fazer upload da imagem
   const handleImageUpload = async (file: File) => {
@@ -138,6 +153,16 @@ function NewProductContent() {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+  };
+
+  // 🆕 Handler para o campo de coleção
+  const handleCollectionNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newName = e.target.value;
+    setCollectionName(newName);
+
+    // Atualiza o ID da coleção (slug) no formulário
+    const slug = generateSlug(newName);
+    setFormData(prev => ({ ...prev, collection: slug }));
   };
 
   // 🆕 FUNÇÃO PARA LIDAR COM TAGS
@@ -325,19 +350,22 @@ function NewProductContent() {
   }}>
     Coleção
   </label>
-  <select 
-    name="collection"
-    value={formData.collection}
-    onChange={handleChange}
+  <input
+    list="collections-list"
+    name="collection_name"
+    value={collectionName}
+    onChange={handleCollectionNameChange}
     style={smallInputStyle}
-  >
-    <option value="">Selecione a coleção</option>
-    {getPokemonCollectionsForAdmin().map(collection => (
-      <option key={collection.id} value={collection.id}>
-        {collection.name}
-      </option>
-    ))}
-  </select>
+    placeholder="Digite ou selecione uma coleção"
+  />
+  <datalist id="collections-list">
+      {getPokemonCollectionsForAdmin().map(collection => (
+        <option key={collection.id} value={collection.name} />
+      ))}
+  </datalist>
+  <small style={{ color: 'var(--text-secondary)', fontSize: '12px', display: 'block', marginTop: '4px' }}>
+    ID da coleção a ser salvo: <strong>{formData.collection || '(nenhum)'}</strong>
+  </small>
 </div>
 
                 {/* Rarity */}

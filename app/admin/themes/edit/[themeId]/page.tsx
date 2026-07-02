@@ -22,54 +22,28 @@ export default function EditThemePage() {
   const [uploadingDesktop, setUploadingDesktop] = useState(false);
   const [uploadingMobile, setUploadingMobile] = useState(false);
 
-  // 🔧 CORREÇÃO COMPLETA: useEffect sem loop
+  // ✅ CORREÇÃO: Efeito simplificado para evitar loops infinitos.
+  // A lógica agora depende de `allThemes` (o array em si) e não de `allThemes.length`.
+  // Isso garante que o efeito só execute quando os dados realmente mudarem, não a cada renderização.
   useEffect(() => {
-    if (hasAttemptedLoad) return;
-
-    const loadThemeForEditing = async () => {
-      try {
-        console.log('🔍 Iniciando carregamento do tema:', themeId);
-        
-        let themeToEdit = allThemes.find(theme => theme.id === themeId);
-        
-        if (!themeToEdit && allThemes.length > 0) {
-          console.log('🔄 Tema não encontrado no context, tentando localStorage...');
-          const savedThemes = localStorage.getItem('videra-themes');
-          if (savedThemes) {
-            const parsedThemes = JSON.parse(savedThemes);
-            themeToEdit = parsedThemes.find((theme: any) => theme.id === themeId);
-          }
-        }
-
-        if (themeToEdit) {
-          console.log('✅ Tema encontrado:', themeToEdit.name);
-          setDraftTheme(JSON.parse(JSON.stringify(themeToEdit)));
-          setError(null);
-        } else {
-          console.error('❌ Tema não encontrado após todas as tentativas:', themeId);
-          setError(`Tema "${themeId}" não foi encontrado. Ele pode ter sido excluído.`);
-        }
-      } catch (err) {
-        console.error('❌ Erro crítico ao carregar tema:', err);
-        setError('Erro inesperado ao carregar o tema.');
-      } finally {
-        setIsLoading(false);
-        setHasAttemptedLoad(true);
-      }
-    };
-
-    if (allThemes.length > 0) {
-      loadThemeForEditing();
-    } else {
-      console.log('⏳ Aguardando temas carregarem...');
-      const timer = setTimeout(() => {
-        refreshThemes();
-        loadThemeForEditing();
-      }, 500);
-
-      return () => clearTimeout(timer);
+    // Se os temas ainda não foram carregados pelo contexto, apenas aguarde.
+    if (allThemes.length === 0) {
+      setIsLoading(true);
+      return;
     }
-  }, [themeId, allThemes.length, hasAttemptedLoad]);
+
+    const themeToEdit = allThemes.find(theme => theme.id === themeId);
+
+    if (themeToEdit) {
+      // Usa uma cópia profunda para evitar mutações no estado global do contexto.
+      setDraftTheme(JSON.parse(JSON.stringify(themeToEdit)));
+      setError(null);
+    } else {
+      setError(`O tema com ID "${themeId}" não foi encontrado. Ele pode ter sido excluído.`);
+    }
+
+    setIsLoading(false);
+  }, [themeId, allThemes, setDraftTheme]); // Depende dos dados, não do seu comprimento.
 
   // 🔧 Função para atualizar propriedades
   const handleUpdateProperty = (path: string, value: any) => {

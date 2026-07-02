@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import ThemeToggle from "../../components/ThemeToggle";
@@ -33,6 +33,13 @@ function ProductsContent() {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [allCategories, setAllCategories] = useState<string[]>([]); // 🆕 State for all categories
+  // 🆕 ESTADOS PARA PAGINAÇÃO
+  const [currentPage, setCurrentPage] = useState(1);
+  const [productsPerPage] = useState(15); // Itens por página
+  const [totalProducts, setTotalProducts] = useState(0);
+
   
   // 🆕 ESTADOS PARA PROMOÇÕES EM MASSA
   const [isProcessingPromotion, setIsProcessingPromotion] = useState(false);
@@ -42,7 +49,16 @@ function ProductsContent() {
   const [showRemovePromoModal, setShowRemovePromoModal] = useState(false);
 
 
-  // 🆕 ESTADOS PARA FILTROS
+  // ESTADOS PARA FILTROS
+  // searchTermInput é o valor visível no campo de busca, atualizado instantaneamente.
+  const [searchTermInput, setSearchTermInput] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('adminProductsSearch') || '';
+    }
+    return '';
+  });
+
+  // filters.searchTerm é o valor "debounced", usado para fazer a busca no banco de dados.
   const [filters, setFilters] = useState<Filters>(() => {
     if (typeof window !== 'undefined') {
       return {
@@ -53,16 +69,48 @@ function ProductsContent() {
     return { category: '', searchTerm: "" };
   });
 
-  // 🆕 Salvar filtros para manter a lista igual ao voltar
+  // Salvar filtros para manter a lista igual ao voltar
   useEffect(() => {
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('adminProductsCategory', filters.category);
-      sessionStorage.setItem('adminProductsSearch', filters.searchTerm);
+      sessionStorage.setItem('adminProductsSearch', searchTermInput);
     }
-  }, [filters]);
+  }, [filters.category, searchTermInput]);
 
   useEffect(() => {
     loadProducts();
+  }, [currentPage, filters]); // Recarrega quando a página ou filtros mudam
+
+  // 🆕 Resetar para a página 1 quando os filtros mudam para uma nova busca
+  const isInitialMount = useRef(true);
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    if (currentPage !== 1) {
+      setCurrentPage(1);
+    }
+  }, [filters]);
+
+  // 🆕 FUNÇÃO PARA BUSCAR AO PRESSIONAR ENTER
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault(); // Previne o comportamento padrão de submissão de formulário
+      setFilters(prev => ({ ...prev, searchTerm: searchTermInput }));
+    }
+  };
+
+  // 🆕 Carregar todas as categorias uma vez para o dropdown
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const { data, error } = await supabase.from('products').select('category');
+      if (!error && data) {
+        const uniqueCategories = [...new Set(data.map(p => p.category).filter(Boolean))] as string[];
+        setAllCategories(uniqueCategories.sort());
+      }
+    };
+    fetchCategories();
   }, []);
 
   // 🆕 ATUALIZAÇÃO AUTOMÁTICA: Recarrega os produtos quando a página fica visível.
@@ -78,14 +126,42 @@ function ProductsContent() {
   }, []);
 
   const loadProducts = async () => {
+    setLoading(true);
     try {
-      const { data, error } = await supabase
+      // Calcular o range da paginação
+      const from = (currentPage - 1) * productsPerPage;
+      const to = from + productsPerPage - 1;
+
+      // 🆕 Constrói a query com base nos filtros
+      let query = supabase
         .from("products")
-        .select("*")
-        .order("created_at", { ascending: false });
+        .select("*", { count: 'exact' }); // Pede a contagem total junto com os dados
+
+      // Aplica filtro de categoria
+      if (filters.category) {
+        query = query.eq('category', filters.category);
+      }
+
+      // Aplica filtro de busca
+      if (filters.searchTerm) {
+        const searchTerm = `%${filters.searchTerm}%`;
+        // Busca em múltiplos campos
+        query = query.or(
+          `name.ilike.${searchTerm},supplier_code.ilike.${searchTerm},collection.ilike.${searchTerm},product_type.ilike.${searchTerm}`
+        );
+      }
+
+      // Adiciona ordenação e paginação
+      query = query
+        .order("created_at", { ascending: false })
+        .range(from, to);
+
+      // Executa a query
+      const { data, error, count } = await query;
 
       if (error) throw error;
-      setProducts(data || []);
+      setProducts(data as Product[] || []);
+      if (count) setTotalProducts(count); // Atualiza a contagem total para a paginação
     } catch (error) {
       console.error("Erro ao carregar produtos:", error);
       alert("Erro ao carregar produtos");
@@ -93,6 +169,8 @@ function ProductsContent() {
       setLoading(false);
     }
   };
+
+  const totalPages = Math.ceil(totalProducts / productsPerPage);
 
   const deleteProduct = async (productId: number) => {
     if (!confirm("Tem certeza que deseja excluir este produto?")) return;
@@ -121,18 +199,57 @@ function ProductsContent() {
       return;
     }
 
-    const confirmation = prompt(
-      `⚠️ ATENÇÃO! Você está prestes a aplicar uma promoção em TODOS os ${products.length} produtos.\n\nEsta ação não pode ser desfeita facilmente.\n\nPara confirmar, digite "APLICAR".`
-    );
-
-    if (confirmation?.toUpperCase() !== 'APLICAR') {
-      alert('Ação cancelada.');
-      return;
-    }
-
     setIsProcessingPromotion(true);
     try {
-      const updates = products.map(product => {
+      // 1. Contar quantos produtos serão afetados para confirmação
+      let countQuery = supabase
+        .from('products')
+        .select('*', { count: 'exact', head: true });
+
+      if (filters.category) {
+        countQuery = countQuery.eq('category', filters.category);
+      }
+      if (filters.searchTerm) {
+        const searchTerm = `%${filters.searchTerm}%`;
+        countQuery = countQuery.or(`name.ilike.${searchTerm},supplier_code.ilike.${searchTerm},collection.ilike.${searchTerm},product_type.ilike.${searchTerm}`);
+      }
+
+      const { count: totalMatchingProducts, error: countError } = await countQuery;
+
+      if (countError) throw countError;
+
+      if (!totalMatchingProducts || totalMatchingProducts === 0) {
+        alert('Nenhum produto encontrado com os filtros atuais para aplicar a promoção.');
+        setIsProcessingPromotion(false);
+        return;
+      }
+
+      const confirmation = prompt(
+        `⚠️ ATENÇÃO! Você está prestes a aplicar uma promoção em ${totalMatchingProducts} produto(s) que correspondem aos filtros atuais.\n\nEsta ação não pode ser desfeita facilmente.\n\nPara confirmar, digite "APLICAR".`
+      );
+
+      if (confirmation?.toUpperCase() !== 'APLICAR') {
+        alert('Ação cancelada.');
+        setIsProcessingPromotion(false);
+        return;
+      }
+
+      // 2. Buscar os produtos que correspondem aos filtros para calcular os novos preços
+      let productsQuery = supabase.from('products').select('id, price');
+      if (filters.category) {
+        productsQuery = productsQuery.eq('category', filters.category);
+      }
+      if (filters.searchTerm) {
+        const searchTerm = `%${filters.searchTerm}%`;
+        productsQuery = productsQuery.or(`name.ilike.${searchTerm},supplier_code.ilike.${searchTerm},collection.ilike.${searchTerm},product_type.ilike.${searchTerm}`);
+      }
+
+      const { data: productsToUpdate, error: fetchError } = await productsQuery.limit(10000); // Limite alto para garantir que todos sejam pegos
+
+      if (fetchError) throw fetchError;
+
+      // 3. Preparar os dados para atualização
+      const updates = productsToUpdate.map(product => {
         const originalPrice = product.price;
         let salePrice = 0;
 
@@ -142,8 +259,7 @@ function ProductsContent() {
           salePrice = originalPrice - value;
         }
 
-        // Garante que o preço de venda não seja negativo
-        salePrice = Math.max(salePrice, 0.01);
+        salePrice = Math.max(salePrice, 0.01); // Garante que o preço não seja negativo
 
         return {
           id: product.id,
@@ -154,10 +270,8 @@ function ProductsContent() {
         };
       });
 
-      // O método `upsert` do Supabase é perfeito para atualizações em massa
-      const { error, count } = await supabase.from('products').upsert(updates);
-
-      if (error) throw error;
+      const { error: upsertError, count } = await supabase.from('products').upsert(updates);
+      if (upsertError) throw upsertError;
 
       alert(`✅ Sucesso! ${count || 0} produtos foram atualizados com a promoção.`);
       loadProducts(); // Recarrega a lista para mostrar os novos preços
@@ -209,20 +323,11 @@ function ProductsContent() {
   };
 
   // 🆕 FILTRAGEM AVANÇADA
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = 
-      product.name.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
-      product.supplier_code?.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
-      product.collection?.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
-      product.product_type?.toLowerCase().includes(filters.searchTerm.toLowerCase());
-
-    const matchesCategory = !filters.category || product.category === filters.category;
-
-    return matchesSearch && matchesCategory;
-  });
+  // A filtragem agora é feita no backend (Supabase).
+  // A variável `products` já contém os produtos filtrados.
+  const filteredProducts = products;
 
   // 🆕 EXTRAIR CATEGORIAS ÚNICAS
-  const categories = [...new Set(products.map(p => p.category).filter(Boolean))];
 
   // 🆕 FUNÇÃO PARA BADGE DE CATEGORIA
   const getCategoryBadge = (category?: string) => {
@@ -533,7 +638,7 @@ function ProductsContent() {
               }}
             >
               <option value="">Todas as categorias</option>
-              {categories.map(category => (
+              {allCategories.map(category => (
                 <option key={category} value={category}>{category}</option>
               ))}
             </select>
@@ -553,8 +658,9 @@ function ProductsContent() {
             <input
               type="text"
               placeholder="Buscar por nome, código, coleção ou tipo..."
-              value={filters.searchTerm}
-              onChange={(e) => setFilters(prev => ({ ...prev, searchTerm: e.target.value }))}
+              value={searchTermInput}
+              onChange={(e) => setSearchTermInput(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
               style={{
                 width: "100%",
                 padding: "10px 12px",
@@ -569,9 +675,12 @@ function ProductsContent() {
         </div>
 
         {/* 🆕 BOTÃO LIMPAR FILTROS */}
-        {(filters.category || filters.searchTerm) && (
+        {(filters.category || searchTermInput) && (
           <button
-            onClick={() => setFilters({ category: '', searchTerm: '' })}
+            onClick={() => {
+              setSearchTermInput('');
+              setFilters({ category: '', searchTerm: '' });
+            }}
             style={{
               background: 'transparent',
               color: '#ef4444',
@@ -588,6 +697,37 @@ function ProductsContent() {
           </button>
         )}
       </div>
+
+      {/* 🆕 CONTROLES DE PAGINAÇÃO */}
+      {totalPages > 1 && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginTop: '24px',
+          padding: '12px',
+          background: 'var(--bg-secondary)',
+          borderRadius: '8px'
+        }}>
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1 || loading}
+            style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid var(--border-color)', cursor: 'pointer', background: 'var(--bg-card)', color: 'var(--text-primary)' }}
+          >
+            Anterior
+          </button>
+          <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+            Página {currentPage} de {totalPages}
+          </span>
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+            disabled={currentPage === totalPages || loading}
+            style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid var(--border-color)', cursor: 'pointer', background: 'var(--bg-card)', color: 'var(--text-primary)' }}
+          >
+            Próxima
+          </button>
+        </div>
+      )}
 
       {/* Lista de Produtos */}
       <div style={{ 
@@ -785,9 +925,9 @@ function ProductsContent() {
           </p>
           
           {/* 🆕 ESTATÍSTICAS POR CATEGORIA */}
-          {categories.length > 0 && (
+          {allCategories.length > 0 && (
             <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-              {categories.map(category => {
+              {allCategories.map(category => {
                 const categoryCount = filteredProducts.filter(p => p.category === category).length;
                 if (categoryCount === 0) return null;
                 
