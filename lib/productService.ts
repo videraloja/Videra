@@ -18,16 +18,21 @@ export interface ProductWithAvailableStock {
   [key: string]: any;
 }
 
-export const getProductsWithAvailableStock = async (): Promise<ProductWithAvailableStock[]> => {
+export const getProductsWithAvailableStock = async (signal?: AbortSignal): Promise<ProductWithAvailableStock[]> => {
   // 1. Buscar todos os produtos
-  const { data: products, error } = await supabase
+  let productsQuery = supabase
     .from('products')
     .select('*')
     .order('updated_at', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false });
+
+  if (signal) productsQuery = productsQuery.abortSignal(signal);
+  const { data: products, error } = await productsQuery;
   
   if (error) {
-    console.error('Erro ao buscar produtos:', error);
+    if (error.name !== 'AbortError' && !error.message.includes('AbortError')) {
+      console.error('Erro ao buscar produtos:', error);
+    }
     return [];
   }
 
@@ -37,12 +42,17 @@ export const getProductsWithAvailableStock = async (): Promise<ProductWithAvaila
 
   // 2. Buscar estoque disponível via RPC (funciona para usuários anônimos)
   const productIds = products.map(p => p.id);
-  const { data: stockData, error: rpcError } = await supabase.rpc('get_available_stock', {
+  let rpcQuery = supabase.rpc('get_available_stock', {
     p_product_ids: productIds
   });
 
+  if (signal) rpcQuery = rpcQuery.abortSignal(signal);
+  const { data: stockData, error: rpcError } = await rpcQuery;
+
   if (rpcError) {
-    console.error('Erro ao chamar get_available_stock RPC:', rpcError);
+    if (rpcError.name !== 'AbortError' && !rpcError.message.includes('AbortError')) {
+      console.error('Erro ao chamar get_available_stock RPC:', rpcError);
+    }
     // Fallback: retornar produtos com stock bruto
     return products.map(p => ({ ...p, available_stock: p.stock }));
   }

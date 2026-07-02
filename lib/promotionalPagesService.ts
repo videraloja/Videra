@@ -7,6 +7,7 @@ export interface PromotionalPage {
   title: string;
   description?: string;
   hero_image_url?: string;
+  hero_image_mobile_url?: string | null;
   filters: Record<string, any>;
   product_ids: string[];
   theme_id?: string;
@@ -14,6 +15,7 @@ export interface PromotionalPage {
   start_date?: string;
   end_date?: string;
   created_at: string;
+  show_overlay?: boolean;
 }
 
 export interface PromotionalPageWithTheme extends PromotionalPage {
@@ -224,22 +226,55 @@ class PromotionalPagesService {
   }
 
   // 🎯 LISTAR TODAS PÁGINAS (para admin)
-  async getAllPages(): Promise<PromotionalPage[]> {
+  async getAllPages(signal?: AbortSignal): Promise<PromotionalPage[]> {
     try {
-      const { data, error } = await supabase
+      const query = supabase
         .from('promotional_pages')
         .select('*')
         .order('created_at', { ascending: false });
 
+      if (signal) query.abortSignal(signal);
+      const { data, error } = await query;
+
       if (error) {
-        console.error('❌ Erro ao listar páginas:', error);
+        if (error.name !== 'AbortError' && !(error.message && error.message.includes('AbortError'))) {
+          console.error('❌ Erro ao listar páginas:', error);
+        }
         return [];
       }
 
       return data as PromotionalPage[];
-    } catch (error) {
-      console.error('❌ Erro ao listar páginas:', error);
+    } catch (error: any) {
+      if (error.name !== 'AbortError' && !(error.message && error.message.includes('AbortError'))) {
+        console.error('❌ Erro ao listar páginas:', error);
+      }
       return [];
+    }
+  }
+
+  // 🎯 BUSCAR PÁGINA POR ID (para admin)
+  async getPageById(id: string, signal?: AbortSignal): Promise<PromotionalPage | null> {
+    try {
+      let query = supabase
+        .from('promotional_pages')
+        .select('*')
+        .eq('id', id);
+
+      if (signal) query.abortSignal(signal);
+      const { data, error } = await query.single();
+
+      if (error) {
+        if (error.name !== 'AbortError' && !(error.message && error.message.includes('AbortError'))) {
+          console.error(`❌ Erro ao buscar página com ID ${id}:`, error);
+        }
+        return null;
+      }
+      return data as PromotionalPage;
+    } catch (error: any) {
+      if (error.name !== 'AbortError' && !(error.message && error.message.includes('AbortError'))) {
+        console.error(`❌ Erro ao buscar página com ID ${id}:`, error);
+      }
+      return null;
     }
   }
 

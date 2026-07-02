@@ -139,13 +139,18 @@ export default function CartPage() {
   }, []);
 
   useEffect(() => {
+    const controller = new AbortController();
     const load = async () => {
       const { data: freshProducts, error } = await supabase
         .from('products')
-        .select('*');
+        .select('*')
+        .abortSignal(controller.signal);
 
       if (error) {
-        console.error('Erro ao buscar produtos:', error);
+        if (error.name !== 'AbortError' && !(error.message && error.message.includes('AbortError'))) {
+          console.error('Erro ao buscar produtos:', error);
+        }
+        return;
       }
 
       const updatedProducts = (freshProducts as Product[]) || [];
@@ -190,6 +195,7 @@ export default function CartPage() {
     load();
 
     const updateHandler = () => {
+      // This handler is synchronous, no need for abort controller here.
       const sCart = localStorage.getItem('cart');
       const sProducts = localStorage.getItem('products');
       if (sCart) {
@@ -218,6 +224,7 @@ export default function CartPage() {
     window.addEventListener('storage', updateHandler);
 
     return () => {
+      controller.abort();
       window.removeEventListener('cart-updated', updateHandler);
       window.removeEventListener('storage', updateHandler);
     };

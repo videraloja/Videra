@@ -25,6 +25,7 @@ interface Product {
   original_price?: number;
   on_sale?: boolean;
   sale_price?: number;
+  is_preorder?: boolean; // 🆕 CAMPO PARA PRÉ-VENDA
 }
 
 // EDIÇÃO DE PRODUTOS EXISTENTES
@@ -53,15 +54,66 @@ function EditProductContent() {
     // 🆕 CAMPOS PARA PROMOÇÕES
     on_sale: false,
     original_price: "",
-    sale_price: ""
+    sale_price: "",
+    is_preorder: false // 🆕 CAMPO PARA PRÉ-VENDA
   });
   const [previewUrl, setPreviewUrl] = useState("");
 
   useEffect(() => {
+    const controller = new AbortController();
+
+    const loadProduct = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("products")
+          .select("*")
+          .eq("id", id)
+          .abortSignal(controller.signal)
+          .single();
+
+        if (error) throw error;
+
+        if (data) {
+          setFormData({
+            name: data.name,
+            price: data.price.toString(),
+            stock: data.stock.toString(),
+            supplier_code: data.supplier_code || "",
+            cost_price: data.cost_price?.toString() || "",
+            image_url: data.image_url || "",
+            category: data.category || "",
+            product_type: data.product_type || "",
+            collection: data.collection || "",
+            rarity: data.rarity || "",
+            card_set: data.card_set || "",
+            tags: data.tags || [],
+            // 🆕 CAMPOS PARA PROMOÇÕES
+            on_sale: data.on_sale || false,
+            original_price: data.original_price?.toString() || data.price.toString(),
+            sale_price: data.sale_price?.toString() || "",
+            is_preorder: data.is_preorder || false
+          });
+          setPreviewUrl(data.image_url || "");
+        }
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
+          console.error("Erro ao carregar produto:", error);
+          alert("Erro ao carregar produto");
+          router.push("/admin/products");
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    };
+
     if (id) {
       loadProduct();
     }
-  }, [id]);
+
+    return () => controller.abort();
+  }, [id, router]);
 
   // 🆕 Função para gerar slug a partir do nome da coleção
   const generateSlug = (text: string) => {
@@ -82,12 +134,9 @@ function EditProductContent() {
     if (formData.collection) {
       const collections = getPokemonCollectionsForAdmin();
       const currentCollection = collections.find(c => c.id === formData.collection);
-      // Se encontrou na lista, usa o nome mapeado.
       if (currentCollection) {
         setCollectionName(currentCollection.name);
       } else {
-        // Se não encontrou, é uma coleção nova. "Des-slugificamos" o ID para mostrar um nome legível.
-        // Ex: "caos-ascendente" vira "Caos Ascendente"
         const deSlugifiedName = formData.collection.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
         setCollectionName(deSlugifiedName);
       }
@@ -95,46 +144,6 @@ function EditProductContent() {
       setCollectionName('');
     }
   }, [formData.collection]);
-
-  const loadProduct = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .eq("id", id)
-        .single();
-
-      if (error) throw error;
-
-      if (data) {
-        setFormData({
-          name: data.name,
-          price: data.price.toString(),
-          stock: data.stock.toString(),
-          supplier_code: data.supplier_code || "",
-          cost_price: data.cost_price?.toString() || "",
-          image_url: data.image_url || "",
-          category: data.category || "",
-          product_type: data.product_type || "",
-          collection: data.collection || "",
-          rarity: data.rarity || "",
-          card_set: data.card_set || "",
-          tags: data.tags || [],
-          // 🆕 CAMPOS PARA PROMOÇÕES
-          on_sale: data.on_sale || false,
-          original_price: data.original_price?.toString() || data.price.toString(),
-          sale_price: data.sale_price?.toString() || ""
-        });
-        setPreviewUrl(data.image_url || "");
-      }
-    } catch (error) {
-      console.error("Erro ao carregar produto:", error);
-      alert("Erro ao carregar produto");
-      router.push("/admin/products");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // 🆕 FUNÇÃO PARA CALCULAR DESCONTO AUTOMATICAMENTE
   const calculateDiscount = () => {
@@ -251,6 +260,7 @@ function EditProductContent() {
         on_sale: formData.on_sale,
         original_price: formData.on_sale && formData.original_price ? parseFloat(formData.original_price) : null,
         sale_price: formData.on_sale && formData.sale_price ? parseFloat(formData.sale_price) : null,
+        is_preorder: formData.is_preorder, // 🆕 SALVAR ESTADO DE PRÉ-VENDA
         updated_at: new Date().toISOString()
       };
 
@@ -279,6 +289,8 @@ function EditProductContent() {
       const checked = (e.target as HTMLInputElement).checked;
       if (name === 'on_sale') {
         handlePromotionToggle(checked);
+      } else if (name === 'is_preorder') {
+        setFormData(prev => ({ ...prev, is_preorder: checked }));
       } else {
         setFormData(prev => ({
           ...prev,
@@ -481,6 +493,30 @@ function EditProductContent() {
               <option value="acessorios">Acessórios TCG</option>
               <option value="hot-wheels">Hot Wheels</option>
             </select>
+          </div>
+
+          {/* 🆕 SEÇÃO DE PRÉ-VENDA */}
+          <div style={{...sectionStyle, background: 'var(--accent-color)', border: '2px solid var(--accent-hover)'}}>
+            <h3 style={{...titleStyle, color: 'white'}}>
+              📦 Configurações de Pré-venda
+            </h3>
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              cursor: 'pointer',
+              color: 'white',
+              fontWeight: 600
+            }}>
+              <input
+                type="checkbox"
+                name="is_preorder"
+                checked={formData.is_preorder}
+                onChange={handleChange}
+                style={{ width: '20px', height: '20px' }}
+              />
+              Marcar este produto como PRÉ-VENDA (ocultará o estoque e da vitrine principal)
+            </label>
           </div>
 
           {/* 🆕 SEÇÃO DE PROMOÇÕES */}

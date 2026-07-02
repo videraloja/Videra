@@ -3,10 +3,14 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Product } from '../types';
+import { Product as BaseProduct } from '../types';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useStock } from '../../hooks/useStock';
 import { useCartContext } from '../contexts/CartContext';
+
+interface Product extends BaseProduct {
+  is_preorder?: boolean;
+}
 
 interface ProductCardProps {
   product: Product;
@@ -84,9 +88,16 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
   };
 
   const getButtonContent = () => {
-    if (currentStock === 0) return 'Esgotado';
-    if (isAdded) return `✓ Adicionado (${quantityInCart})`;
-    return `Adicionar ao Carrinho`;
+    if (product.is_preorder) {
+      return currentStock > 0 ? 'Reservar na Pré-venda' : 'Esgotado';
+    }
+    if (currentStock === 0) {
+      return 'Esgotado';
+    }
+    if (isAdded) {
+      return `✓ Adicionado (${quantityInCart})`;
+    }
+    return 'Adicionar ao Carrinho';
   };
 
   const getButtonColor = () => {
@@ -202,12 +213,22 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px' }}>
-          <span style={{ fontSize: '14px' }}>{stockInfo.icon}</span>
-          <span style={applyCardStyles('stockInfo', { fontSize: '14px', fontWeight: '500' })}>
-            {stockInfo.text}
-          </span>
-        </div>
+        {/* 🆕 LÓGICA CONDICIONAL PARA ESTOQUE OU PRÉ-VENDA */}
+        {product.is_preorder ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', background: '#f3e8ff', color: '#7c3aed', padding: '6px 10px', borderRadius: '8px', border: '1px solid #e9d5ff' }}>
+            <span style={{ fontSize: '14px' }}>📦</span>
+            <span style={{ fontSize: '14px', fontWeight: '600' }}>
+              Produto em Pré-venda
+            </span>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px' }}>
+            <span style={{ fontSize: '14px' }}>{stockInfo.icon}</span>
+            <span style={applyCardStyles('stockInfo', { fontSize: '14px', fontWeight: '500' })}>
+              {stockInfo.text}
+            </span>
+          </div>
+        )}
 
         <div style={{ height: '50px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 'auto' }}>
           <button

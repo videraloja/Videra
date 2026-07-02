@@ -1,12 +1,14 @@
 // app/admin/themes/components/PromotionalPageManager.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { promotionalPagesService, PromotionalPage } from '@/lib/promotionalPagesService';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 
 export default function PromotionalPageManager() {
+  const router = useRouter();
   const [pages, setPages] = useState<PromotionalPage[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -21,22 +23,31 @@ export default function PromotionalPageManager() {
     is_active: true
   });
 
-  // Carregar páginas
-  const loadPages = async () => {
+  // 🎨 FUNÇÃO DE CARREGAMENTO MOVDA PARA FORA E ENVOLVIDA COM useCallback
+  const loadPages = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     try {
-      const pagesData = await promotionalPagesService.getAllPages();
+      const pagesData = await promotionalPagesService.getAllPages(signal);
       setPages(pagesData);
-    } catch (error) {
-      console.error('❌ Erro ao carregar páginas:', error);
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        console.error('❌ Erro ao carregar páginas:', error);
+      }
     } finally {
-      setLoading(false);
+      if (!signal || !signal.aborted) {
+        setLoading(false);
+      }
     }
-  };
-
-  useEffect(() => {
-    loadPages();
   }, []);
+
+  // Efeito para carregar páginas na montagem do componente
+  useEffect(() => {
+    const controller = new AbortController();
+    loadPages(controller.signal);
+    return () => {
+      controller.abort();
+    };
+  }, [loadPages]);
 
   // Gerar slug automático a partir do título - MELHORADO!
   const generateSlug = (title: string) => {
@@ -90,11 +101,7 @@ export default function PromotionalPageManager() {
         setShowCreateModal(false);
         setNewPage({ title: '', slug: '', description: '', is_active: true });
         loadPages();
-        
-        // Redirecionar para edição
-        setTimeout(() => {
-          window.location.href = `/admin/promocao/edit/${createdPage.id}`;
-        }, 500);
+        router.push(`/admin/promocao/edit/${createdPage.id}`);
       }
     } catch (error) {
       console.error('❌ Erro ao criar página:', error);

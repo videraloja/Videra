@@ -152,17 +152,22 @@ export default function JogosTabuleiroPage() {
 
   // Carregar produtos e coleções
   useEffect(() => {
+    const controller = new AbortController();
     const load = async () => {
       try {
         const { data, error } = await supabase
           .from('products')
           .select('*')
           .eq('category', 'board-games')
+          .eq('is_preorder', false)
           .order('updated_at', { ascending: false, nullsFirst: false })
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false })
+          .abortSignal(controller.signal);
 
         if (error) {
-          console.error('Erro ao buscar jogos de tabuleiro:', error);
+          if (error.name !== 'AbortError' && !(error.message && error.message.includes('AbortError'))) {
+            console.error('Erro ao buscar jogos de tabuleiro:', error);
+          }
           return;
         }
 
@@ -181,21 +186,27 @@ export default function JogosTabuleiroPage() {
 
           setAvailableCollections(uniqueCollections);
         }
-      } catch (err) {
-        console.error('Erro ao acessar Supabase:', err);
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          console.error('Erro ao acessar Supabase:', err);
+        }
       }
-      setReady(true);
+      if (!controller.signal.aborted) {
+        setReady(true);
+      }
     };
 
     load();
+    return () => controller.abort();
   }, []);
 
   // Carregar carrosséis
   useEffect(() => {
+    let isCancelled = false;
     const loadCarousels = async () => {
       if (!ready) return;
 
-      setCarouselsLoading(true);
+      if (!isCancelled) setCarouselsLoading(true);
       try {
         const configs = await carouselService.getCarouselConfigs('jogosdetabuleiro');
         setCarouselConfigs(configs);
@@ -203,6 +214,8 @@ export default function JogosTabuleiroPage() {
 
         const { getProductsWithAvailableStock } = await import('@/lib/productService');
         const productsWithStock = await getProductsWithAvailableStock();
+
+        if (isCancelled) return;
 
         const best = await carouselService.getBestsellers('board-games', 10);
         const syncedBest = best.map(product => {
@@ -217,14 +230,19 @@ export default function JogosTabuleiroPage() {
           return { ...product, stock: stockInfo?.available_stock ?? product.stock };
         });
         setNewArrivals(syncedArrivals);
-      } catch (error) {
-        console.error('Erro ao carregar carrosséis:', error);
+      } catch (error: any) {
+        if (!isCancelled && error.name !== 'AbortError') {
+          console.error('Erro ao carregar carrosséis:', error);
+        }
       } finally {
-        setCarouselsLoading(false);
+        if (!isCancelled) {
+          setCarouselsLoading(false);
+        }
       }
     };
 
     loadCarousels();
+    return () => { isCancelled = true; };
   }, [ready]);
 
   const handleCarouselSelect = (type: 'all' | 'bestsellers' | 'new_arrivals') => {

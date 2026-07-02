@@ -22,24 +22,30 @@ function ProductSelector({ selectedIds, onSelectionChange }: ProductSelectorProp
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
   useEffect(() => {
+    const controller = new AbortController();
+    const loadProducts = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .order('name')
+          .abortSignal(controller.signal);
+
+        if (error) throw error;
+        setProducts(data || []);
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
+          console.error('Erro ao carregar produtos:', error);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    };
     loadProducts();
+    return () => controller.abort();
   }, []);
-
-  const loadProducts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('name');
-
-      if (error) throw error;
-      setProducts(data || []);
-    } catch (error) {
-      console.error('Erro ao carregar produtos:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -199,30 +205,37 @@ interface FilterEditorProps {
 }
 
 function FilterEditor({ filters, onFiltersChange }: FilterEditorProps) {
-  const [activeTab, setActiveTab] = useState<'pokemon' | 'boardgames' | 'acessorios' | 'hotwheels'>('pokemon');
+  const [activeTab, setActiveTab] = useState<'pokemon' | 'boardgames' | 'acessorios' | 'hotwheels' | null>(() => {
+    return (filters.category as any) || null;
+  });
   const [collections, setCollections] = useState<string[]>([]);
   const [productTypes, setProductTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   // 🎯 BUSCAR VALORES REAIS DO BANCO
   useEffect(() => {
+    const controller = new AbortController();
     const loadFilterValues = async () => {
       try {
         console.log('🔍 Carregando valores de filtro do banco...');
         
         // Buscar coleções únicas para Pokémon
-        const { data: collectionsData } = await supabase
+        const collectionsPromise = supabase
           .from('products')
           .select('collection')
           .eq('category', 'pokemon')
-          .not('collection', 'is', null);
+          .not('collection', 'is', null)
+          .abortSignal(controller.signal);
 
         // Buscar tipos únicos para Pokémon
-        const { data: typesData } = await supabase
+        const typesPromise = supabase
           .from('products')
           .select('product_type')
           .eq('category', 'pokemon')
-          .not('product_type', 'is', null);
+          .not('product_type', 'is', null)
+          .abortSignal(controller.signal);
+
+        const [{ data: collectionsData }, { data: typesData }] = await Promise.all([collectionsPromise, typesPromise]);
 
         // Processar coleções
         const uniqueCollections = Array.from(
@@ -251,14 +264,18 @@ function FilterEditor({ filters, onFiltersChange }: FilterEditorProps) {
 
         setCollections(uniqueCollections);
         setProductTypes(uniqueTypes);
-      } catch (error) {
-        console.error('❌ Erro ao carregar valores de filtro:', error);
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
+          console.error('❌ Erro ao carregar valores de filtro:', error);
+        }
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
-
     loadFilterValues();
+    return () => controller.abort();
   }, []);
 
   const updateFilter = (key: string, value: any) => {
@@ -273,7 +290,71 @@ function FilterEditor({ filters, onFiltersChange }: FilterEditorProps) {
     onFiltersChange(newFilters);
   };
 
-  // 🎯 FILTROS PARA POKÉMON
+  // 🆕 COMPONENTE REUTILIZÁVEL PARA FILTROS GENÉRICOS
+  const renderGenericFilters = () => (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+      {/* Preço Máximo */}
+      <div>
+        <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+          Preço Máximo (R$)
+        </label>
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          value={filters.max_price || ''}
+          onChange={(e) => updateFilter('max_price', e.target.value ? parseFloat(e.target.value) : undefined)}
+          placeholder="Ex: 100.00"
+          style={{
+            width: '100%',
+            padding: '10px 12px',
+            border: '1px solid #d1d5db',
+            borderRadius: '6px',
+            fontSize: '14px'
+          }}
+          onWheel={(e) => e.currentTarget.blur()}
+        />
+      </div>
+
+      {/* Status de Produto */}
+      <div>
+        <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+          Status de Produto
+        </label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={filters.on_sale || false}
+              onChange={(e) => updateFilter('on_sale', e.target.checked)}
+              style={{ width: '16px', height: '16px' }}
+            />
+            <span style={{ fontSize: '14px' }}>Apenas produtos em promoção</span>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={filters.in_stock || false}
+              onChange={(e) => updateFilter('in_stock', e.target.checked)}
+              style={{ width: '16px', height: '16px' }}
+            />
+            <span style={{ fontSize: '14px' }}>Apenas produtos em estoque</span>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', background: '#f3e8ff', padding: '8px', borderRadius: '6px', border: '1px solid #e9d5ff' }}>
+            <input
+              type="checkbox"
+              checked={filters.is_preorder || false}
+              onChange={(e) => updateFilter('is_preorder', e.target.checked)}
+              style={{ width: '16px', height: '16px' }}
+            />
+            <span style={{ fontSize: '14px', fontWeight: '600', color: '#7c3aed' }}>📦 Apenas produtos em PRÉ-VENDA</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  );
+
+  //  FILTROS PARA POKÉMON
   const renderPokemonFilters = () => {
     if (loading) {
       return (
@@ -285,8 +366,8 @@ function FilterEditor({ filters, onFiltersChange }: FilterEditorProps) {
     }
 
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-        {/* Coleção */}
+      <>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px dashed #e5e7eb' }}>
         <div>
           <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
             Coleção
@@ -347,58 +428,9 @@ function FilterEditor({ filters, onFiltersChange }: FilterEditorProps) {
             </p>
           )}
         </div>
-
-        {/* Preço Máximo */}
-        <div>
-          <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
-            Preço Máximo (R$)
-          </label>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={filters.max_price || ''}
-            onChange={(e) => updateFilter('max_price', e.target.value ? parseFloat(e.target.value) : undefined)}
-            placeholder="Ex: 100.00"
-            style={{
-              width: '100%',
-              padding: '10px 12px',
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              fontSize: '14px'
-            }}
-            onWheel={(e) => e.currentTarget.blur()}
-          />
         </div>
-
-        {/* Apenas em promoção */}
-        <div>
-          <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
-            Status de Promoção
-          </label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={filters.on_sale || false}
-                onChange={(e) => updateFilter('on_sale', e.target.checked)}
-                style={{ width: '16px', height: '16px' }}
-              />
-              <span style={{ fontSize: '14px' }}>Apenas produtos em promoção</span>
-            </label>
-            
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={filters.in_stock || false}
-                onChange={(e) => updateFilter('in_stock', e.target.checked)}
-                style={{ width: '16px', height: '16px' }}
-              />
-              <span style={{ fontSize: '14px' }}>Apenas produtos em estoque</span>
-            </label>
-          </div>
-        </div>
-      </div>
+        {renderGenericFilters()}
+      </>
     );
   };
 
@@ -414,7 +446,8 @@ function FilterEditor({ filters, onFiltersChange }: FilterEditorProps) {
     }
 
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+      <>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px dashed #e5e7eb' }}>
         <div>
           <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
             Tipo de Jogo
@@ -444,29 +477,9 @@ function FilterEditor({ filters, onFiltersChange }: FilterEditorProps) {
               ))}
           </select>
         </div>
-
-        <div>
-          <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
-            Preço Máximo (R$)
-          </label>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={filters.max_price || ''}
-            onChange={(e) => updateFilter('max_price', e.target.value ? parseFloat(e.target.value) : undefined)}
-            placeholder="Ex: 200.00"
-            style={{
-              width: '100%',
-              padding: '10px 12px',
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              fontSize: '14px'
-            }}
-            onWheel={(e) => e.currentTarget.blur()}
-          />
         </div>
-      </div>
+        {renderGenericFilters()}
+      </>
     );
   };
 
@@ -481,44 +494,7 @@ function FilterEditor({ filters, onFiltersChange }: FilterEditorProps) {
         Esta categoria usa filtros simples de preço e estoque.
       </p>
       
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', maxWidth: '400px', margin: '0 auto' }}>
-        <div>
-          <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
-            Preço Máximo
-          </label>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={filters.max_price || ''}
-            onChange={(e) => updateFilter('max_price', e.target.value ? parseFloat(e.target.value) : undefined)}
-            placeholder="R$ 0.00"
-            style={{
-              width: '100%',
-              padding: '10px 12px',
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              fontSize: '14px'
-            }}
-            onWheel={(e) => e.currentTarget.blur()}
-          />
-        </div>
-        
-        <div>
-          <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
-            Em Estoque
-          </label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={filters.in_stock || false}
-              onChange={(e) => updateFilter('in_stock', e.target.checked)}
-              style={{ width: '20px', height: '20px' }}
-            />
-            <span style={{ fontSize: '14px' }}>Apenas em estoque</span>
-          </div>
-        </div>
-      </div>
+      {renderGenericFilters()}
     </div>
   );
 
@@ -551,8 +527,14 @@ function FilterEditor({ filters, onFiltersChange }: FilterEditorProps) {
           <button
             key={tab.id}
             onClick={() => {
-              setActiveTab(tab.id);
-              updateFilter('category', tab.category);
+              if (activeTab === tab.id) {
+                // Clicar na aba ativa a desativa
+                setActiveTab(null);
+                updateFilter('category', undefined);
+              } else {
+                setActiveTab(tab.id);
+                updateFilter('category', tab.category);
+              }
             }}
             style={{
               padding: '10px 16px',
@@ -576,6 +558,14 @@ function FilterEditor({ filters, onFiltersChange }: FilterEditorProps) {
       {activeTab === 'pokemon' && renderPokemonFilters()}
       {activeTab === 'boardgames' && renderBoardGamesFilters()}
       {(activeTab === 'acessorios' || activeTab === 'hotwheels') && renderSimpleFilters()}
+      {activeTab === null && (
+        <>
+          <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: '#374151' }}>
+            Filtros Gerais (para todas as categorias)
+          </h4>
+          {renderGenericFilters()}
+        </>
+      )}
 
       {/* Resumo dos filtros */}
       {Object.keys(filters).length > 0 && (
@@ -619,6 +609,7 @@ function FilterEditor({ filters, onFiltersChange }: FilterEditorProps) {
               else if (key === 'max_price') displayKey = 'Preço Máximo';
               else if (key === 'on_sale') displayKey = 'Em Promoção';
               else if (key === 'in_stock') displayKey = 'Em Estoque';
+              else if (key === 'is_preorder') displayKey = 'Pré-venda';
               else if (key === 'category') displayKey = 'Categoria';
               
               // Formatar valores
@@ -631,12 +622,17 @@ function FilterEditor({ filters, onFiltersChange }: FilterEditorProps) {
                 else if (value === 'hotwheels') displayValue = 'Hot Wheels';
               }
               
+              // 🎨 COR ESPECIAL PARA PRÉ-VENDA
+              const isPreOrderFilter = key === 'is_preorder' && value;
+              const bgColor = isPreOrderFilter ? '#e9d5ff' : '#e0f2fe';
+              const textColor = isPreOrderFilter ? '#7c3aed' : '#0369a1';
+
               return (
                 <div
                   key={key}
                   style={{
-                    background: '#e0f2fe',
-                    color: '#0369a1',
+                    background: bgColor,
+                    color: textColor,
                     padding: '6px 12px',
                     borderRadius: '6px',
                     fontSize: '13px',
@@ -705,24 +701,30 @@ function ThemeSelector({ selectedThemeId, onThemeSelect }: ThemeSelectorProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const controller = new AbortController();
+    const loadThemes = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('themes')
+          .select('*')
+          .order('name')
+          .abortSignal(controller.signal);
+
+        if (error) throw error;
+        setThemes(data || []);
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
+          console.error('Erro ao carregar temas:', error);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    };
     loadThemes();
+    return () => controller.abort();
   }, []);
-
-  const loadThemes = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('themes')
-        .select('*')
-        .order('name');
-
-      if (error) throw error;
-      setThemes(data || []);
-    } catch (error) {
-      console.error('Erro ao carregar temas:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -838,6 +840,7 @@ function EditPromotionalPageContent() {
   const [slug, setSlug] = useState('');
   const [description, setDescription] = useState('');
   const [heroImageUrl, setHeroImageUrl] = useState('');
+  const [heroImageMobileUrl, setHeroImageMobileUrl] = useState('');
   const [filters, setFilters] = useState<Record<string, any>>({});
   const [productIds, setProductIds] = useState<string[]>([]);
   const [themeId, setThemeId] = useState<string | undefined>(undefined);
@@ -846,9 +849,13 @@ function EditPromotionalPageContent() {
   const [endDate, setEndDate] = useState('');
   const [showOverlay, setShowOverlay] = useState(true);
   const [activeTab, setActiveTab] = useState<'info' | 'filters' | 'products' | 'appearance'>('info');
+  const [uploadingDesktop, setUploadingDesktop] = useState(false);
+  const [uploadingMobile, setUploadingMobile] = useState(false);
 
   // Adicione esta função no componente EditPromotionalPageContent (após os states):
-const handleImageUpload = async (file: File) => {
+const handleImageUpload = async (file: File, type: 'desktop' | 'mobile') => {
+  if (type === 'desktop') setUploadingDesktop(true);
+  else setUploadingMobile(true);
   try {
     // Criar nome único para o arquivo
     const fileName = `hero-${Date.now()}-${file.name}`;
@@ -869,49 +876,70 @@ const handleImageUpload = async (file: File) => {
       .from('product-images')
       .getPublicUrl(filePath);
 
-    setHeroImageUrl(publicUrl);
-    alert('✅ Imagem enviada com sucesso!');
+    if (type === 'desktop') {
+      setHeroImageUrl(publicUrl);
+    } else {
+      setHeroImageMobileUrl(publicUrl);
+    }
+    alert(`✅ Imagem ${type} enviada com sucesso!`);
     
   } catch (error) {
     console.error('❌ Erro ao enviar imagem:', error);
     alert('❌ Erro ao enviar imagem. Tente novamente.');
+  } finally {
+    if (type === 'desktop') setUploadingDesktop(false);
+    else setUploadingMobile(false);
   }
 };
 
   useEffect(() => {
-    loadPage();
-  }, [pageId]);
-
-  const loadPage = async () => {
-    try {
-      const pages = await promotionalPagesService.getAllPages();
-      const currentPage = pages.find(p => p.id === pageId);
-      
-      if (!currentPage) {
-        alert('Página não encontrada');
-        router.push('/admin/themes');
-        return;
+    const controller = new AbortController();
+    const loadPage = async () => {
+      let currentPage: PromotionalPage | null = null;
+      for (let i = 0; i < 3; i++) { // Tenta 3 vezes
+        try {
+          if (controller.signal.aborted) return;
+          currentPage = await promotionalPagesService.getPageById(pageId, controller.signal);
+          if (currentPage) {
+            break; // Encontrou, sai do loop
+          }
+          // Se não encontrou, espera um pouco e tenta de novo
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (error: any) {
+          if (error.name !== 'AbortError') {
+            console.error(`Erro na tentativa ${i + 1}:`, error);
+          } else {
+            return; // Abortado, para tudo
+          }
+        }
       }
 
-      setPage(currentPage);
-      setTitle(currentPage.title);
-      setSlug(currentPage.slug);
-      setDescription(currentPage.description || '');
-      setHeroImageUrl(currentPage.hero_image_url || '');
-      setFilters(currentPage.filters || {});
-      setProductIds(currentPage.product_ids || []);
-      setThemeId(currentPage.theme_id || undefined);
-      setIsActive(currentPage.is_active);
-      setStartDate(currentPage.start_date?.split('T')[0] || '');
-      setEndDate(currentPage.end_date?.split('T')[0] || '');
-      setShowOverlay((currentPage as any).show_overlay !== false); // Padrão true
-    } catch (error) {
-      console.error('Erro ao carregar página:', error);
-      alert('Erro ao carregar página');
-    } finally {
+      if (controller.signal.aborted) return;
+
+      if (currentPage) {
+        setPage(currentPage);
+        setTitle(currentPage.title);
+        setSlug(currentPage.slug);
+        setDescription(currentPage.description || '');
+        setHeroImageUrl(currentPage.hero_image_url || '');
+        setHeroImageMobileUrl(currentPage.hero_image_mobile_url || '');
+        setFilters(currentPage.filters || {});
+        setProductIds(currentPage.product_ids || []);
+        setThemeId(currentPage.theme_id || undefined);
+        setIsActive(currentPage.is_active);
+        setStartDate(currentPage.start_date?.split('T')[0] || '');
+        setEndDate(currentPage.end_date?.split('T')[0] || '');
+        setShowOverlay((currentPage as any).show_overlay !== false);
+      } else {
+        alert('Página não encontrada após várias tentativas. Verifique se ela foi criada corretamente.');
+        router.push('/admin/themes');
+      }
+      
       setLoading(false);
     }
-  };
+    loadPage();
+    return () => controller.abort();
+  }, [pageId, router]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -921,6 +949,7 @@ const handleImageUpload = async (file: File) => {
         slug,
         description: description || "",
         hero_image_url: heroImageUrl || "",
+        hero_image_mobile_url: heroImageMobileUrl || null,
         filters,
         product_ids: productIds,
         theme_id: themeId || null,
@@ -1218,7 +1247,7 @@ const handleImageUpload = async (file: File) => {
             alert('❌ A imagem deve ter no máximo 15MB');
             return;
           }
-          handleImageUpload(file);
+          handleImageUpload(file, 'desktop');
         }
       }}
       style={{
@@ -1230,6 +1259,7 @@ const handleImageUpload = async (file: File) => {
         opacity: 0,
         cursor: 'pointer'
       }}
+      disabled={uploadingDesktop}
     />
     
     <div style={{ fontSize: '48px', marginBottom: '12px' }}>
@@ -1237,7 +1267,7 @@ const handleImageUpload = async (file: File) => {
     </div>
     
     <p style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px' }}>
-      {heroImageUrl ? 'Alterar imagem' : 'Fazer upload de imagem'}
+      {uploadingDesktop ? 'Enviando...' : (heroImageUrl ? 'Alterar imagem Desktop' : 'Fazer upload de imagem Desktop')}
     </p>
     
     <p style={{ fontSize: '12px', color: '#6b7280' }}>
@@ -1258,6 +1288,101 @@ const handleImageUpload = async (file: File) => {
       value={heroImageUrl}
       onChange={(e) => setHeroImageUrl(e.target.value)}
       placeholder="https://exemplo.com/imagem-hero.jpg"
+      style={{
+        width: '100%',
+        padding: '8px 12px',
+        border: '1px solid #d1d5db',
+        borderRadius: '6px',
+        fontSize: '13px'
+      }}
+    />
+  </div>
+</div>
+
+<div>
+  <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+    Imagem de Fundo do Hero (Mobile)
+  </label>
+  
+  {/* Preview da imagem atual */}
+  {heroImageMobileUrl && (
+    <div style={{ marginBottom: '12px' }}>
+      <div style={{ 
+        width: '100%', 
+        height: '150px', 
+        backgroundImage: `url(${heroImageMobileUrl})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        borderRadius: '8px',
+        border: '1px solid #e5e7eb',
+        marginBottom: '8px'
+      }} />
+      <p style={{ fontSize: '12px', color: '#6b7280' }}>
+        Imagem mobile atual.
+      </p>
+    </div>
+  )}
+  
+  {/* Upload de arquivo */}
+  <div style={{ 
+    border: '2px dashed #d1d5db', 
+    borderRadius: '8px', 
+    padding: '24px',
+    textAlign: 'center',
+    cursor: 'pointer',
+    position: 'relative'
+  }}>
+    <input
+      type="file"
+      accept="image/jpeg,image/png,image/webp"
+      onChange={(e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          if (file.size > 15 * 1024 * 1024) {
+            alert('❌ A imagem deve ter no máximo 15MB');
+            return;
+          }
+          handleImageUpload(file, 'mobile');
+        }
+      }}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        opacity: 0,
+        cursor: 'pointer'
+      }}
+      disabled={uploadingMobile}
+    />
+    
+    <div style={{ fontSize: '48px', marginBottom: '12px' }}>
+      {heroImageMobileUrl ? '🖼️' : '📤'}
+    </div>
+    
+    <p style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px' }}>
+      {uploadingMobile ? 'Enviando...' : (heroImageMobileUrl ? 'Alterar imagem Mobile' : 'Fazer upload de imagem Mobile')}
+    </p>
+    
+    <p style={{ fontSize: '12px', color: '#6b7280' }}>
+      Clique para selecionar uma imagem (JPG, PNG, WebP)
+    </p>
+    <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>
+      Tamanho máximo: 15MB | Recomendado: 750x600px
+    </p>
+  </div>
+  
+  {/* URL manual (alternativa) */}
+  <div style={{ marginTop: '12px' }}>
+    <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>
+      Ou cole uma URL manualmente:
+    </p>
+    <input
+      type="text"
+      value={heroImageMobileUrl}
+      onChange={(e) => setHeroImageMobileUrl(e.target.value)}
+      placeholder="https://exemplo.com/imagem-hero-mobile.jpg"
       style={{
         width: '100%',
         padding: '8px 12px',

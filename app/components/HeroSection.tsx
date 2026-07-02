@@ -37,21 +37,27 @@ export default function HeroSection({
 
   // Carregar banners
   useEffect(() => {
+    const controller = new AbortController();
+
     const loadBanners = async () => {
       try {
         setIsLoading(true);
         setError(null);
-        const activeBanners = await heroBannerService.getActiveBanners();
+        const activeBanners = await heroBannerService.getActiveBanners(controller.signal);
         setBanners(activeBanners);
-      } catch (err) {
-        console.error('Erro ao carregar banners:', err);
-        setError('Não foi possível carregar os banners promocionais.');
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          console.error('Erro ao carregar banners:', err);
+          setError('Não foi possível carregar os banners promocionais.');
+        }
       } finally {
-        setIsLoading(false);
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
       }
     };
-
     loadBanners();
+    return () => { controller.abort(); };
   }, []);
 
   // Carrossel automático

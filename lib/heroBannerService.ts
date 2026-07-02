@@ -38,19 +38,24 @@ const sanitizeDates = (data: any): any => {
 
 export const heroBannerService = {
   // Buscar todos os banners ativos
-  async getActiveBanners(): Promise<HeroBanner[]> {
+  async getActiveBanners(signal?: AbortSignal): Promise<HeroBanner[]> {
     const now = new Date().toISOString();
     
-    const { data, error } = await supabase
+    let query = supabase
       .from('hero_banners')
       .select('*')
       .eq('is_active', true)
       .or(`start_date.is.null,start_date.lte.${now}`)
       .or(`end_date.is.null,end_date.gte.${now}`)
       .order('display_order', { ascending: true });
+
+    if (signal) query = query.abortSignal(signal);
+    const { data, error } = await query;
     
     if (error) {
-      console.error('Erro ao buscar banners:', error);
+      if (error.name !== 'AbortError' && !error.message.includes('AbortError')) {
+        console.error('Erro ao buscar banners:', error);
+      }
       return [];
     }
     

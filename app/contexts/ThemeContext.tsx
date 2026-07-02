@@ -102,46 +102,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   };
 
-  // 🆕 FUNÇÃO PARA CARREGAR TEMAS DO SUPABASE (CORRIGIDA)
-  const loadThemesFromSupabase = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      console.log('🔍 Carregando temas do Supabase...');
-      
-      const themes = await getAllThemes();
-      const activeTheme = await getActiveTheme();
-      
-      setAllThemes(themes);
-      setCurrentThemeConfig(activeTheme);
-      
-      console.log('✅ Temas carregados:', {
-        total: themes.length,
-        active: activeTheme.name
-      });
-      
-      // Migração apenas para admin (se necessário)
-      if (!hasInitialized && typeof window !== 'undefined' && isAdmin) {
-        const hasLocalThemes = localStorage.getItem('videra-themes');
-        if (hasLocalThemes && hasLocalThemes !== '[]') {
-          await migrateLocalStorageToSupabase(themes);
-        }
-        setHasInitialized(true);
-      }
-      
-    } catch (error) {
-      console.error('❌ Erro ao carregar temas do Supabase:', error);
-      
-      if (allThemes.length === 0) {
-        setAllThemes([EMERGENCY_THEME]);
-        setCurrentThemeConfig(EMERGENCY_THEME);
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [hasInitialized, allThemes.length, isAdmin]);
-
   // 🆕 FUNÇÃO DE MIGRAÇÃO (apenas admin)
-  const migrateLocalStorageToSupabase = async (existingThemes: ThemeConfig[]) => {
+  const migrateLocalStorageToSupabase = useCallback(async (existingThemes: ThemeConfig[]) => {
     if (!isAdmin) return;
     try {
       console.log('🔄 Verificando migração do localStorage...');
@@ -170,14 +132,47 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem('videra-themes');
         localStorage.removeItem('videra-current-theme');
         console.log(`✅ ${migratedCount} temas migrados com sucesso!`);
-      } else {
-        console.log('ℹ️  Nenhum tema novo para migrar');
       }
-      
     } catch (error) {
       console.error('❌ Erro na migração:', error);
     }
-  };
+  }, [isAdmin]);
+
+  // 🆕 FUNÇÃO PARA CARREGAR TEMAS DO SUPABASE (CORRIGIDA)
+  const loadThemesFromSupabase = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      console.log('🔍 Carregando temas do Supabase...');
+      
+      const themes = await getAllThemes();
+      const activeTheme = await getActiveTheme();
+      
+      setAllThemes(themes);
+      setCurrentThemeConfig(activeTheme);
+      
+      console.log('✅ Temas carregados:', {
+        total: themes.length,
+        active: activeTheme.name
+      });
+      
+      // Migração apenas para admin (se necessário)
+      if (!hasInitialized && typeof window !== 'undefined' && isAdmin) {
+        const hasLocalThemes = localStorage.getItem('videra-themes');
+        if (hasLocalThemes && hasLocalThemes !== '[]') {
+          await migrateLocalStorageToSupabase(themes);
+        }
+        setHasInitialized(true);
+      }
+      
+    } catch (error) {
+      console.error('❌ Erro ao carregar temas do Supabase:', error);
+      // Fallback para tema de emergência em caso de falha
+      setAllThemes([EMERGENCY_THEME]);
+      setCurrentThemeConfig(EMERGENCY_THEME);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [hasInitialized, isAdmin, migrateLocalStorageToSupabase]);
 
   // CARREGAR TEMAS NA INICIALIZAÇÃO (apenas admin precisa dos temas do banco)
   useEffect(() => {

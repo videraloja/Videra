@@ -91,9 +91,10 @@ export default function HomePage() {
 
   // Carrega produtos e carrinho do Supabase
   useEffect(() => {
+    const controller = new AbortController();
     const load = async () => {
       try {
-        const { data, error } = await supabase
+        const query = supabase
           .from('products')
           .select(`
             id,
@@ -107,11 +108,17 @@ export default function HomePage() {
             stock,
             collection
           `)
+          .eq('is_preorder', false)
           .order('updated_at', { ascending: false, nullsFirst: false })
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false })
+          .abortSignal(controller.signal);
+
+        const { data, error } = await query;
 
         if (error) {
-          console.error('Erro ao buscar produtos no Supabase:', error);
+          if (error.name !== 'AbortError' && !(error.message && error.message.includes('AbortError'))) {
+            console.error('Erro ao buscar produtos no Supabase:', error);
+          }
           return;
         }
 
@@ -121,14 +128,19 @@ export default function HomePage() {
           setAllProducts(adjustedProducts);
           localStorage.setItem('products', JSON.stringify(adjustedProducts));
         }
-      } catch (err) {
-        console.error('Erro ao acessar Supabase:', err);
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          console.error('Erro ao acessar Supabase:', err);
+        }
       }
 
-      setReady(true);
+      if (!controller.signal.aborted) {
+        setReady(true);
+      }
     };
 
     load();
+    return () => controller.abort();
   }, []);
 
   // CARREGAR CARROSSÉIS (dados reais garantidos)

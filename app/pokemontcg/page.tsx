@@ -127,17 +127,22 @@ export default function PokemonTCGPage() {
   };
 
   useEffect(() => {
+    const controller = new AbortController();
     const load = async () => {
       try {
         const { data, error } = await supabase
           .from('products')
           .select('*')
           .eq('category', 'pokemon')
+          .eq('is_preorder', false) // 👈 OCULTA PRODUTOS DE PRÉ-VENDA
           .order('updated_at', { ascending: false, nullsFirst: false })
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false })
+          .abortSignal(controller.signal);
 
         if (error) {
-          console.error('Erro ao buscar produtos Pokémon:', error);
+          if (error.name !== 'AbortError' && !(error.message && error.message.includes('AbortError'))) {
+            console.error('Erro ao buscar produtos Pokémon:', error);
+          }
           return;
         }
 
@@ -146,28 +151,35 @@ export default function PokemonTCGPage() {
           setProducts(adjustedProducts);
           localStorage.setItem('products', JSON.stringify(adjustedProducts));
         }
-      } catch (err) {
-        console.error('Erro ao acessar Supabase:', err);
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          console.error('Erro ao acessar Supabase:', err);
+        }
       }
       setReady(true);
     };
 
     load();
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
+    let isCancelled = false;
     const loadCarousels = async () => {
       if (!ready) return;
-      setCarouselsLoading(true);
+      if (!isCancelled) setCarouselsLoading(true);
       try {
         const configs = await carouselService.getCarouselConfigs('pokemontcg');
+        const { getProductsWithAvailableStock } = await import('@/lib/productService');
+        const productsWithStock = await getProductsWithAvailableStock();
+        const best = await carouselService.getBestsellers('pokemon', 10);
+        const arrivals = await carouselService.getNewArrivals('pokemon', 10);
+
+        if (isCancelled) return;
+
         setCarouselConfigs(configs);
         if (configs.length > 0) setCurrentConfig(configs[0]);
 
-        const { getProductsWithAvailableStock } = await import('@/lib/productService');
-        const productsWithStock = await getProductsWithAvailableStock();
-
-        const best = await carouselService.getBestsellers('pokemon', 10);
         const syncedBest = best.map(product => {
           const stockInfo = productsWithStock.find(p => p.id === product.id);
           const availableStock = stockInfo?.available_stock ?? product.stock;
@@ -175,21 +187,25 @@ export default function PokemonTCGPage() {
         });
         setBestsellers(syncedBest);
 
-        const arrivals = await carouselService.getNewArrivals('pokemon', 10);
         const syncedArrivals = arrivals.map(product => {
           const stockInfo = productsWithStock.find(p => p.id === product.id);
           const availableStock = stockInfo?.available_stock ?? product.stock;
           return { ...product, stock: availableStock };
         });
         setNewArrivals(syncedArrivals);
-      } catch (error) {
-        console.error('Erro ao carregar carrosséis:', error);
+      } catch (error: any) {
+        if (!isCancelled && error.name !== 'AbortError') {
+          console.error('Erro ao carregar carrosséis:', error);
+        }
       } finally {
-        setCarouselsLoading(false);
+        if (!isCancelled) {
+          setCarouselsLoading(false);
+        }
       }
     };
 
     loadCarousels();
+    return () => { isCancelled = true; };
   }, [ready]);
 
   const [searchTerm, setSearchTerm] = useState('');

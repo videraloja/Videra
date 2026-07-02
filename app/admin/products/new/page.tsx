@@ -26,7 +26,8 @@ function NewProductContent() {
     collection: "", // 🆕 NOVO CAMPO
     rarity: "", // 🆕 NOVO CAMPO
     card_set: "", // 🆕 NOVO CAMPO
-    tags: [] as string[] // 🆕 NOVO CAMPO
+    tags: [] as string[], // 🆕 NOVO CAMPO
+    is_preorder: false // 🆕 CAMPO PARA PRÉ-VENDA
   });
   const [previewUrl, setPreviewUrl] = useState("");
 
@@ -113,7 +114,8 @@ function NewProductContent() {
         collection: formData.collection || null, // 🆕 NOVO CAMPO
         rarity: formData.rarity || null, // 🆕 NOVO CAMPO
         card_set: formData.card_set || null, // 🆕 NOVO CAMPO
-        tags: formData.tags.length > 0 ? formData.tags : null // 🆕 NOVO CAMPO
+        tags: formData.tags.length > 0 ? formData.tags : null, // 🆕 NOVO CAMPO
+        is_preorder: formData.is_preorder // 🆕 SALVAR ESTADO DE PRÉ-VENDA
       };
 
       const { error } = await supabase
@@ -134,13 +136,19 @@ function NewProductContent() {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    
+    const { name, value, type } = e.target;
+
+    if (type === 'checkbox') {
+      const checked = (e.target as HTMLInputElement).checked;
+      setFormData(prev => ({ ...prev, [name]: checked }));
+      return;
+    }
+
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
-    
+
     // Atualiza preview se for URL manual
     if (name === "image_url") {
       setPreviewUrl(value);
@@ -300,6 +308,30 @@ function NewProductContent() {
               <option value="acessorios">Acessórios TCG</option>
               <option value="hot-wheels">Hot Wheels</option>
             </select>
+          </div>
+
+          {/* 🆕 SEÇÃO DE PRÉ-VENDA */}
+          <div style={{...sectionStyle, background: 'var(--accent-color)', border: '2px solid var(--accent-hover)'}}>
+            <h3 style={{...titleStyle, color: 'white'}}>
+              📦 Configurações de Pré-venda
+            </h3>
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              cursor: 'pointer',
+              color: 'white',
+              fontWeight: 600
+            }}>
+              <input
+                type="checkbox"
+                name="is_preorder"
+                checked={formData.is_preorder}
+                onChange={handleChange}
+                style={{ width: '20px', height: '20px' }}
+              />
+              Marcar este produto como PRÉ-VENDA (ocultará o estoque e da vitrine principal)
+            </label>
           </div>
 
           {/* 🆕 CAMPOS ESPECÍFICOS PARA POKÉMON TCG */}

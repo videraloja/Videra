@@ -106,17 +106,22 @@ export default function AcessoriosPage() {
 
   // Carregar produtos
   useEffect(() => {
+    const controller = new AbortController();
     const load = async () => {
       try {
         const { data, error } = await supabase
           .from('products')
           .select('*')
           .eq('category', 'acessorios')
+          .eq('is_preorder', false)
           .order('updated_at', { ascending: false, nullsFirst: false })
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false })
+          .abortSignal(controller.signal);
 
         if (error) {
-          console.error('Erro ao buscar acessórios:', error);
+          if (error.name !== 'AbortError' && !(error.message && error.message.includes('AbortError'))) {
+            console.error('Erro ao buscar acessórios:', error);
+          }
           return;
         }
 
@@ -125,21 +130,27 @@ export default function AcessoriosPage() {
           setProducts(adjustedProducts);
           localStorage.setItem('products_acessorios', JSON.stringify(adjustedProducts));
         }
-      } catch (err) {
-        console.error('Erro ao acessar Supabase:', err);
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          console.error('Erro ao acessar Supabase:', err);
+        }
       }
-      setReady(true);
+      if (!controller.signal.aborted) {
+        setReady(true);
+      }
     };
 
     load();
+    return () => controller.abort();
   }, []);
 
   // Carregar carrosséis
   useEffect(() => {
+    let isCancelled = false;
     const loadCarousels = async () => {
       if (!ready) return;
 
-      setCarouselsLoading(true);
+      if (!isCancelled) setCarouselsLoading(true);
       try {
         const configs = await carouselService.getCarouselConfigs('acessorios');
         setCarouselConfigs(configs);
@@ -147,6 +158,8 @@ export default function AcessoriosPage() {
 
         const { getProductsWithAvailableStock } = await import('@/lib/productService');
         const productsWithStock = await getProductsWithAvailableStock();
+
+        if (isCancelled) return;
 
         const best = await carouselService.getBestsellers('acessorios', 10);
         const syncedBest = best.map(product => {
@@ -161,14 +174,19 @@ export default function AcessoriosPage() {
           return { ...product, stock: stockInfo?.available_stock ?? product.stock };
         });
         setNewArrivals(syncedArrivals);
-      } catch (error) {
-        console.error('Erro ao carregar carrosséis:', error);
+      } catch (error: any) {
+        if (!isCancelled && error.name !== 'AbortError') {
+          console.error('Erro ao carregar carrosséis:', error);
+        }
       } finally {
-        setCarouselsLoading(false);
+        if (!isCancelled) {
+          setCarouselsLoading(false);
+        }
       }
     };
 
     loadCarousels();
+    return () => { isCancelled = true; };
   }, [ready]);
 
   const handleCarouselSelect = (type: 'all' | 'bestsellers' | 'new_arrivals') => {

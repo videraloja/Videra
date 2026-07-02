@@ -26,33 +26,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
+    const controller = new AbortController();
+
     const getSession = async () => {
-      console.log('🔄 Verificando sessão...');
+      // console.log('🔄 Verificando sessão...');
       
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
-        console.log('Sessão:', session);
-        console.log('Erro sessão:', error);
+        // console.log('Sessão:', session);
+        // console.log('Erro sessão:', error);
 
         if (session?.user) {
-          console.log('✅ Usuário autenticado:', session.user.email);
+          // console.log('✅ Usuário autenticado:', session.user.email);
           
           // VERIFICAÇÃO SIMPLIFICADA - tenta buscar da tabela, mas se der erro, usa fallback
           try {
             const { data: adminUsers, error: queryError } = await supabase
               .from('admin_users')
               .select('*')
-              .eq('email', session.user.email);
+              .eq('email', session.user.email)
+              .abortSignal(controller.signal);
 
-            console.log('Admin users:', adminUsers);
-            console.log('Query error:', queryError);
+            // console.log('Admin users:', adminUsers);
+            // console.log('Query error:', queryError);
 
             if (!queryError && adminUsers && adminUsers.length > 0) {
               setUser(adminUsers[0]);
-              console.log('✅ Admin user encontrado na tabela');
+              // console.log('✅ Admin user encontrado na tabela');
             } else {
               // FALLBACK: Se não encontrar na tabela, usa dados básicos do auth
-              console.log('⚠️  Usando fallback - dados do auth');
+              // console.log('⚠️  Usando fallback - dados do auth');
               setUser({
                 id: session.user.id,
                 email: session.user.email!,
@@ -61,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               });
             }
           } catch (tableError) {
-            console.log('❌ Erro na tabela, usando fallback:', tableError);
+            // console.log('❌ Erro na tabela, usando fallback:', tableError);
             setUser({
               id: session.user.id,
               email: session.user.email!,
@@ -70,14 +73,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             });
           }
         } else {
-          console.log('❌ Nenhuma sessão ativa');
+          // console.log('❌ Nenhuma sessão ativa');
           setUser(null);
         }
       } catch (error) {
-        console.log('💥 Erro geral no auth:', error);
+        if ((error as any).name !== 'AbortError') {
+          // console.log('💥 Erro geral no auth:', error);
+        }
         setUser(null);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
 
@@ -85,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('🔄 Auth state changed:', event);
+        // console.log('🔄 Auth state changed:', event);
         
         if (session?.user) {
           setUser({
@@ -101,11 +108,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      controller.abort();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    console.log('🔐 Tentando login:', email);
+    // console.log('🔐 Tentando login:', email);
     setLoading(true);
     
     try {
@@ -114,15 +124,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password,
       });
 
-      console.log('Resposta login:', { data, error });
+      // console.log('Resposta login:', { data, error });
 
       if (error) {
-        console.log('❌ Erro no login:', error.message);
+        // console.log('❌ Erro no login:', error.message);
         return { error };
       }
 
       if (data.user) {
-        console.log('✅ Login auth sucesso!');
+        // console.log('✅ Login auth sucesso!');
         // Login bem sucedido - redireciona para admin
         router.push('/admin');
         return { error: null };
@@ -130,7 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       return { error: new Error('Erro desconhecido') };
     } catch (error) {
-      console.log('💥 Erro no login:', error);
+      // console.log('💥 Erro no login:', error);
       return { error };
     } finally {
       setLoading(false);
@@ -138,7 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    console.log('🚪 Fazendo logout');
+    // console.log('🚪 Fazendo logout');
     await supabase.auth.signOut();
     setUser(null);
     router.push('/admin/login');

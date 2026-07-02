@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { heroBannerService, HeroBanner } from '@/lib/heroBannerService';
 
@@ -25,30 +25,36 @@ export default function HeroBannerManager() {
   });
 
   // Carregar banners
-  useEffect(() => {
-    loadBanners();
-  }, []);
-
-  const loadBanners = async () => {
+  const loadBanners = useCallback(async (signal?: AbortSignal) => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      let query = supabase
         .from('hero_banners')
         .select('*')
         .order('display_order', { ascending: true });
       
-      if (error) {
-        console.error('Erro ao carregar banners:', error);
-        return;
-      }
+      if (signal) query = query.abortSignal(signal);
+      const { data, error } = await query;
       
+      if (error) throw error;
+
       setHeroBanners(data || []);
-    } catch (error) {
-      console.error('Erro ao carregar banners:', error);
+    } catch (error: any) {
+      if (error.name !== 'AbortError' && !(error.message && error.message.includes('AbortError'))) {
+        console.error('Erro ao carregar banners:', error);
+      }
     } finally {
-      setLoading(false);
+      if (!signal || !signal.aborted) {
+        setLoading(false);
+      }
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    loadBanners(controller.signal);
+    return () => controller.abort();
+  }, [loadBanners]);
 
   const handleUploadImage = async (file: File, type: 'desktop' | 'mobile') => {
     if (!file) return;
