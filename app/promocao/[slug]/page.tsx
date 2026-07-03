@@ -145,9 +145,12 @@ export default function PromotionalDisplayPage() {
     );
   }
 
-  const imageUrl = isMobile && page.hero_image_mobile_url 
+  const imageUrl = isMobile && page.hero_image_mobile_url
     ? page.hero_image_mobile_url 
     : page.hero_image_url;
+
+  // Define o aspect ratio baseado no dispositivo para comportar as imagens
+  const heroAspectRatio = isMobile ? '750 / 600' : '1920 / 600';
 
   return (
     <>
@@ -158,7 +161,8 @@ export default function PromotionalDisplayPage() {
         <div style={{
           position: 'relative',
           width: '100%',
-          height: '350px',
+          aspectRatio: heroAspectRatio,
+          maxHeight: '600px', // Limita a altura máxima em telas muito largas
           marginBottom: '40px',
           background: `url(${imageUrl}) no-repeat center center`,
           backgroundSize: 'cover',
