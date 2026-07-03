@@ -114,7 +114,7 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
     <div
       className="product-card-mobile-optimized"
       style={{
-        width: '280px',
+        width: '100%',
         minHeight: '420px',
         maxHeight: '480px',
         display: 'flex',
@@ -218,7 +218,7 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', background: '#f3e8ff', color: '#7c3aed', padding: '6px 10px', borderRadius: '8px', border: '1px solid #e9d5ff' }}>
             <span style={{ fontSize: '14px' }}>📦</span>
             <span style={{ fontSize: '14px', fontWeight: '600' }}>
-              Produto em Pré-venda
+              Pré-venda
             </span>
           </div>
         ) : (

@@ -445,6 +445,12 @@ export default function JogosTabuleiroPage() {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.5; }
         }
+        @media (max-width: 640px) {
+          .product-grid-container {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 12px !important;
+          }
+        }
       `}</style>
     </div>
   );

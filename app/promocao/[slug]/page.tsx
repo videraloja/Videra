@@ -195,7 +195,7 @@ export default function PromotionalDisplayPage() {
 
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 20px 40px' }}>
         {products.length > 0 ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' }}>
+          <div className="product-grid-container" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' }}>
             {products.map((product) => (
               <ProductCard
                 key={product.id}
@@ -211,6 +211,15 @@ export default function PromotionalDisplayPage() {
           </div>
         )}
       </main>
+
+      <style jsx>{`
+        @media (max-width: 640px) {
+          .product-grid-container {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 12px !important;
+          }
+        }
+      `}</style>
     </>
   );
 }
