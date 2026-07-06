@@ -1,11 +1,11 @@
-'use client';
+"use client";
+import { useEffect, useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
+import AuthGuard from "@/app/components/AuthGuard";
+import ThemeToggle from "../../components/ThemeToggle";
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
-import AuthGuard from '@/app/components/AuthGuard';
-import ThemeToggle from '../../components/ThemeToggle';
-
+// 🆕 INTERFACES COMPLETAS
 interface Order {
   id: string;
   order_code: string;
@@ -14,34 +14,39 @@ interface Order {
   pickup_option: string;
   observations: string | null;
   created_at: string;
+  is_preorder: boolean;
 }
 
 interface OrderItem {
   id: string;
   order_id: string;
-  product_id: number;
   quantity: number;
   price: number;
-  name: string;
+  products: {
+    id: number;
+    name: string;
+    image_url: string;
+  } | null;
 }
 
-// 🆕 Interface para reserva
-interface Reservation {
-  id: string;
-  order_id: string;
-  expires_at: string;
-}
-
-function OrdersContent() {
+// Componente principal com toda a lógica existente
+function PedidosContent() {
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [orderItems, setOrderItems] = useState<Record<string, OrderItem[]>>({});
   const [loading, setLoading] = useState(true);
-  
-  // 🆕 Inicializa os estados dos filtros a partir do localStorage
+  const [now, setNow] = useState(new Date()); // 🆕 Para o cronômetro
+
+  // 🆕 Atualiza o tempo a cada segundo para o cronômetro
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // 🆕 ESTADOS DOS FILTROS COM PERSISTÊNCIA NO LOCALSTORAGE
   const [statusFilter, setStatusFilter] = useState<'all' | 'pendente' | 'pago' | 'cancelado'>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('ordersStatusFilter') as 'all' | 'pendente' | 'pago' | 'cancelado') || 'all';
+      return (localStorage.getItem('ordersStatusFilter') as any) || 'all';
     }
     return 'all';
   });
@@ -51,9 +56,15 @@ function OrdersContent() {
     }
     return 'all';
   });
-  const [dateFilter, setDateFilter] = useState<string>(() => {
+  const [startDate, setStartDate] = useState<string>(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('ordersDateFilter') || '';
+      return localStorage.getItem('ordersStartDate') || '';
+    }
+    return '';
+  });
+  const [endDate, setEndDate] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('ordersEndDate') || '';
     }
     return '';
   });
@@ -63,179 +74,66 @@ function OrdersContent() {
     }
     return '';
   });
-
-  
-  // 🆕 Estado para reservas ativas
-  const [activeReservations, setActiveReservations] = useState<Map<string, Reservation>>(new Map());
-  const [reservationStatus, setReservationStatus] = useState<Map<string, { active: boolean; expiresAt: Date | null; timeLeft: string }>>(new Map());
+  const [preorderFilter, setPreorderFilter] = useState<'all' | 'preorder'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('ordersPreorderFilter') as any) || 'all';
+    }
+    return 'all';
+  });
 
   useEffect(() => {
-    const loadOrders = async () => {
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false });
+    const fetchOrders = async () => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-      if (ordersError) {
-        console.error('Erro ao carregar pedidos:', ordersError);
-        return;
-      }
-
-      setOrders(ordersData || []);
+      if (error) console.error("Erro ao buscar pedidos:", error);
+      else setOrders(data as Order[] || []);
 
       const { data: itemsData, error: itemsError } = await supabase
         .from('order_items')
-        .select('*');
+        .select('*, products(id, name, image_url)');
 
       if (itemsError) {
         console.error('Erro ao carregar itens:', itemsError);
+        setLoading(false);
         return;
       }
 
-      const grouped: Record<string, OrderItem[]> = {};
+      const grouped: Record<string, any[]> = {};
       (itemsData || []).forEach((item) => {
         if (!grouped[item.order_id]) grouped[item.order_id] = [];
         grouped[item.order_id].push(item);
       });
 
-      setOrderItems(grouped);
-      
-      // 🆕 Buscar reservas ativas para todos os pedidos
-      await loadReservations(ordersData || []);
-      
+      setOrderItems(grouped as Record<string, OrderItem[]>);
       setLoading(false);
     };
 
-    loadOrders();
+    fetchOrders();
   }, []);
 
-// 🆕 Efeitos para salvar os filtros no localStorage sempre que mudarem
+  // 🆕 Efeitos para salvar os filtros no localStorage sempre que mudarem
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('ordersStatusFilter', statusFilter);
-    }
+    if (typeof window !== 'undefined') localStorage.setItem('ordersStatusFilter', statusFilter);
   }, [statusFilter]);
-
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('ordersMonthFilter', monthFilter);
-    }
+    if (typeof window !== 'undefined') localStorage.setItem('ordersMonthFilter', monthFilter);
   }, [monthFilter]);
-
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('ordersDateFilter', dateFilter);
-    }
-  }, [dateFilter]);
-
+    if (typeof window !== 'undefined') localStorage.setItem('ordersStartDate', startDate);
+  }, [startDate]);
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('ordersSearchTerm', searchTerm);
-    }
+    if (typeof window !== 'undefined') localStorage.setItem('ordersEndDate', endDate);
+  }, [endDate]);
+  useEffect(() => {
+    if (typeof window !== 'undefined') localStorage.setItem('ordersSearchTerm', searchTerm);
   }, [searchTerm]);
-
-
-
-
-const loadReservations = async (ordersList: Order[]) => {
-  const orderIds = ordersList.map(o => o.id);
-  if (orderIds.length === 0) return;
-
-  const { data: reservationsData, error } = await supabase
-    .from('reservations')
-    .select('id, order_id, expires_at')
-    .in('order_id', orderIds);
-
-  if (error) {
-    console.error('Erro ao buscar reservas:', error);
-    return;
-  }
-
-  const reservationsMap = new Map();
-  reservationsData?.forEach((res: Reservation) => {
-    reservationsMap.set(res.order_id, res);
-  });
-  setActiveReservations(reservationsMap);
-
-  const statusMap = new Map();
-  const nowUtc = Date.now(); // timestamp UTC em ms
-
-  ordersList.forEach(order => {
-    const reservation = reservationsMap.get(order.id);
-    
-    if (reservation && order.status === 'pendente') {
-      // 🔧 FORÇAR leitura como UTC: adicionar 'Z' se não tiver
-      let expiresStr = reservation.expires_at;
-      if (!expiresStr.endsWith('Z')) {
-        expiresStr += 'Z';
-      }
-      const expiresUtc = new Date(expiresStr).getTime();
-      const diffMs = expiresUtc - nowUtc;
-      
-      console.log(`🔍 Depuração pedido ${order.order_code}:`, {
-        expires_at_original: reservation.expires_at,
-        expires_utc: new Date(expiresUtc).toISOString(),
-        now_utc: new Date(nowUtc).toISOString(),
-        diff_ms: diffMs,
-        diff_min: Math.floor(diffMs / 60000)
-      });
-      
-      if (diffMs > 0) {
-        const totalMinutes = Math.floor(diffMs / 60000);
-        const hours = Math.floor(totalMinutes / 60);
-        const minutes = totalMinutes % 60;
-        
-        let timeLeft = '';
-        if (hours > 0) {
-          timeLeft = `${hours}h ${minutes}min`;
-        } else {
-          timeLeft = `${minutes}min`;
-        }
-        
-        const isExpiringSoon = totalMinutes < 10;
-        
-        statusMap.set(order.id, {
-          active: true,
-          expiresAt: new Date(expiresUtc),
-          timeLeft,
-          isExpiringSoon
-        });
-      } else {
-        statusMap.set(order.id, {
-          active: false,
-          expiresAt: null,
-          timeLeft: 'Expirada',
-          isExpiringSoon: false
-        });
-      }
-    } else {
-      let timeLeft = '';
-      if (order.status === 'pago') timeLeft = 'Pago';
-      else if (order.status === 'cancelado') timeLeft = 'Cancelado';
-      else timeLeft = 'Sem reserva';
-      
-      statusMap.set(order.id, {
-        active: false,
-        expiresAt: null,
-        timeLeft,
-        isExpiringSoon: false
-      });
-    }
-  });
-  
-  setReservationStatus(statusMap);
-};
-
-  // 🆕 Atualizar reservas a cada 10 segundos
   useEffect(() => {
-    if (orders.length === 0) return;
+    if (typeof window !== 'undefined') localStorage.setItem('ordersPreorderFilter', preorderFilter);
+  }, [preorderFilter]);
 
-    const interval = setInterval(() => {
-      loadReservations(orders);
-    }, 10000); // Atualiza a cada 10 segundos
-
-    return () => clearInterval(interval);
-  }, [orders]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -244,36 +142,6 @@ const loadReservations = async (ordersList: Order[]) => {
       case 'cancelado': return { bg: '#fee2e2', text: '#991b1b', border: '#ef4444' };
       default: return { bg: '#f3f4f6', text: '#374151', border: '#9ca3af' };
     }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'pendente': return '🟡';
-      case 'pago': return '🟢';
-      case 'cancelado': return '🔴';
-      default: return '⚪';
-    }
-  };
-
-  // 🆕 Função para pegar cor do status da reserva
-  const getReservationColor = (orderId: string) => {
-    const status = reservationStatus.get(orderId);
-    if (!status) return { bg: '#f3f4f6', text: '#6b7280', icon: '⚪' };
-    
-    if (status.active) {
-      const timeLeft = status.timeLeft;
-      const mins = parseInt(timeLeft);
-      if (!isNaN(mins) && mins < 10) {
-        return { bg: '#fee2e2', text: '#dc2626', icon: '🔴', label: `⏰ Expira em ${timeLeft}` };
-      }
-      return { bg: '#dbeafe', text: '#2563eb', icon: '⏳', label: `🕐 Reservado (${timeLeft})` };
-    }
-    
-    if (status.timeLeft === 'Expirada') {
-      return { bg: '#fef3c7', text: '#d97706', icon: '⚠️', label: '⏰ Reserva expirada' };
-    }
-    
-    return { bg: '#f3f4f6', text: '#6b7280', icon: '⚪', label: status.timeLeft };
   };
 
   const getUniqueMonths = () => {
@@ -285,7 +153,7 @@ const loadReservations = async (ordersList: Order[]) => {
     const uniqueMonths = [...new Set(months)].sort().reverse();
     
     return [
-      { value: 'all', label: '📅 Todos os meses' },
+      { value: 'all', label: 'Todos os Meses' },
       ...uniqueMonths.map(month => {
         const [year, monthNum] = month.split('-');
         const monthNames = [
@@ -300,34 +168,39 @@ const loadReservations = async (ordersList: Order[]) => {
     ];
   };
 
-  const filteredOrders = orders.filter(order => {
+  const filteredOrders = useMemo(() => orders.filter(order => {
     const statusMatch = statusFilter === 'all' || order.status === statusFilter;
     
     const orderDate = new Date(order.created_at);
     const orderMonth = `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, '0')}`;
     const monthMatch = monthFilter === 'all' || orderMonth === monthFilter;
     
+    const preorderMatch = preorderFilter === 'all' || order.is_preorder === true;
+
+    const orderDateISO = order.created_at.substring(0, 10);
     let dateMatch = true;
-    if (dateFilter) {
-      const filterDate = new Date(dateFilter);
-      const orderDateOnly = new Date(orderDate.getFullYear(), orderDate.getMonth(), orderDate.getDate());
-      dateMatch = orderDateOnly.getTime() === filterDate.getTime();
+    if (startDate && endDate) {
+      dateMatch = orderDateISO >= startDate && orderDateISO <= endDate;
+    } else if (startDate) {
+      dateMatch = orderDateISO >= startDate;
+    } else if (endDate) {
+      dateMatch = orderDateISO <= endDate;
     }
     
     let searchMatch = true;
-if (searchTerm !== '') {
-  const searchLower = searchTerm.toLowerCase();
-  searchMatch = !!(
-    (order.order_code && order.order_code.toLowerCase().includes(searchLower)) ||
-    (order.payment_method && order.payment_method.toLowerCase().includes(searchLower)) ||
-    (order.pickup_option && order.pickup_option.toLowerCase().includes(searchLower))
-  );
-}
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      searchMatch = !!(
+        order.order_code?.toLowerCase().includes(searchLower) ||
+        order.payment_method?.toLowerCase().includes(searchLower) ||
+        order.pickup_option?.toLowerCase().includes(searchLower)
+      );
+    }
     
-    return statusMatch && monthMatch && dateMatch && searchMatch;
-  });
+    return statusMatch && monthMatch && dateMatch && searchMatch && preorderMatch;
+  }), [orders, statusFilter, monthFilter, startDate, endDate, searchTerm, preorderFilter]);
 
-  const ordersForList = filteredOrders.map((order) => {
+  const ordersForList = useMemo(() => filteredOrders.map((order) => {
     const items = orderItems[order.id] || [];
     const total = items.reduce(
       (sum, item) => sum + item.price * item.quantity,
@@ -343,9 +216,10 @@ if (searchTerm !== '') {
       total,
       status: order.status,
       created_at: order.created_at,
+      is_preorder: order.is_preorder,
       items_count: items.length,
     };
-  });
+  }), [filteredOrders, orderItems]);
 
   const totalOrders = filteredOrders.length;
   const pendingOrders = filteredOrders.filter(o => o.status === 'pendente').length;
@@ -353,12 +227,25 @@ if (searchTerm !== '') {
   const cancelledOrders = filteredOrders.filter(o => o.status === 'cancelado').length;
   const totalValue = ordersForList.reduce((sum, order) => sum + order.total, 0);
 
-  const clearDateFilter = () => {
-    setDateFilter('');
+  const clearDateFilters = () => {
+    setStartDate('');
+    setEndDate('');
   };
 
   const clearSearch = () => {
     setSearchTerm('');
+  };
+
+  // 🆕 FUNÇÃO PARA FORMATAR TEMPO RESTANTE
+  const formatTimeRemaining = (expiryDate: Date) => {
+    const total = expiryDate.getTime() - now.getTime();
+    if (total <= 0) {
+      return 'Expirado';
+    }
+    const minutes = Math.floor((total / 1000 / 60) % 60);
+    const seconds = Math.floor((total / 1000) % 60);
+
+    return `${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`;
   };
 
   if (loading) return (
@@ -369,8 +256,10 @@ if (searchTerm !== '') {
       color: 'var(--text-primary)',
       minHeight: '100vh'
     }}>
-      <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
-      <p>Carregando pedidos...</p>
+      <div className="global-loading-container">
+        <div className="global-spinner"></div>
+        <p className="global-loading-text">Carregando pedidos...</p>
+      </div>
     </div>
   );
 
@@ -383,13 +272,12 @@ if (searchTerm !== '') {
       maxWidth: 1200,
       margin: '0 auto'
     }}>
+      {/* Cabeçalho */}
       <div style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'flex-start',
-        marginBottom: 32,
-        flexWrap: 'wrap',
-        gap: 16
+        marginBottom: 32 
       }}>
         <div>
           <button
@@ -407,7 +295,7 @@ if (searchTerm !== '') {
               gap: 8
             }}
           >
-            ← Voltar
+            ← Voltar para Admin
           </button>
           <h1 style={{ 
             fontSize: 28, 
@@ -415,14 +303,14 @@ if (searchTerm !== '') {
             color: 'var(--text-primary)',
             margin: 0
           }}>
-            📦 Gestão de Pedidos
+            Pedidos Videra
           </h1>
           <p style={{ 
             color: 'var(--text-secondary)', 
             marginTop: 4,
             margin: 0
           }}>
-            Gerencie todos os pedidos da sua loja
+            Visualização simplificada dos pedidos
           </p>
         </div>
         <ThemeToggle />
@@ -430,8 +318,8 @@ if (searchTerm !== '') {
 
       {/* Cards de estatísticas */}
       <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
         gap: 16, 
         marginBottom: 24 
       }}>
@@ -480,7 +368,7 @@ if (searchTerm !== '') {
         </div>
       </div>
 
-      {/* Barra de Pesquisa */}
+      {/* Barra de Pesquisa e Filtros */}
       <div style={{ 
         background: 'var(--bg-card)', 
         padding: 24, 
@@ -488,316 +376,279 @@ if (searchTerm !== '') {
         border: '1px solid var(--border-color)',
         marginBottom: 24
       }}>
-        <div style={{ marginBottom: 16 }}>
+        {/* Pesquisa */}
+        <div style={{ marginBottom: 24 }}>
           <label style={{ 
             display: 'block', 
             marginBottom: 8, 
             fontWeight: 600,
             color: 'var(--text-primary)'
           }}>
-            🔍 Pesquisar Pedido:
+            Pesquisar Pedido
           </label>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <div style={{ flex: 1, position: 'relative' }}>
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar por código do pedido (ex: VID-1234), forma de pagamento ou opção de retirada..."
-                style={{
-                  width: '100%',
-                  padding: '12px 16px',
-                  paddingLeft: '40px',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: 8,
-                  fontSize: 14,
-                  background: 'var(--bg-primary)',
-                  color: 'var(--text-primary)',
-                  outline: 'none',
-                  transition: 'all 0.2s ease'
-                }}
-                onFocus={(e) => e.currentTarget.style.borderColor = '#7c3aed'}
-                onBlur={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
-              />
-              <span style={{ 
-                position: 'absolute', 
-                left: 12, 
-                top: '50%', 
-                transform: 'translateY(-50%)',
-                fontSize: 18
-              }}>
-                🔍
-              </span>
-            </div>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Código, forma de pagamento, etc..."
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                border: '1px solid var(--border-color)',
+                borderRadius: 8,
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+              }}
+            />
             {searchTerm && (
-              <button
-                onClick={clearSearch}
-                style={{
-                  background: '#ef4444',
-                  color: 'white',
-                  padding: '10px 16px',
-                  border: 'none',
-                  borderRadius: 8,
-                  cursor: 'pointer',
-                  fontSize: 14,
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6
-                }}
-              >
-                ❌ Limpar
+              <button onClick={clearSearch} style={{ padding: '10px 12px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                Limpar
               </button>
             )}
           </div>
         </div>
 
         {/* Filtros */}
-        <div style={{ display: 'grid', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 24 }}>
+          {/* Status */}
           <div>
             <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: 'var(--text-primary)' }}>
-              Status do Pedido:
+              Status do Pedido
             </label>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {[
-                { value: 'all' as const, label: '📋 Todos' },
-                { value: 'pendente' as const, label: '🟡 Pendentes' },
-                { value: 'pago' as const, label: '🟢 Pagos' },
-                { value: 'cancelado' as const, label: '🔴 Cancelados' }
-              ].map(({ value, label }) => (
-                <button
-                  key={value}
-                  onClick={() => setStatusFilter(value)}
-                  style={{
-                    background: statusFilter === value ? '#7c3aed' : 'var(--bg-secondary)',
-                    color: statusFilter === value ? 'white' : 'var(--text-primary)',
-                    padding: '8px 16px',
-                    border: `1px solid ${statusFilter === value ? '#7c3aed' : 'var(--border-color)'}`,
-                    borderRadius: 8,
-                    cursor: 'pointer',
-                    fontSize: 14,
-                    fontWeight: 600,
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as any)}
+              style={{ width: '100%', padding: '12px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)'}}
+            >
+              <option value="all">Todos</option>
+              <option value="pendente">Pendentes</option>
+              <option value="pago">Pagos</option>
+              <option value="cancelado">Cancelados</option> 
+            </select>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: 'var(--text-primary)' }}>
-                Filtrar por Mês:
-              </label>
-              <select
-                value={monthFilter}
-                onChange={(e) => setMonthFilter(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: 8,
-                  fontSize: 14,
-                  background: 'var(--bg-card)',
-                  color: 'var(--text-primary)'
-                }}
-              >
-                {getUniqueMonths().map(month => (
-                  <option key={month.value} value={month.value}>
-                    {month.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {/* Tipo de Pedido */}
+          <div>
+            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: 'var(--text-primary)' }}>
+              Tipo de Pedido
+            </label>
+             <select
+              value={preorderFilter}
+              onChange={(e) => setPreorderFilter(e.target.value as any)}
+              style={{ width: '100%', padding: '12px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)'}}
+            >
+              <option value="all">Todos</option>
+              <option value="preorder">Pré-Vendas</option>
+            </select>
+          </div>
 
+          {/* 🆕 Filtro por Mês */}
+          <div>
+            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: 'var(--text-primary)' }}>
+              Mês do Pedido
+            </label>
+            <select
+              value={monthFilter}
+              onChange={(e) => setMonthFilter(e.target.value)}
+              style={{ width: '100%', padding: '12px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)'}}
+            >
+              {getUniqueMonths().map(month => (
+                <option key={month.value} value={month.value}>{month.label}</option>
+              ))}
+            </select>
+          </div>
+          {/* Filtro de Data */}
+          <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 16, alignItems: 'flex-end' }}>
             <div>
               <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: 'var(--text-primary)' }}>
-                Filtrar por Data:
+                Data de Início
               </label>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input
-                  type="date"
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
-                  style={{
-                    flex: 1,
-                    padding: '10px 12px',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: 8,
-                    fontSize: 14,
-                    background: 'var(--bg-card)',
-                    color: 'var(--text-primary)'
-                  }}
-                />
-                {dateFilter && (
-                  <button
-                    onClick={clearDateFilter}
-                    style={{
-                      background: '#ef4444',
-                      color: 'white',
-                      padding: '10px 12px',
-                      border: 'none',
-                      borderRadius: 8,
-                      cursor: 'pointer',
-                      fontSize: 14,
-                      fontWeight: 600
-                    }}
-                  >
-                    ❌ Limpar
-                  </button>
-                )}
-              </div>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                style={{ width: '100%', padding: '10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+              />
             </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: 'var(--text-primary)' }}>
+                Data de Fim
+              </label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                style={{ width: '100%', padding: '10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+              />
+            </div>
+            <button
+              onClick={clearDateFilters}
+              style={{
+                background: 'var(--bg-secondary)',
+                color: 'var(--text-primary)',
+                padding: '12px 16px',
+                border: '1px solid var(--border-color)',
+                borderRadius: 8,
+                cursor: 'pointer',
+              }}
+            >
+              Limpar Datas
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Lista de Pedidos */}
-      <div style={{ 
-        background: 'var(--bg-card)', 
-        borderRadius: 12,
-        border: '1px solid var(--border-color)',
-        overflow: 'hidden'
-      }}>
-        {ordersForList.length === 0 ? (
-          <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-secondary)' }}>
-            <div style={{ fontSize: 64, marginBottom: 16 }}>📭</div>
-            <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, color: 'var(--text-primary)' }}>
-              Nenhum pedido encontrado
-            </h3>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gap: 1, background: 'var(--bg-secondary)' }}>
-            {ordersForList.map((order, index) => {
-              const statusColor = getStatusColor(order.status);
-              const reservation = getReservationColor(order.id);
-              
-              // Calcula o número do pedido: o último da lista (mais antigo) será o 1
-              const sequenceNumber = ordersForList.length - index;
+      {ordersForList.length === 0 ? (
+        <div style={{ 
+          padding: 60, 
+          textAlign: 'center', 
+          color: 'var(--text-secondary)',
+          background: 'var(--bg-card)',
+          borderRadius: 12,
+          border: '1px solid var(--border-color)'
+        }}>
+          <h3 style={{ 
+            fontSize: 18, 
+            fontWeight: 600, 
+            marginBottom: 8,
+            color: 'var(--text-primary)'
+          }}>
+            Nenhum pedido encontrado
+          </h3>
+          <p style={{ margin: 0 }}>
+            Tente ajustar os filtros ou a busca.
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {ordersForList.map((order, index) => {
+            const statusColor = getStatusColor(order.status);
 
-              return (
-                <div
-                  key={order.id}
-                  onClick={() => router.push(`/admin/orders/${order.id}`)}
-                  style={{
-                    background: 'var(--bg-card)',
-                    padding: '20px 24px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    borderBottom: index < ordersForList.length - 1 ? '1px solid var(--border-color)' : 'none'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'var(--bg-secondary)';
-                    e.currentTarget.style.transform = 'translateX(4px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'var(--bg-card)';
-                    e.currentTarget.style.transform = 'translateX(0)';
-                  }}
-                >
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: '1fr auto auto', 
-                    gap: '16px', 
-                    alignItems: 'center',
-                    flexWrap: 'wrap'
-                  }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: 14, fontWeight: 800, color: '#7c3aed', background: 'var(--bg-secondary)', padding: '2px 8px', borderRadius: '6px', border: '1px solid var(--border-color)', minWidth: '40px', textAlign: 'center' }}>
-                          #{sequenceNumber}
-                        </span>
-                        <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                          🏷️ {order.order_code}
-                        </h3>
-                        <div
-                          style={{
-                            background: statusColor.bg,
-                            color: statusColor.text,
-                            padding: '4px 8px',
-                            borderRadius: 12,
-                            fontSize: 12,
-                            fontWeight: 600,
-                            border: `1px solid ${statusColor.border}`
-                          }}
-                        >
-                          {getStatusIcon(order.status)} {order.status.toUpperCase()}
-                        </div>
-                        {/* 🆕 Badge de status da reserva */}
-                        <div
-                          style={{
-                            background: reservation.bg,
-                            color: reservation.text,
-                            padding: '4px 10px',
-                            borderRadius: 12,
-                            fontSize: 12,
-                            fontWeight: 600,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 6
-                          }}
-                        >
-                          <span>{reservation.icon}</span>
-                          <span>{reservation.label}</span>
-                        </div>
-                      </div>
-                      
-                      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 14, color: 'var(--text-secondary)' }}>
-                        <span><strong>💳 Pagamento:</strong> {order.payment_method}</span>
-                        <span><strong>📦 Retirada:</strong> {order.pickup_option}</span>
-                        <span><strong>📦 Itens:</strong> {order.items_count}</span>
-                        <span><strong>📅 Data:</strong> {new Date(order.created_at).toLocaleDateString('pt-BR')}</span>
-                        <span><strong>⏰ Hora:</strong> {new Date(order.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-                      </div>
-                      
-                      {order.observations && (
-                        <div style={{ marginTop: 8, fontSize: 13, color: '#f59e0b', background: '#fef3c7', padding: '4px 8px', borderRadius: 6, display: 'inline-block' }}>
-                          💬 Obs: {order.observations}
-                        </div>
-                      )}
-                    </div>
+            // 🆕 LÓGICA PARA TEMPO DE RESERVA
+            const isPendingPreorder = order.is_preorder && order.status === 'pendente';
+            let reservationDisplay;
+            if (isPendingPreorder) {
+              const expiryDate = new Date(new Date(order.created_at).getTime() + 60 * 60 * 1000);
+              const timeRemaining = formatTimeRemaining(expiryDate);
+              if (timeRemaining === 'Expirado') {
+                reservationDisplay = 'RESERVA EXPIRADA';
+              } else {
+                reservationDisplay = `RESERVA EXPIRA EM ${timeRemaining}`;
+              }
+            } else if (order.is_preorder) {
+              reservationDisplay = `${order.status.toUpperCase()} (PRÉ-VENDA)`;
+            } else {
+              reservationDisplay = order.status.toUpperCase();
+            }
 
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>
-                        R$ {order.total.toFixed(2)}
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Total</div>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const message = `Olá! Gostaria de informações sobre o pedido *${order.order_code}*`;
-                          window.open(`https://wa.me/5592986446677?text=${encodeURIComponent(message)}`, '_blank');
-                        }}
+            return (
+              <div
+                key={order.id}
+                onClick={() => router.push(`/admin/orders/${order.id}`)}
+                style={{
+                  background: order.is_preorder
+                    ? 'linear-gradient(135deg, var(--bg-card) 0%, #f3e8ff 150%)'
+                    : 'var(--bg-card)',
+                  border: order.is_preorder ? '2px solid #7c3aed' : '1px solid var(--border-color)',
+                  padding: '20px 24px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  borderRadius: 12,
+                  boxShadow: 'var(--shadow)',
+                }}
+              >
+                <div className="order-card-header" style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '12px',
+                  marginBottom: '16px',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{
+                      fontSize: '18px',
+                      fontWeight: 700,
+                      color: 'var(--text-secondary)',
+                      background: 'var(--bg-secondary)',
+                      borderRadius: '8px',
+                      padding: '8px 12px',
+                      minWidth: '50px',
+                      textAlign: 'center'
+                    }}>
+                      #{ordersForList.length - index}
+                    </span>
+                    <h3 style={{
+                      fontSize: 18,
+                      fontWeight: 700,
+                      color: 'var(--text-primary)',
+                      margin: 0
+                    }}>
+                      {order.order_code}
+                    </h3>
+                    {order.is_preorder && (
+                      <div
                         style={{
-                          background: '#25D366',
+                          background: '#7c3aed',
                           color: 'white',
-                          padding: '8px 12px',
-                          border: 'none',
-                          borderRadius: 6,
-                          cursor: 'pointer',
+                          padding: '4px 10px',
+                          borderRadius: 12,
                           fontSize: 12,
-                          fontWeight: 600,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 6
+                          fontWeight: 600
                         }}
                       >
-                        📱 WhatsApp
-                      </button>
-                    </div>
+                        PRÉ-VENDA
+                      </div>
+                    )}
+                  </div>
+                  <div
+                    style={{
+                      background: statusColor.bg,
+                      color: statusColor.text,
+                      padding: '6px 12px',
+                      borderRadius: 12,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      border: `1px solid ${statusColor.border}`,
+                      // 🎨 Cor especial para reserva expirada
+                      ...(isPendingPreorder && reservationDisplay === 'RESERVA EXPIRADA' && { background: '#fee2e2', color: '#991b1b', border: '1px solid #ef4444' })
+                    }}
+                  >
+                    {reservationDisplay}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
+                <div className="order-card-body" style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                  gap: '16px',
+                  fontSize: 14,
+                  color: 'var(--text-secondary)',
+                  paddingTop: '16px',
+                  borderTop: '1px solid var(--border-color)'
+                }}>
+                  <span><strong>Data:</strong> {new Date(order.created_at).toLocaleString('pt-BR')}</span>
+                  <span><strong>Itens:</strong> {order.items_count}</span>
+                  <span><strong>Total:</strong> R$ {order.total.toFixed(2)}</span>
+                  <span><strong>Pagamento:</strong> {order.payment_method}</span>
+                  <span><strong>Retirada:</strong> {order.pickup_option}</span>
+                </div>
+
+                {order.observations && (
+                  <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed var(--border-color)' }}>
+                    <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-primary)' }}>
+                      <strong>Obs:</strong> <span style={{ color: 'var(--text-secondary)' }}>{order.observations}</span>
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Rodapé Informativo */}
       <div style={{ 
         marginTop: 24, 
         padding: 16, 
@@ -806,19 +657,23 @@ if (searchTerm !== '') {
         border: '1px solid var(--border-color)',
         textAlign: 'center'
       }}>
-        <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: 0 }}>
-          💡 <strong>Dica:</strong> Clique em qualquer pedido para ver detalhes completos e gerenciar o status.
-          {pendingOrders > 0 && ` 🔴 Pedidos pendentes têm reserva de 1 hora.`}
+        <p style={{ 
+          color: 'var(--text-secondary)', 
+          fontSize: 14,
+          margin: 0
+        }}>
+          <strong>Dica:</strong> Clique em um pedido para ver mais detalhes e gerenciar o status.
         </p>
       </div>
     </div>
   );
 }
 
-export default function OrdersPage() {
+// Componente exportado com proteção
+export default function PedidosPage() {
   return (
     <AuthGuard>
-      <OrdersContent />
+      <PedidosContent />
     </AuthGuard>
   );
 }

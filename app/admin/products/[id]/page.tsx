@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import AuthGuard from "@/app/components/AuthGuard";
 import ThemeToggle from "@/app/components/ThemeToggle";
+import { useAuth } from "@/app/contexts/AuthContext";
 import { getPokemonCollectionsForAdmin } from '@/lib/collections';
 
 interface Product {
@@ -33,6 +34,7 @@ interface Product {
 function EditProductContent() {
   const router = useRouter();
   const { id } = useParams();
+  const { user, loading: authLoading } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -60,6 +62,10 @@ function EditProductContent() {
   const [previewUrl, setPreviewUrl] = useState("");
 
   useEffect(() => {
+    // Aguarda a autenticação antes de fazer qualquer coisa
+    if (authLoading || !user) {
+      return;
+    }
     const controller = new AbortController();
 
     const loadProduct = async () => {
@@ -96,7 +102,8 @@ function EditProductContent() {
           setPreviewUrl(data.image_url || "");
         }
       } catch (error: any) {
-        if (error.name !== 'AbortError') {
+        const isAbortError = error.name === 'AbortError' || (error.message && error.message.includes('AbortError'));
+        if (!isAbortError) {
           console.error("Erro ao carregar produto:", error);
           alert("Erro ao carregar produto");
           router.push("/admin/products");
@@ -113,7 +120,7 @@ function EditProductContent() {
     }
 
     return () => controller.abort();
-  }, [id, router]);
+  }, [id, user, authLoading, router]);
 
   // 🆕 Função para gerar slug a partir do nome da coleção
   const generateSlug = (text: string) => {

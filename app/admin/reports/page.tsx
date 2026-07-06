@@ -59,7 +59,7 @@ function ReportsContent() {
       const { data: orders, error: ordersError } = await supabase
         .from("orders")
         .select("id, created_at")
-        .eq("status", "pago")
+        .in("status", ["pago", "entregue"])
         .gte("created_at", startDateTime)
         .lte("created_at", endDateTime);
 

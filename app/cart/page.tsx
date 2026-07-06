@@ -16,6 +16,7 @@ interface Product {
   image_url: string;
   category?: string;
   stock: number;
+  is_preorder?: boolean;
 }
 
 interface CartItem extends Product {
@@ -177,6 +178,7 @@ export default function CartPage() {
                 stock: freshProduct.stock,
                 name: freshProduct.name,
                 image_url: freshProduct.image_url,
+                is_preorder: freshProduct.is_preorder,
               };
             }
             return cartItem;
@@ -408,13 +410,16 @@ export default function CartPage() {
       return;
     }
 
+    const isPreOrder = cart.some(item => item.is_preorder);
+
     const orderCode = generateOrderCode();
     const { data: orderResult, error: orderError } = await supabase.rpc('create_order', {
       p_order_code: orderCode,
       p_status: 'pendente',
       p_payment_method: paymentMethodLabels[paymentMethod],
       p_pickup_option: pickupOptionLabels[pickupOption],
-      p_observations: observations || null
+      p_observations: observations || null,
+      p_is_preorder: isPreOrder
     });
 
     if (orderError || !orderResult?.id) {
