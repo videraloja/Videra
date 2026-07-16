@@ -196,51 +196,10 @@ export default function CartPage() {
 
     load();
 
-    const updateHandler = () => {
-      // This handler is synchronous, no need for abort controller here.
-      const sCart = localStorage.getItem('cart');
-      const sProducts = localStorage.getItem('products');
-      if (sCart) {
-        try {
-          const parsed = JSON.parse(sCart) as CartItem[];
-          setCart((prev) => {
-            const prevStr = JSON.stringify(prev);
-            const newStr = JSON.stringify(parsed);
-            return prevStr !== newStr ? parsed : prev;
-          });
-        } catch {}
-      }
-      if (sProducts) {
-        try {
-          const parsedP = JSON.parse(sProducts) as Product[];
-          setProducts((prev) => {
-            const prevStr = JSON.stringify(prev);
-            const newStr = JSON.stringify(parsedP);
-            return prevStr !== newStr ? parsedP : prev;
-          });
-        } catch {}
-      }
-    };
-
-    window.addEventListener('cart-updated', updateHandler);
-    window.addEventListener('storage', updateHandler);
-
     return () => {
       controller.abort();
-      window.removeEventListener('cart-updated', updateHandler);
-      window.removeEventListener('storage', updateHandler);
     };
   }, []);
-
-  useEffect(() => {
-    if (!ready) return;
-    try {
-      localStorage.setItem('cart', JSON.stringify(cart));
-    } catch (e) {
-      console.error('Erro ao salvar cart:', e);
-    }
-    window.dispatchEvent(new Event('cart-updated'));
-  }, [cart, ready]);
 
   const increaseQuantity = (id: number) => {
     const prod = products.find((p) => p.id === id);

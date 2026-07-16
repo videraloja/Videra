@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { heroBannerService, HeroBanner } from '@/lib/heroBannerService';
+import styles from './HeroSection.module.css';
 
 interface HeroSectionProps {
   autoPlay?: boolean;
@@ -134,7 +135,7 @@ export default function HeroSection({
             src={currentBanner.image_url}
             alt="Banner promocional"
             fill
-            className="hero-image hero-image-desktop"
+            className={styles.heroImageDesktop}
             sizes="100vw"
             priority={currentIndex === 0}
           />
@@ -143,7 +144,7 @@ export default function HeroSection({
             src={currentBanner.image_mobile_url || currentBanner.image_url}
             alt="Banner promocional"
             fill
-            className="hero-image hero-image-mobile"
+            className={styles.heroImageMobile}
             sizes="100vw"
             priority={currentIndex === 0}
           />
@@ -222,15 +223,6 @@ export default function HeroSection({
           overflow: hidden;
         }
 
-        .hero-image {
-          object-fit: cover;
-          object-position: center;
-        }
-
-        .hero-image-mobile {
-          display: none;
-        }
-
         /* Desktop (>= 1200px) */
         .hero-section {
           height: 500px;
@@ -254,12 +246,6 @@ export default function HeroSection({
             border-radius: 16px;
             margin-top: 16px;
             margin-bottom: 16px;
-          }
-          .hero-image-desktop {
-            display: none;
-          }
-          .hero-image-mobile {
-            display: block;
           }
         }
 

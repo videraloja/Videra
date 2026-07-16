@@ -1,0 +1,20 @@
+.heroImageDesktop {
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+.heroImageMobile {
+  object-fit: cover;
+  object-position: center;
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .heroImageDesktop {
+    display: none;
+  }
+  .heroImageMobile {
+    display: block;
+  }
+}
