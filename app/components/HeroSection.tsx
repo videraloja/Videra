@@ -25,16 +25,6 @@ export default function HeroSection({
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [isMobile, setIsMobile] = useState(false);
 
-  // Detectar mobile
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
   // Carregar banners
   useEffect(() => {
     const controller = new AbortController();
@@ -121,12 +111,6 @@ export default function HeroSection({
   }
 
   const currentBanner = banners[currentIndex];
-  
-  // Escolhe a imagem certa para o dispositivo
-  // Se for mobile E tiver imagem mobile específica, usa ela. Senão, usa a desktop
-  const imageUrl = isMobile && currentBanner.image_mobile_url 
-    ? currentBanner.image_mobile_url 
-    : currentBanner.image_url;
 
   return (
     <section 
@@ -143,11 +127,23 @@ export default function HeroSection({
         className="hero-link"
       >
         <div className="hero-image-wrapper">
+          {/* Renderiza as duas imagens (desktop e mobile) e usa CSS para mostrar a correta. */}
+          {/* Isso permite que o Next.js otimize o preload corretamente para diferentes tamanhos de tela. */}
           <Image
-            src={imageUrl}
+            key={`${currentBanner.id}-desktop`}
+            src={currentBanner.image_url}
             alt="Banner promocional"
             fill
-            className="hero-image"
+            className="hero-image hero-image-desktop"
+            sizes="100vw"
+            priority={currentIndex === 0}
+          />
+          <Image
+            key={`${currentBanner.id}-mobile`}
+            src={currentBanner.image_mobile_url || currentBanner.image_url}
+            alt="Banner promocional"
+            fill
+            className="hero-image hero-image-mobile"
             sizes="100vw"
             priority={currentIndex === 0}
           />
@@ -231,6 +227,10 @@ export default function HeroSection({
           object-position: center;
         }
 
+        .hero-image-mobile {
+          display: none;
+        }
+
         /* Desktop (>= 1200px) */
         .hero-section {
           height: 500px;
@@ -254,6 +254,12 @@ export default function HeroSection({
             border-radius: 16px;
             margin-top: 16px;
             margin-bottom: 16px;
+          }
+          .hero-image-desktop {
+            display: none;
+          }
+          .hero-image-mobile {
+            display: block;
           }
         }
 
