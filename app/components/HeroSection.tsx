@@ -136,7 +136,7 @@ export default function HeroSection({
             alt="Banner promocional"
             fill
             className={styles.heroImageDesktop}
-            sizes="100vw"
+            sizes="(max-width: 1440px) calc(100vw - 40px), 1400px"
             priority={currentIndex === 0}
           />
           <Image
@@ -145,7 +145,7 @@ export default function HeroSection({
             alt="Banner promocional"
             fill
             className={styles.heroImageMobile}
-            sizes="100vw"
+            sizes="(max-width: 1440px) calc(100vw - 40px), 1400px"
             priority={currentIndex === 0}
           />
         </div>
@@ -223,46 +223,35 @@ export default function HeroSection({
           overflow: hidden;
         }
 
-        /* Desktop (>= 1200px) */
+        /* 
+          Ajuste para usar aspect-ratio em vez de altura fixa.
+          Isso garante que o contêiner do banner sempre tenha a mesma proporção 
+          da imagem, evitando cortes indesejados.
+        */
+
+        /* Desktop e Tablet (>= 768px) - usa a proporção da imagem desktop */
         .hero-section {
-          height: 500px;
+          aspect-ratio: 1920 / 600;
+          height: auto; /* Remove a altura fixa para permitir que a proporção funcione */
           border-radius: 24px;
         }
 
         /* Tablet (768px - 1199px) */
         @media (max-width: 1199px) {
           .hero-section {
-            height: 400px;
             border-radius: 20px;
             margin-top: 20px;
             margin-bottom: 20px;
           }
         }
 
-        /* Mobile (<= 767px) */
+        /* Mobile (<= 767px) - usa a proporção da imagem mobile */
         @media (max-width: 767px) {
           .hero-section {
-            height: 400px;
+            aspect-ratio: 750 / 600;
             border-radius: 16px;
             margin-top: 16px;
             margin-bottom: 16px;
-          }
-        }
-
-        /* Mobile pequeno (<= 480px) */
-        @media (max-width: 480px) {
-          .hero-section {
-            height: 350px;
-            border-radius: 12px;
-            margin-top: 12px;
-            margin-bottom: 12px;
-          }
-        }
-
-        /* Mobile muito pequeno (<= 380px) */
-        @media (max-width: 380px) {
-          .hero-section {
-            height: 300px;
           }
         }
 
