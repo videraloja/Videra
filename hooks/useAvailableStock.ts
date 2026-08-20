@@ -25,11 +25,13 @@ export const useAvailableStock = (products: Product[]) => {
   };
 
   useEffect(() => {
+    if (products.length === 0) return;
+
     syncWithReservations();
-    
+
     // Atualizar a cada 30 segundos (opcional)
     const interval = setInterval(syncWithReservations, 30000);
-    
+
     return () => clearInterval(interval);
   }, [products]);
 

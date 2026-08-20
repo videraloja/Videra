@@ -3,13 +3,29 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { Product as BaseProduct } from '../types';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useStock } from '../../hooks/useStock';
 import { useCartContext } from '../contexts/CartContext';
+import { trackAddToCart } from '@/lib/analytics';
 
 interface Product extends BaseProduct {
   is_preorder?: boolean;
+}
+
+function ProductLink({ slug, enabled, style, children }: {
+  slug?: string;
+  enabled: boolean;
+  style?: React.CSSProperties;
+  children: React.ReactNode;
+}) {
+  if (!enabled || !slug) return <>{children}</>;
+  return (
+    <Link href={`/produto/${slug}`} style={{ textDecoration: 'none', color: 'inherit', ...style }}>
+      {children}
+    </Link>
+  );
 }
 
 interface ProductCardProps {
@@ -20,9 +36,11 @@ interface ProductCardProps {
     icon: string;
     badgeText: string;
   };
+  /** Desativa o link para a página do produto (ex.: previews no admin). */
+  disableLink?: boolean;
 }
 
-export default function ProductCard({ product, onAddToCart, categoryConfig }: ProductCardProps) {
+export default function ProductCard({ product, onAddToCart, categoryConfig, disableLink }: ProductCardProps) {
   const { colors, getCardStyles, applyCardStyles } = useThemeColors();
   const { stockLabel } = useStock();
   const { isInCart, getItemQuantity } = useCartContext();
@@ -79,13 +97,18 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
   const config = categoryConfig || defaultConfig;
   const cardStyles = getCardStyles();
 
-  const handleAddToCart = () => {
+  const handleAddToCart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (currentStock <= 0) return;
     onAddToCart(product);
+    trackAddToCart({ id: product.id, name: product.name, price: displayPrice, category: product.category });
     setIsAdded(true);
     setQuantityInCart(prev => prev + 1);
     setCurrentStock(prev => Math.max(prev - 1, 0));
   };
+
+  const showLink = !disableLink && !!product.slug;
 
   const getButtonContent = () => {
     if (product.is_preorder) {
@@ -154,48 +177,51 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
       )}
 
       {/* Container da imagem com next/image */}
-      <div style={{
-        width: '100%',
-        height: '200px',
-        overflow: 'hidden',
-        position: 'relative',
-        background: cardStyles.imageOverlay
-      }}>
-        <Image
-          src={product.image_url || '/placeholder.png'}
-          alt={product.name}
-          fill
-          sizes="280px"
-          style={{ objectFit: 'cover' }}
-          priority={false}
-          unoptimized
-        />
-      </div>
+      <ProductLink slug={product.slug} enabled={showLink} style={{ display: 'block' }}>
+        <div className="product-card-image" style={{
+          width: '100%',
+          height: '200px',
+          overflow: 'hidden',
+          position: 'relative',
+          background: cardStyles.imageOverlay
+        }}>
+          <Image
+            src={product.image_url || '/placeholder.png'}
+            alt={product.name}
+            fill
+            sizes="(max-width: 768px) 45vw, 280px"
+            style={{ objectFit: 'cover' }}
+            priority={false}
+          />
+        </div>
+      </ProductLink>
 
-      <div style={{
+      <div className="product-card-content" style={{
         padding: '20px',
         display: 'flex',
         flexDirection: 'column',
         flex: '1',
         minHeight: '220px'
       }}>
-        <h3 style={{
-          ...applyCardStyles('productName', {
-            fontSize: '16px',
-            fontWeight: '600',
-            lineHeight: '1.3',
-            height: '42px',
-            overflow: 'hidden',
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            marginBottom: '8px'
-          })
-        }}>
-          {product.name}
-        </h3>
+        <ProductLink slug={product.slug} enabled={showLink} style={{ display: 'block' }}>
+          <h3 className="product-card-title" style={{
+            ...applyCardStyles('productName', {
+              fontSize: '16px',
+              fontWeight: '600',
+              lineHeight: '1.3',
+              height: '42px',
+              overflow: 'hidden',
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              marginBottom: '8px'
+            })
+          }}>
+            {product.name}
+          </h3>
+        </ProductLink>
 
-        <div style={{ marginBottom: '12px' }}>
+        <div className="product-card-price" style={{ marginBottom: '12px' }}>
           {product.on_sale && originalPrice && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
               <span style={applyCardStyles('originalPrice', { fontSize: '14px', fontWeight: '500' })}>
@@ -215,14 +241,14 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
 
         {/* 🆕 LÓGICA CONDICIONAL PARA ESTOQUE OU PRÉ-VENDA */}
         {product.is_preorder ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', background: '#f3e8ff', color: '#7c3aed', padding: '6px 10px', borderRadius: '8px', border: '1px solid #e9d5ff' }}>
+          <div className="product-card-stock" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', background: '#f3e8ff', color: '#7c3aed', padding: '6px 10px', borderRadius: '8px', border: '1px solid #e9d5ff' }}>
             <span style={{ fontSize: '14px' }}>📦</span>
             <span style={{ fontSize: '14px', fontWeight: '600' }}>
               Pré-venda
             </span>
           </div>
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px' }}>
+          <div className="product-card-stock" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px' }}>
             <span style={{ fontSize: '14px' }}>{stockInfo.icon}</span>
             <span style={applyCardStyles('stockInfo', { fontSize: '14px', fontWeight: '500' })}>
               {stockInfo.text}
@@ -230,9 +256,10 @@ export default function ProductCard({ product, onAddToCart, categoryConfig }: Pr
           </div>
         )}
 
-        <div style={{ height: '50px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 'auto' }}>
+        <div className="product-card-button-wrapper" style={{ height: '50px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 'auto' }}>
           <button
             id={`add-to-cart-${product.id}`}
+            className="product-card-button"
             onClick={handleAddToCart}
             disabled={currentStock === 0}
             style={{

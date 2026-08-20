@@ -235,6 +235,9 @@ export default function PokemonTCGPage() {
       <Header onSearch={handleSearch} searchTerm={searchTerm} />
 
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '0px 20px' }}>
+        <h1 style={{ position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
+          Pokémon TCG em Manaus — Videra Store
+        </h1>
         {!ready && (
           <div className="global-loading-container" style={{ padding: '80px 20px' }}>
             <div className="global-spinner" style={{ borderTopColor: colors.primary }}></div>

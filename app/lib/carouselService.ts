@@ -71,14 +71,22 @@ export const carouselService = {
         salesCount[item.product_id] = (salesCount[item.product_id] || 0) + item.quantity;
       });
 
+      const soldProductIds = Object.keys(salesCount);
+      if (soldProductIds.length === 0) {
+        // Sem vendas no período: id=in.() nunca retorna nada, evita a requisição
+        return [];
+      }
+
       // Buscar produtos: se for 'home', não filtrar por categoria
-      let productQuery = supabase.from('products').select('*');
+      let productQuery = supabase
+        .from('products')
+        .select('id, name, slug, price, original_price, sale_price, on_sale, image_url, category, stock, collection, is_preorder');
       if (category && category !== 'home') {
         productQuery = productQuery.eq('category', category);
       }
 
       const { data: products, error: productsError } = await productQuery
-        .in('id', Object.keys(salesCount));
+        .in('id', soldProductIds);
 
       if (productsError) {
         console.error('Erro ao buscar produtos:', productsError);
@@ -104,7 +112,9 @@ export const carouselService = {
   // Obter lançamentos (corrigido para Home)
   async getNewArrivals(category: string, limit: number = 10): Promise<any[]> {
     try {
-      let query = supabase.from('products').select('*');
+      let query = supabase
+        .from('products')
+        .select('id, name, slug, price, original_price, sale_price, on_sale, image_url, category, stock, collection, is_preorder, created_at');
       if (category && category !== 'home') {
         query = query.eq('category', category);
       }

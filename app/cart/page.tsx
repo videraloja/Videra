@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { supabase } from '../../lib/supabaseClient';
 import { useToast } from '../components/Toast';
+import { trackBeginCheckout, trackWhatsAppOrder } from '@/lib/analytics';
 
 interface Product {
   id: number;
@@ -268,9 +269,18 @@ export default function CartPage() {
     dinheiro: 'Dinheiro'
   };
 
+  // Valor interno usado na mensagem do WhatsApp e gravado no banco (create_order).
+  // NÃO alterar — mudar aqui muda o texto do pedido no WhatsApp e o valor salvo.
   const pickupOptionLabels: Record<string, string> = {
     buscar: 'Vou buscar',
     mandar: 'Vou mandar buscar'
+  };
+
+  // Rótulo exibido na UI (botão e modal). Pode ser alterado livremente sem afetar
+  // WhatsApp ou banco, pois é usado só para exibição.
+  const pickupOptionDisplayLabels: Record<string, string> = {
+    buscar: 'Vou buscar',
+    mandar: 'Vou mandar Uber Moto'
   };
 
   const handleCreditClick = () => {
@@ -461,6 +471,7 @@ Aguarde enquanto processamos seu pedido : )
       timestamp: Date.now()
     };
     persistOrderSuccess(successData);
+    trackWhatsAppOrder(orderCode, total);
 
     try {
       const newWindow = window.open(whatsappUrl, '_blank');
@@ -489,6 +500,11 @@ Aguarde enquanto processamos seu pedido : )
       showToast('Por favor, selecione uma opção de retirada antes de enviar o pedido.', 'warning');
       return;
     }
+
+    trackBeginCheckout(
+      cart.map((item) => ({ id: item.id, name: item.name, price: getCurrentPrice(item), category: item.category, quantity: item.quantity })),
+      total
+    );
 
     await processOrder();
   };
@@ -783,7 +799,7 @@ Aguarde enquanto processamos seu pedido : )
             <label className="section-label"> Método Retirada</label>
             <div className="options-group">
               <button onClick={handlePickupClick} className={`option-btn ${pickupOption === 'buscar' ? 'active' : ''}`}>Vou buscar</button>
-              <button onClick={handleSendPickupClick} className={`option-btn ${pickupOption === 'mandar' ? 'active' : ''} ${paymentMethod === 'dinheiro' ? 'disabled-option' : ''}`} style={paymentMethod === 'dinheiro' ? { opacity: 0.5, cursor: 'not-allowed' } : {}} disabled={paymentMethod === 'dinheiro'}>Vou mandar buscar</button>
+              <button onClick={handleSendPickupClick} className={`option-btn ${pickupOption === 'mandar' ? 'active' : ''} ${paymentMethod === 'dinheiro' ? 'disabled-option' : ''}`} style={paymentMethod === 'dinheiro' ? { opacity: 0.5, cursor: 'not-allowed' } : {}} disabled={paymentMethod === 'dinheiro'}>{pickupOptionDisplayLabels.mandar}</button>
             </div>
             {paymentMethod === 'dinheiro' && <p className="disabled-warning" style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.5rem' }}>⚠️ Opção indisponível para pagamento em dinheiro</p>}
           </div>
@@ -830,7 +846,7 @@ Aguarde enquanto processamos seu pedido : )
       {showPickupModal && (
         <div className="modal-overlay" onClick={() => setShowPickupModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header"><span className="modal-icon">🛵</span><h3>Você escolheu "Vou mandar buscar"</h3></div>
+            <div className="modal-header"><span className="modal-icon">🛵</span><h3>Você escolheu "Vou mandar Uber Moto"</h3></div>
             <div className="modal-body"><p>Nessa modalidade, você precisa solicitar um motorista de aplicativo (Uber, 99, etc.) para retirar o item em nossa loja.</p><p><strong>Não solicitamos o envio.</strong> Fazemos dessa forma para sua melhor comodidade:</p><ul className="modal-list"><li>✓ Você acompanha a corrida em tempo real</li><li>✓ Realiza o pagamento da corrida diretamente no app</li><li>✓ Entra em contato com o motorista caso precise resolver algo</li></ul><p className="modal-note">Após a confirmação do pedido, lhe será enviado nosso endereço e você poderá solicitar a retirada.</p></div>
             <div className="modal-footer"><button onClick={() => setShowPickupModal(false)} className="modal-btn-primary">Entendi</button></div>
           </div>

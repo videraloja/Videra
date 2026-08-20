@@ -2,6 +2,7 @@
 export interface Product {
   id: number;
   name: string;
+  slug?: string;
   price: number;
   original_price?: number;
   sale_price?: number;
@@ -15,6 +16,9 @@ export interface Product {
   description?: string;
   tags?: string[];
   card_set?: string;
+  brand?: string;
+  gtin?: string;
+  is_preorder?: boolean;
   created_at?: string;
 }
 

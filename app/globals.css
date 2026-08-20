@@ -585,10 +585,100 @@ th, td {
   .carousel-container-mobile {
     scroll-snap-type: x mandatory;
   }
-  
+
   .carousel-container-mobile + div button {
     min-height: 44px;
     min-width: 44px;
+  }
+}
+
+/* ===== CARROSSEL COMPACTO — 2 CARDS POR VEZ NO MOBILE =====
+   Aplicado junto com .carousel-container-mobile no mesmo elemento. Só tem efeito
+   até 768px — no desktop o carrossel continua igual (mais de 2 cards visíveis,
+   280px fixos). Os valores replicam o que já existe em .product-grid-container
+   (grid "Ver Todos"), usando as classes estáveis do ProductCard.tsx em vez de
+   seletores de atributo/posição — evita repetir a fragilidade de lá. */
+@media (max-width: 768px) {
+  /* 4.2 — largura proporcional (2 por linha) no lugar do width:280px fixo.
+     Divisor 2.2 (em vez de 2) deixa sobrar uma fatia do 3º card visível — sinal
+     visual de que dá pra arrastar. 16px = gap do container (definido inline em
+     Carousel.tsx). box-sizing: border-box já é global (topo deste arquivo). */
+  .carousel-compact > div {
+    flex: 0 0 calc((100% - 16px) / 2.2) !important;
+    max-width: calc((100% - 16px) / 2.2) !important;
+    width: auto !important;
+    box-sizing: border-box;
+  }
+
+  /* 4.5 — snap de 2 em 2: só o 1º item de cada par é ponto de parada */
+  .carousel-compact > div:nth-child(odd) {
+    scroll-snap-align: start !important;
+  }
+  .carousel-compact > div:nth-child(even) {
+    scroll-snap-align: none !important;
+  }
+
+  /* 4.1 — replica o visual compacto do grid "Ver Todos" dentro do carrossel */
+  .carousel-compact .product-card-mobile-optimized {
+    width: 100% !important;
+    min-height: 320px !important;
+    max-height: 320px !important;
+  }
+
+  .carousel-compact .product-card-image {
+    height: 150px !important;
+    min-height: 150px !important;
+  }
+
+  .carousel-compact .product-card-image img {
+    height: 150px !important;
+  }
+
+  /* Container de conteúdo (sem classe antes) tinha min-height:220px inline, que
+     o flex:1 não conseguia encolher — 150 (imagem) + 220 (conteúdo) > 320 (card),
+     e os 70px que sobravam eram cortados pelo overflow:hidden do card, incluindo
+     o botão. 150 + 170 = 320 fecha exatamente com a altura do card. */
+  .carousel-compact .product-card-content {
+    min-height: 170px !important;
+    padding: 12px !important;
+  }
+
+  .carousel-compact .product-card-mobile-optimized .description {
+    display: none !important;
+  }
+
+  .carousel-compact .product-card-title {
+    font-size: 13px !important;
+    height: 32px !important;
+    line-height: 1.3 !important;
+  }
+
+  .carousel-compact .product-card-price span {
+    font-size: 16px !important;
+  }
+
+  .carousel-compact .product-card-stock {
+    font-size: 11px !important;
+    margin-bottom: 6px !important;
+  }
+
+  .carousel-compact .product-card-stock span {
+    font-size: 11px !important;
+  }
+
+  .carousel-compact .product-card-button-wrapper {
+    height: 40px !important;
+    margin-top: auto !important;
+    padding-top: 4px !important;
+  }
+
+  .carousel-compact .product-card-button {
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 6px 12px !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    width: 100% !important;
   }
 }
 
@@ -831,6 +921,19 @@ th, td {
   .product-grid-container .product-card-mobile-optimized .image-wrapper,
   .product-grid-container .product-card-mobile-optimized > div:first-of-type {
     height: 20px !important;
+  }
+}
+
+/* ===== CORREÇÃO: container da imagem ficava sem encolher (200px) enquanto a
+   <img> já encolhia pra 170px, deixando uma faixa vazia embaixo da imagem no
+   grid "Ver Todos". As regras acima paravam de bater a partir do momento em
+   que a imagem passou a ficar dentro de um <Link> (página de produto), porque
+   usam seletores de filho direto / atributo que dependem da estrutura exata.
+   Esta usa a classe estável .product-card-image, que não depende disso. ===== */
+@media (max-width: 768px) {
+  .product-grid-container .product-card-image {
+    height: 170px !important;
+    min-height: 170px !important;
   }
 }
 

@@ -26,6 +26,8 @@ function NewProductContent() {
     collection: "", // 🆕 NOVO CAMPO
     rarity: "", // 🆕 NOVO CAMPO
     card_set: "", // 🆕 NOVO CAMPO
+    brand: "", // 🆕 MARCA/FABRICANTE (usado no JSON-LD e no feed do Google Merchant Center)
+    gtin: "", // 🆕 CÓDIGO DE BARRAS (EAN-13) impresso na embalagem
     tags: [] as string[], // 🆕 NOVO CAMPO
     is_preorder: false // 🆕 CAMPO PARA PRÉ-VENDA
   });
@@ -43,6 +45,20 @@ function NewProductContent() {
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '')
       .trim();
+  };
+
+  // Gera um slug \u00fanico para o produto (URL da p\u00e1gina /produto/[slug]),
+  // adicionando -2, -3... em caso de colis\u00e3o com outro produto.
+  const generateUniqueProductSlug = async (name: string): Promise<string> => {
+    const baseSlug = generateSlug(name);
+    let slug = baseSlug;
+    let suffix = 2;
+    while (true) {
+      const { data } = await supabase.from('products').select('id').eq('slug', slug).limit(1);
+      if (!data || data.length === 0) return slug;
+      slug = `${baseSlug}-${suffix}`;
+      suffix++;
+    }
   };
 
   // Função para fazer upload da imagem
@@ -102,8 +118,11 @@ function NewProductContent() {
     setLoading(true);
 
     try {
+      const slug = await generateUniqueProductSlug(formData.name);
+
       const productData = {
         name: formData.name,
+        slug,
         price: parseFloat(formData.price),
         stock: parseInt(formData.stock),
         supplier_code: formData.supplier_code || null,
@@ -114,6 +133,8 @@ function NewProductContent() {
         collection: formData.collection || null, // 🆕 NOVO CAMPO
         rarity: formData.rarity || null, // 🆕 NOVO CAMPO
         card_set: formData.card_set || null, // 🆕 NOVO CAMPO
+        brand: formData.brand || null, // 🆕 MARCA/FABRICANTE
+        gtin: formData.gtin || null, // 🆕 CÓDIGO DE BARRAS (EAN-13)
         tags: formData.tags.length > 0 ? formData.tags : null, // 🆕 NOVO CAMPO
         is_preorder: formData.is_preorder // 🆕 SALVAR ESTADO DE PRÉ-VENDA
       };
@@ -308,6 +329,42 @@ function NewProductContent() {
               <option value="acessorios">Acessórios TCG</option>
               <option value="hot-wheels">Hot Wheels</option>
             </select>
+          </div>
+
+          {/* 🆕 MARCA / FABRICANTE */}
+          <div>
+            <label style={labelStyle}>
+              Marca (fabricante)
+            </label>
+            <input
+              type="text"
+              name="brand"
+              value={formData.brand}
+              onChange={handleChange}
+              style={inputStyle}
+              placeholder="Ex: Mattel, Dragon Shield, Copag..."
+            />
+            <small style={{ color: 'var(--text-secondary)', fontSize: '12px', display: 'block', marginTop: '4px' }}>
+              Usado no Google (dados estruturados e feed de produtos). Deixe em branco se não souber — Pokémon TCG e Hot Wheels já são preenchidos automaticamente pela categoria.
+            </small>
+          </div>
+
+          {/* 🆕 GTIN / CÓDIGO DE BARRAS */}
+          <div>
+            <label style={labelStyle}>
+              Código de barras (GTIN/EAN-13)
+            </label>
+            <input
+              type="text"
+              name="gtin"
+              value={formData.gtin}
+              onChange={handleChange}
+              style={inputStyle}
+              placeholder="Ex: 7898357420123"
+            />
+            <small style={{ color: 'var(--text-secondary)', fontSize: '12px', display: 'block', marginTop: '4px' }}>
+              O código de barras impresso na embalagem do produto. Usado no feed do Google Merchant Center. Deixe em branco se não tiver à mão.
+            </small>
           </div>
 
           {/* 🆕 SEÇÃO DE PRÉ-VENDA */}

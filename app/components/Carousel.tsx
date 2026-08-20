@@ -45,9 +45,20 @@ export default function Carousel({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Mede a largura real do 1º item + gap, em vez de assumir 280px fixos —
+  // necessário porque no mobile compacto o item tem largura proporcional (~50%).
+  const getScrollStep = () => {
+    const container = carouselRef.current;
+    if (!container) return 280 + 16;
+    const firstItem = container.firstElementChild as HTMLElement | null;
+    if (!firstItem) return 280 + 16;
+    const gap = parseFloat(getComputedStyle(container).columnGap || '16') || 16;
+    return firstItem.offsetWidth + gap;
+  };
+
   const scroll = (direction: 'left' | 'right') => {
     if (!carouselRef.current) return;
-    const scrollAmount = 280 + 16;
+    const scrollAmount = getScrollStep();
     carouselRef.current.scrollBy({
       left: direction === 'left' ? -scrollAmount : scrollAmount,
       behavior: 'smooth'
@@ -88,7 +99,7 @@ export default function Carousel({
         if (carouselRef.current.scrollLeft >= maxScroll) {
           carouselRef.current.scrollTo({ left: 0, behavior: 'smooth' });
         } else {
-          carouselRef.current.scrollBy({ left: 280 + 16, behavior: 'smooth' });
+          carouselRef.current.scrollBy({ left: getScrollStep(), behavior: 'smooth' });
         }
       }
     }, config.auto_scroll_interval);
@@ -108,7 +119,7 @@ export default function Carousel({
         padding: '0 8px',
         minHeight: '40px'
       }}>
-        <h3 style={{
+        <h2 style={{
           fontSize: '20px',
           fontWeight: config.title_font_weight || '600',
           color: config.title_text_color || colors.text,
@@ -127,7 +138,7 @@ export default function Carousel({
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {title}
           </span>
-        </h3>
+        </h2>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
           {showViewAll && onViewAll && (
@@ -161,7 +172,7 @@ export default function Carousel({
       {/* Container do carrossel */}
       <div
         ref={carouselRef}
-        className="carousel-container-mobile"
+        className="carousel-container-mobile carousel-compact"
         style={{
           display: 'flex',
           gap: '16px',

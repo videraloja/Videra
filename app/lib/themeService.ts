@@ -22,6 +22,27 @@ function setCachedTheme(key: string, theme: ThemeConfig): void {
 }
 
 // ============================================
+// DEDUPLICAÇÃO DE REQUISIÇÕES EM VOO
+// ============================================
+// Vários componentes (Carousel, ProductCard, Header, etc.) montam ao mesmo tempo
+// e todos veem o cache de valor vazio antes da 1ª resposta chegar, disparando
+// requisições idênticas em paralelo (cache stampede). Isto guarda a PROMISE em
+// andamento, não o resultado, para que chamadas concorrentes aguardem a mesma
+// requisição em vez de abrir uma nova.
+const pendingFetches = new Map<string, Promise<any>>();
+
+function dedupeInFlight<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const existing = pendingFetches.get(key);
+  if (existing) return existing as Promise<T>;
+
+  const promise = fn().finally(() => {
+    pendingFetches.delete(key);
+  });
+  pendingFetches.set(key, promise);
+  return promise;
+}
+
+// ============================================
 // FUNÇÕES PRINCIPAIS
 // ============================================
 
@@ -57,29 +78,31 @@ export async function getAllThemes(): Promise<ThemeConfig[]> {
 }
 
 export async function getActiveTheme(): Promise<ThemeConfig> {
-  try {
-    const { data: activeThemes, error } = await supabase
-      .from('themes')
-      .select('id, name')
-      .eq('is_active', true)
-      .limit(1);
+  return dedupeInFlight('activeTheme', async () => {
+    try {
+      const { data: activeThemes, error } = await supabase
+        .from('themes')
+        .select('id, name')
+        .eq('is_active', true)
+        .limit(1);
 
-    if (error) {
-      console.error('Erro na query de tema ativo:', error.message);
+      if (error) {
+        console.error('Erro na query de tema ativo:', error.message);
+        return await getDefaultThemeFallback();
+      }
+
+      if (activeThemes && activeThemes.length > 0) {
+        const theme = await getThemeById(activeThemes[0].id);
+        if (theme) return theme;
+      }
+
       return await getDefaultThemeFallback();
+
+    } catch (error) {
+      console.error('Erro crítico ao buscar tema ativo:', error);
+      return getDefaultThemes()[0];
     }
-
-    if (activeThemes && activeThemes.length > 0) {
-      const theme = await getThemeById(activeThemes[0].id);
-      if (theme) return theme;
-    }
-
-    return await getDefaultThemeFallback();
-
-  } catch (error) {
-    console.error('Erro crítico ao buscar tema ativo:', error);
-    return getDefaultThemes()[0];
-  }
+  });
 }
 
 async function getDefaultThemeFallback(): Promise<ThemeConfig> {
@@ -118,6 +141,7 @@ export async function getThemeById(themeId: string): Promise<ThemeConfig | null>
   const cached = getCachedTheme(themeId);
   if (cached) return cached;
 
+  return dedupeInFlight(`themeById:${themeId}`, async () => {
   try {
     const [themeResult, colorsResult, emojisResult, stylesResult] = await Promise.all([
       supabase.from('themes').select('*').eq('id', themeId).single(),
@@ -220,6 +244,7 @@ export async function getThemeById(themeId: string): Promise<ThemeConfig | null>
     console.error(`Erro ao buscar tema ${themeId}:`, error);
     return null;
   }
+  });
 }
 
 export async function saveTheme(theme: ThemeConfig): Promise<boolean> {
@@ -436,61 +461,65 @@ export async function activateDefaultTheme(): Promise<boolean> {
 }
 
 export async function getThemeForPage(pagePath: string): Promise<ThemeConfig | null> {
-  try {
-    const { data: pageThemeData, error: pageError } = await supabase
-      .from('page_themes')
-      .select('theme_id')
-      .eq('page_path', pagePath)
-      .limit(1);
+  return dedupeInFlight(`themeForPage:${pagePath}`, async () => {
+    try {
+      const { data: pageThemeData, error: pageError } = await supabase
+        .from('page_themes')
+        .select('theme_id')
+        .eq('page_path', pagePath)
+        .limit(1);
 
-    if (pageError || !pageThemeData || pageThemeData.length === 0 || !pageThemeData[0].theme_id) {
+      if (pageError || !pageThemeData || pageThemeData.length === 0 || !pageThemeData[0].theme_id) {
+        return null;
+      }
+
+      const themeId = pageThemeData[0].theme_id;
+      return await getThemeById(themeId);
+
+    } catch (error) {
+      console.error(`Erro ao buscar tema para página ${pagePath}:`, error);
       return null;
     }
-
-    const themeId = pageThemeData[0].theme_id;
-    return await getThemeById(themeId);
-
-  } catch (error) {
-    console.error(`Erro ao buscar tema para página ${pagePath}:`, error);
-    return null;
-  }
+  });
 }
 
 export async function getEffectiveTheme(pagePath?: string): Promise<ThemeConfig> {
-  try {
-    // Cache composto pela página
-    const cacheKey = `effective:${pagePath || 'global'}`;
-    const cached = getCachedTheme(cacheKey);
-    if (cached) return cached;
+  // Cache composto pela página
+  const cacheKey = `effective:${pagePath || 'global'}`;
+  const cached = getCachedTheme(cacheKey);
+  if (cached) return cached;
 
-    let theme: ThemeConfig | null = null;
+  return dedupeInFlight(cacheKey, async () => {
+    try {
+      let theme: ThemeConfig | null = null;
 
-    if (pagePath) {
-      theme = await getThemeForPage(pagePath);
+      if (pagePath) {
+        theme = await getThemeForPage(pagePath);
+        if (theme) {
+          setCachedTheme(cacheKey, theme);
+          return theme;
+        }
+      }
+
+      theme = await getActiveTheme();
       if (theme) {
         setCachedTheme(cacheKey, theme);
         return theme;
       }
+
+      const defaultTheme = await getThemeById('default');
+      if (defaultTheme) {
+        setCachedTheme(cacheKey, defaultTheme);
+        return defaultTheme;
+      }
+
+      return getDefaultThemes()[0];
+
+    } catch (error) {
+      console.error('Erro ao buscar tema efetivo:', error);
+      return getDefaultThemes()[0];
     }
-
-    theme = await getActiveTheme();
-    if (theme) {
-      setCachedTheme(cacheKey, theme);
-      return theme;
-    }
-
-    const defaultTheme = await getThemeById('default');
-    if (defaultTheme) {
-      setCachedTheme(cacheKey, defaultTheme);
-      return defaultTheme;
-    }
-
-    return getDefaultThemes()[0];
-
-  } catch (error) {
-    console.error('Erro ao buscar tema efetivo:', error);
-    return getDefaultThemes()[0];
-  }
+  });
 }
 
 function getDefaultThemes(): ThemeConfig[] {
@@ -519,7 +548,7 @@ function getDefaultThemes(): ThemeConfig[] {
       category: '📁'
     },
     backgroundImage: {
-      url: 'https://images.unsplash.com/photo-1607082350899-7e105aa886ae?w=1200&h=400&fit=crop',
+      url: '/og-image.jpg',
       overlayColor: '#000000',
       opacity: 0.3
     }

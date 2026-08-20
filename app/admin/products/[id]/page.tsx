@@ -11,6 +11,7 @@ import { getPokemonCollectionsForAdmin } from '@/lib/collections';
 interface Product {
   id: number;
   name: string;
+  slug?: string;
   price: number;
   stock: number;
   supplier_code?: string;
@@ -21,6 +22,8 @@ interface Product {
   collection?: string;
   rarity?: string;
   card_set?: string;
+  brand?: string;
+  gtin?: string;
   tags?: string[];
   // 🆕 CAMPOS PARA PROMOÇÕES
   original_price?: number;
@@ -42,6 +45,7 @@ function EditProductContent() {
   const [uploading, setUploading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
+    slug: "",
     price: "",
     stock: "",
     supplier_code: "",
@@ -52,6 +56,8 @@ function EditProductContent() {
     collection: "",
     rarity: "",
     card_set: "",
+    brand: "",
+    gtin: "",
     tags: [] as string[],
     // 🆕 CAMPOS PARA PROMOÇÕES
     on_sale: false,
@@ -82,6 +88,7 @@ function EditProductContent() {
         if (data) {
           setFormData({
             name: data.name,
+            slug: data.slug || "",
             price: data.price.toString(),
             stock: data.stock.toString(),
             supplier_code: data.supplier_code || "",
@@ -92,6 +99,8 @@ function EditProductContent() {
             collection: data.collection || "",
             rarity: data.rarity || "",
             card_set: data.card_set || "",
+            brand: data.brand || "",
+            gtin: data.gtin || "",
             tags: data.tags || [],
             // 🆕 CAMPOS PARA PROMOÇÕES
             on_sale: data.on_sale || false,
@@ -134,6 +143,20 @@ function EditProductContent() {
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '')
       .trim();
+  };
+
+  // Gera um slug \u00fanico para o produto, excluindo o pr\u00f3prio produto da checagem
+  // de colis\u00e3o (sen\u00e3o ele "colidiria" com o pr\u00f3prio slug ao salvar sem mudar o nome).
+  const generateUniqueProductSlug = async (name: string): Promise<string> => {
+    const baseSlug = generateSlug(name);
+    let slug = baseSlug;
+    let suffix = 2;
+    while (true) {
+      const { data } = await supabase.from('products').select('id').eq('slug', slug).neq('id', id).limit(1);
+      if (!data || data.length === 0) return slug;
+      slug = `${baseSlug}-${suffix}`;
+      suffix++;
+    }
   };
 
   // 🆕 Efeito para popular o nome da coleção quando o produto é carregado
@@ -250,8 +273,13 @@ function EditProductContent() {
     setSaving(true);
 
     try {
+      // Só gera um slug novo se o produto ainda não tiver um — preserva a URL
+      // existente (links já compartilhados/indexados) mesmo que o nome mude.
+      const slug = formData.slug || await generateUniqueProductSlug(formData.name);
+
       const updateData = {
         name: formData.name,
+        slug,
         price: parseFloat(formData.price),
         stock: parseInt(formData.stock),
         supplier_code: formData.supplier_code || null,
@@ -262,6 +290,8 @@ function EditProductContent() {
         collection: formData.collection || null,
         rarity: formData.rarity || null,
         card_set: formData.card_set || null,
+        brand: formData.brand || null,
+        gtin: formData.gtin || null,
         tags: formData.tags.length > 0 ? formData.tags : null,
         // 🆕 DADOS DE PROMOÇÃO
         on_sale: formData.on_sale,
@@ -500,6 +530,42 @@ function EditProductContent() {
               <option value="acessorios">Acessórios TCG</option>
               <option value="hot-wheels">Hot Wheels</option>
             </select>
+          </div>
+
+          {/* 🆕 MARCA / FABRICANTE */}
+          <div>
+            <label style={labelStyle}>
+              Marca (fabricante)
+            </label>
+            <input
+              type="text"
+              name="brand"
+              value={formData.brand}
+              onChange={handleChange}
+              style={inputStyle}
+              placeholder="Ex: Mattel, Dragon Shield, Copag..."
+            />
+            <small style={{ color: 'var(--text-secondary)', fontSize: '12px', display: 'block', marginTop: '4px' }}>
+              Usado no Google (dados estruturados e feed de produtos). Deixe em branco se não souber — Pokémon TCG e Hot Wheels já são preenchidos automaticamente pela categoria.
+            </small>
+          </div>
+
+          {/* 🆕 GTIN / CÓDIGO DE BARRAS */}
+          <div>
+            <label style={labelStyle}>
+              Código de barras (GTIN/EAN-13)
+            </label>
+            <input
+              type="text"
+              name="gtin"
+              value={formData.gtin}
+              onChange={handleChange}
+              style={inputStyle}
+              placeholder="Ex: 7898357420123"
+            />
+            <small style={{ color: 'var(--text-secondary)', fontSize: '12px', display: 'block', marginTop: '4px' }}>
+              O código de barras impresso na embalagem do produto. Usado no feed do Google Merchant Center. Deixe em branco se não tiver à mão.
+            </small>
           </div>
 
           {/* 🆕 SEÇÃO DE PRÉ-VENDA */}
