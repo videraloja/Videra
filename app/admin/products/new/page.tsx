@@ -147,10 +147,11 @@ function NewProductContent() {
 
       alert("Produto adicionado com sucesso!");
       router.back();
-      
-    } catch (error) {
+
+    } catch (error: any) {
       console.error("Erro ao adicionar produto:", error);
-      alert("Erro ao adicionar produto");
+      const detail = error?.message || error?.error_description || JSON.stringify(error);
+      alert(`Erro ao adicionar produto:\n\n${detail}`);
     } finally {
       setLoading(false);
     }

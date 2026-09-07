@@ -5,9 +5,16 @@ import { Product } from '@/app/types';
 
 // Feed no formato RSS 2.0 + namespace g: (spec do Google Merchant Center),
 // aceito também pelo catálogo de produtos do Meta.
-// Revalida de hora em hora — não precisa bater no Supabase a cada fetch do
-// Google/Meta.
-export const revalidate = 3600;
+//
+// IMPORTANTE: um Route Handler (route.ts) com GET simples, sem usar nenhuma API
+// dinâmica, é tratado como ESTÁTICO por padrão pelo Next.js — ele roda a consulta
+// UMA VEZ no build e serve esse resultado congelado depois (era isso que estava
+// fazendo o feed sair sempre vazio: a consulta falhou no build por causa da coluna
+// `gtin` que ainda não existia, e o resultado vazio ficou congelado em cache).
+// app/sitemap.ts nunca teve esse problema porque a convenção de arquivo de sitemap
+// do Next.js já roda a cada requisição por padrão, sem precisar de config extra.
+// force-dynamic replica esse comportamento aqui: consulta sempre fresca.
+export const dynamic = 'force-dynamic';
 
 const FEED_COLUMNS = 'id, name, slug, price, original_price, sale_price, on_sale, image_url, category, stock, description, brand, gtin, is_preorder';
 
@@ -75,6 +82,12 @@ export async function GET() {
     .from('products')
     .select(FEED_COLUMNS)
     .not('slug', 'is', null);
+
+  if (error) {
+    // Sem isso, uma falha na consulta produzia um feed vazio sem nenhum rastro
+    // nos logs — visível só no efeito (feed sem <item>), nunca na causa.
+    console.error('Erro ao buscar produtos para o feed.xml:', error);
+  }
 
   const products = (error || !data) ? [] : (data as Product[]);
 

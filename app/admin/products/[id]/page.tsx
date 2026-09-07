@@ -310,10 +310,11 @@ function EditProductContent() {
 
       alert("Produto atualizado com sucesso!");
       router.back();
-      
-    } catch (error) {
+
+    } catch (error: any) {
       console.error("Erro ao atualizar produto:", error);
-      alert("Erro ao atualizar produto");
+      const detail = error?.message || error?.error_description || JSON.stringify(error);
+      alert(`Erro ao atualizar produto:\n\n${detail}`);
     } finally {
       setSaving(false);
     }
