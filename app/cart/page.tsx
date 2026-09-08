@@ -919,8 +919,8 @@ Aguarde enquanto processamos seu pedido : )
       )}
 
       {showStockModal && (
-        <div className="modal-overlay" onClick={() => setShowStockModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal-content">
             <div className="modal-header" style={{ background: 'linear-gradient(135deg, #fef3c7, #fff)', borderBottomColor: '#fde68a' }}><span className="modal-icon">⚠️</span><h3 style={{ color: '#d97706' }}>Atualização do Carrinho</h3></div>
             <div className="modal-body">
               {stockModalData.adjustedItems.length > 0 && (
