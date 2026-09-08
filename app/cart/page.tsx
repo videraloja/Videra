@@ -333,102 +333,147 @@ export default function CartPage() {
     if (isProcessing) return;
     setIsProcessing(true);
 
+    // ═══ 1. PRÉ-CHECAGEM DE ESTOQUE ═══
+    // Falha TÉCNICA aqui (rede, timeout) não bloqueia — segue como se tivesse
+    // passado. Falta de estoque REAL (a RPC respondeu e apontou item insuficiente)
+    // continua bloqueando exatamente como antes, com o mesmo modal.
     const productIds = cart.map(i => i.id);
-    const { data: stockData, error: stockError } = await supabase.rpc('get_available_stock', {
-      p_product_ids: productIds
-    });
+    const availableMap = new Map<number, number>();
+    let preCheckSucceeded = false;
 
-    if (stockError) {
-      console.error('Erro ao verificar estoque:', stockError);
-      showToast('Erro ao verificar disponibilidade. Tente novamente.', 'error');
-      setIsProcessing(false);
-      return;
+    try {
+      const { data: stockData, error: stockError } = await supabase.rpc('get_available_stock', {
+        p_product_ids: productIds
+      });
+      if (stockError) throw stockError;
+      stockData?.forEach((s: { product_id: number; available_stock: number }) => {
+        availableMap.set(s.product_id, s.available_stock);
+      });
+      preCheckSucceeded = true;
+    } catch (err) {
+      console.error('[estoque] Falha técnica na pré-checagem — pedido segue sem bloquear:', err);
     }
 
-    const availableMap = new Map();
-    stockData?.forEach((s: { product_id: number; available_stock: number }) => {
-      availableMap.set(s.product_id, s.available_stock);
-    });
+    if (preCheckSucceeded) {
+      const unavailableItems: { name: string; available: number; requested: number }[] = [];
+      const adjustedItems: { name: string; oldQty: number; newQty: number }[] = [];
 
-    const unavailableItems: { name: string; available: number; requested: number }[] = [];
-    const adjustedItems: { name: string; oldQty: number; newQty: number }[] = [];
-
-    for (const item of cart) {
-      const available = availableMap.get(item.id) ?? 0;
-      if (available < item.quantity) {
-        if (available > 0) {
-          adjustedItems.push({
-            name: item.name,
-            oldQty: item.quantity,
-            newQty: available
-          });
-        } else {
-          unavailableItems.push({
-            name: item.name,
-            available,
-            requested: item.quantity
-          });
+      for (const item of cart) {
+        const available = availableMap.get(item.id) ?? 0;
+        if (available < item.quantity) {
+          if (available > 0) {
+            adjustedItems.push({
+              name: item.name,
+              oldQty: item.quantity,
+              newQty: available
+            });
+          } else {
+            unavailableItems.push({
+              name: item.name,
+              available,
+              requested: item.quantity
+            });
+          }
         }
+      }
+
+      if (adjustedItems.length > 0 || unavailableItems.length > 0) {
+        setStockModalData({ adjustedItems, unavailableItems });
+        setShowStockModal(true);
+        setIsProcessing(false);
+        return; // BLOQUEIA — falta de estoque real, confirmada pela RPC
       }
     }
 
-    if (adjustedItems.length > 0 || unavailableItems.length > 0) {
-      setStockModalData({ adjustedItems, unavailableItems });
-      setShowStockModal(true);
-      setIsProcessing(false);
-      return;
-    }
-
+    // ═══ 2. CRIA O PEDIDO ═══
+    // create_order não faz nenhuma checagem de estoque (é um INSERT puro), então
+    // qualquer falha aqui é sempre técnica — nunca bloqueia. Sem orderId, os
+    // passos 3 e 4 (reserva e itens) são pulados explicitamente, e a mensagem do
+    // WhatsApp é montada e enviada do mesmo jeito.
     const isPreOrder = cart.some(item => item.is_preorder);
-
     const orderCode = generateOrderCode();
-    const { data: orderResult, error: orderError } = await supabase.rpc('create_order', {
-      p_order_code: orderCode,
-      p_status: 'pendente',
-      p_payment_method: paymentMethodLabels[paymentMethod],
-      p_pickup_option: pickupOptionLabels[pickupOption],
-      p_observations: observations || null,
-      p_is_preorder: isPreOrder
-    });
-
-    if (orderError || !orderResult?.id) {
-      console.error('Erro ao criar pedido:', orderError);
-      showToast('Erro ao registrar o pedido. Tente novamente.', 'error');
-      setIsProcessing(false);
-      return;
-    }
-
-    const orderId = orderResult.id;
+    let orderId: string | null = null;
 
     try {
-      await createReservations(orderId, cart);
+      const { data: orderResult, error: orderError } = await supabase.rpc('create_order', {
+        p_order_code: orderCode,
+        p_status: 'pendente',
+        p_payment_method: paymentMethodLabels[paymentMethod],
+        p_pickup_option: pickupOptionLabels[pickupOption],
+        p_observations: observations || null,
+        p_is_preorder: isPreOrder
+      });
+      if (orderError || !orderResult?.id) throw orderError || new Error('create_order não retornou id');
+      orderId = orderResult.id;
     } catch (err) {
-      console.error('Erro ao criar reservas:', err);
-      await supabase.from('orders').delete().eq('id', orderId);
-      showToast('Erro ao processar pedido. Tente novamente.', 'error');
-      setIsProcessing(false);
-      return;
+      console.error('[estoque] Falha técnica ao criar pedido no banco — segue direto para o WhatsApp, sem registro no admin:', err);
     }
 
-    const itemsPayload = cart.map((item) => ({
-      order_id: orderId,
-      product_id: item.id,
-      name: item.name,
-      quantity: item.quantity,
-      price: getCurrentPrice(item),
-    }));
+    // ═══ 3. CRIA A RESERVA (só se o pedido foi gravado — precisa de orderId) ═══
+    if (!orderId) {
+      console.warn('[estoque] Sem orderId (create_order falhou) — pulando criação de reserva.');
+    } else {
+      try {
+        await createReservations(orderId, cart);
+      } catch (err: any) {
+        const message = String(err?.message || '');
 
-    const { error: itemsError } = await supabase
-      .from("order_items")
-      .insert(itemsPayload);
+        if (message.startsWith('INSUFFICIENT_STOCK:')) {
+          // Corrida real: a pré-checagem passou, mas entre ela e a reserva
+          // (janela de milissegundos) outro pedido levou a mesma unidade.
+          // Isso É falta de estoque real — bloqueia, com o mesmo modal de sempre.
+          const [, productIdStr, , availableStr] = message.split(':');
+          const conflictProductId = Number(productIdStr);
+          const available = Number(availableStr);
+          const conflictItem = cart.find(i => i.id === conflictProductId);
+          const itemName = conflictItem?.name || 'um item do seu carrinho';
 
-    if (itemsError) {
-      console.error("Erro ao salvar itens:", itemsError);
-      showToast('Erro ao salvar itens do pedido.', 'error');
-      setIsProcessing(false);
-      return;
+          await supabase.from('orders').delete().eq('id', orderId);
+
+          if (available > 0) {
+            setStockModalData({
+              adjustedItems: [{ name: itemName, oldQty: conflictItem?.quantity ?? 0, newQty: available }],
+              unavailableItems: []
+            });
+          } else {
+            setStockModalData({
+              adjustedItems: [],
+              unavailableItems: [{ name: itemName, available, requested: conflictItem?.quantity ?? 0 }]
+            });
+          }
+          setShowStockModal(true);
+          setIsProcessing(false);
+          return; // BLOQUEIA — falta de estoque real, confirmada na reserva
+        }
+
+        // Qualquer outro erro é técnico. Não desfaz o pedido (trade-off aceito:
+        // o pedido fica pendente sem reserva protegendo, mas a venda não se perde).
+        console.error('[estoque] Falha técnica ao criar reserva — pedido segue sem proteção de estoque:', err);
+      }
     }
 
+    // ═══ 4. SALVA OS ITENS DO PEDIDO (só se o pedido foi gravado) ═══
+    if (orderId) {
+      const itemsPayload = cart.map((item) => ({
+        order_id: orderId,
+        product_id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        price: getCurrentPrice(item),
+      }));
+
+      const { error: itemsError } = await supabase
+        .from("order_items")
+        .insert(itemsPayload);
+
+      if (itemsError) {
+        // Técnico — não bloqueia. A mensagem do WhatsApp abaixo carrega os itens
+        // em texto de qualquer forma, então a venda não se perde por isso.
+        console.error('[estoque] Falha técnica ao salvar itens do pedido — segue para o WhatsApp mesmo assim:', itemsError);
+      }
+    }
+
+    // ═══ 5. MONTA E ENVIA A MENSAGEM DO WHATSAPP — sempre roda a partir daqui ═══
     const total = cart.reduce((s, i) => s + getCurrentPrice(i) * i.quantity, 0);
     const lines = cart.map((i) => {
       const price = getCurrentPrice(i);
@@ -874,8 +919,8 @@ Aguarde enquanto processamos seu pedido : )
       )}
 
       {showStockModal && (
-        <div className="modal-overlay" onClick={() => setShowStockModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal-content">
             <div className="modal-header" style={{ background: 'linear-gradient(135deg, #fef3c7, #fff)', borderBottomColor: '#fde68a' }}><span className="modal-icon">⚠️</span><h3 style={{ color: '#d97706' }}>Atualização do Carrinho</h3></div>
             <div className="modal-body">
               {stockModalData.adjustedItems.length > 0 && (
