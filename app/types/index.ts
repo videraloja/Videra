@@ -8,6 +8,7 @@ export interface Product {
   sale_price?: number;
   on_sale: boolean;
   image_url: string;
+  gallery_urls?: string[];
   stock: number;
   category?: string;
   product_type?: string;
@@ -98,8 +99,42 @@ export interface ProductCardStyles {
   border?: string;
 }
 
+export interface ProductDetailStyles {
+  productName: ProductCardTextStyles;
+  price: ProductCardTextStyles;
+  originalPrice: ProductCardTextStyles & { strikethrough?: boolean };
+  salePrice: ProductCardTextStyles;
+  stockInfo: ProductCardTextStyles;
+  description: ProductCardTextStyles;
+  collectionName: ProductCardTextStyles;
+
+  // 🏷️ MARCA (sinal de confiança — tratada como destaque, não texto solto)
+  brandBadge: ProductCardBadgeStyles;
+
+  // 📦 TARJA DE PRÉ-VENDA
+  preorderBadge: {
+    backgroundColor: string;
+    textColor: string;
+    borderColor: string;
+  };
+
+  addToCart: ProductCardButtonStyles;
+
+  // ⬅️ BOTÃO VOLTAR (leva pra categoria do produto, nunca histórico do navegador)
+  backButton: {
+    backgroundColor: string;
+    textColor: string;
+    size: string;
+  };
+
+  // 🖼️ GALERIA DE IMAGENS (miniaturas extras, só aparece quando o produto tem)
+  galleryThumbnailBorderColor: string;
+  galleryThumbnailActiveBorderColor: string;
+}
+
 export interface ComponentStyles {
   productCard: ProductCardStyles;
+  productDetail?: ProductDetailStyles;
   // FUTURO: header, filters, buttons, etc.
 }
 

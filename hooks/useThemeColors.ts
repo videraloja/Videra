@@ -4,7 +4,7 @@
 import { useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { ThemeContext } from '../app/contexts/ThemeContext';
 import { PageThemeContext } from '../app/contexts/PageThemeContext';
-import { ThemeConfig, ComponentStyles, ProductCardStyles } from '../app/types';
+import { ThemeConfig, ComponentStyles, ProductCardStyles, ProductDetailStyles } from '../app/types';
 import { getEffectiveTheme } from '@/app/lib/themeService';
 
 // CONSTANTES DE EMERGÊNCIA (sem backgroundImage fixo)
@@ -70,6 +70,42 @@ const emergencyComponentStyles: ComponentStyles = {
     hoverShadow: '0 20px 40px rgba(0,0,0,0.15)',
     cornerRadius: '20px',
     imageOverlay: 'transparent'
+  },
+  productDetail: {
+    productName: { color: '#1f2937', fontSize: '32px', fontWeight: '700' },
+    price: { color: '#059669', fontSize: '32px', fontWeight: '700' },
+    originalPrice: { color: '#6b7280', fontSize: '18px', fontWeight: '500', strikethrough: true },
+    salePrice: { color: '#dc2626', fontSize: '32px', fontWeight: '700' },
+    stockInfo: { color: '#6b7280', fontSize: '15px', fontWeight: '500' },
+    description: { color: '#6b7280', fontSize: '15px', fontWeight: '400' },
+    collectionName: { color: '#7c3aed', fontSize: '13px', fontWeight: '600' },
+    brandBadge: {
+      backgroundColor: '#ede9fe',
+      textColor: '#5b21b6',
+      position: 'left' as const,
+      fontSize: '13px',
+      fontWeight: '700',
+      borderRadius: '8px',
+      padding: '6px 12px'
+    },
+    preorderBadge: {
+      backgroundColor: '#f3e8ff',
+      textColor: '#7c3aed',
+      borderColor: '#e9d5ff'
+    },
+    addToCart: {
+      backgroundColor: '#7c3aed',
+      textColor: '#ffffff',
+      hoverBackgroundColor: '#6d28d9',
+      disabledBackgroundColor: '#9ca3af'
+    },
+    backButton: {
+      backgroundColor: '#ffffff',
+      textColor: '#1f2937',
+      size: '40px'
+    },
+    galleryThumbnailBorderColor: '#e5e7eb',
+    galleryThumbnailActiveBorderColor: '#7c3aed'
   }
 };
 
@@ -306,6 +342,55 @@ export const useThemeColors = () => {
     return defaultStyles;
   };
 
+  const getDetailStyles = (usePageTheme: boolean = true): ProductDetailStyles => {
+    return getComponentStyles('productDetail', usePageTheme) as ProductDetailStyles;
+  };
+
+  const applyDetailStyles = (
+    element: keyof ProductDetailStyles,
+    defaultStyles: React.CSSProperties,
+    usePageTheme: boolean = true
+  ) => {
+    const detailStyles = getDetailStyles(usePageTheme);
+    const elementStyles = detailStyles[element];
+
+    if (!elementStyles) return defaultStyles;
+
+    if (typeof elementStyles === 'object' && 'color' in elementStyles) {
+      const textStyles = elementStyles as any;
+      return {
+        ...defaultStyles,
+        color: textStyles.color,
+        fontSize: textStyles.fontSize,
+        fontWeight: textStyles.fontWeight,
+        textDecoration: textStyles.strikethrough ? 'line-through' : 'none'
+      };
+    }
+
+    if (typeof elementStyles === 'object' && 'backgroundColor' in elementStyles && 'textColor' in elementStyles) {
+      const badgeStyles = elementStyles as any;
+      return {
+        ...defaultStyles,
+        backgroundColor: badgeStyles.backgroundColor,
+        color: badgeStyles.textColor,
+        ...(badgeStyles.borderColor ? { borderColor: badgeStyles.borderColor } : {}),
+        fontSize: badgeStyles.fontSize || defaultStyles.fontSize || '13px',
+        fontWeight: badgeStyles.fontWeight || defaultStyles.fontWeight || '700'
+      };
+    }
+
+    if (typeof elementStyles === 'object' && 'hoverBackgroundColor' in elementStyles) {
+      const buttonStyles = elementStyles as any;
+      return {
+        ...defaultStyles,
+        backgroundColor: buttonStyles.backgroundColor,
+        color: buttonStyles.textColor
+      };
+    }
+
+    return defaultStyles;
+  };
+
   const hasPageSpecificStyles = (): boolean => {
     return !!pageThemeContext?.currentPageId &&
       !!pageThemeContext.getPageTheme(pageThemeContext.currentPageId);
@@ -324,6 +409,8 @@ export const useThemeColors = () => {
     getComponentStyles,
     getCardStyles,
     applyCardStyles,
+    getDetailStyles,
+    applyDetailStyles,
     currentPageId: pageThemeContext?.currentPageId || '/',
     effectiveTheme,
     isPageSpecific: hasPageSpecificStyles(),

@@ -8,7 +8,7 @@ import ProductDetailClient from './ProductDetailClient';
 
 export const revalidate = 3600;
 
-const PRODUCT_COLUMNS = 'id, name, slug, price, original_price, sale_price, on_sale, image_url, category, stock, collection, is_preorder, description, brand';
+const PRODUCT_COLUMNS = 'id, name, slug, price, original_price, sale_price, on_sale, image_url, gallery_urls, category, stock, collection, is_preorder, description, brand';
 
 async function getProductBySlug(slug: string): Promise<Product | null> {
   const { data, error } = await supabase
@@ -161,7 +161,7 @@ export default async function ProdutoPage({ params }: { params: Promise<{ slug: 
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
-      <ProductDetailClient product={product} relatedProducts={relatedProducts} />
+      <ProductDetailClient product={product} relatedProducts={relatedProducts} brandName={brandName} />
     </>
   );
 }

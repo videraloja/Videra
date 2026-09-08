@@ -7,6 +7,7 @@ import AuthGuard from "@/app/components/AuthGuard";
 import ThemeToggle from "@/app/components/ThemeToggle";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { getPokemonCollectionsForAdmin } from '@/lib/collections';
+import { compressImage, formatFileSize } from '@/lib/imageCompression';
 
 interface Product {
   id: number;
@@ -43,6 +44,11 @@ function EditProductContent() {
   const [saving, setSaving] = useState(false);
   const [collectionName, setCollectionName] = useState(''); // 🆕 State para o nome da coleção
   const [uploading, setUploading] = useState(false);
+  const [compressionInfo, setCompressionInfo] = useState<string>('');
+  const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
+  const [uploadingGallery, setUploadingGallery] = useState(false);
+  const [galleryCompressionInfo, setGalleryCompressionInfo] = useState<string>('');
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
@@ -109,6 +115,7 @@ function EditProductContent() {
             is_preorder: data.is_preorder || false
           });
           setPreviewUrl(data.image_url || "");
+          setGalleryUrls(data.gallery_urls || []);
         }
       } catch (error: any) {
         const isAbortError = error.name === 'AbortError' || (error.message && error.message.includes('AbortError'));
@@ -206,37 +213,104 @@ function EditProductContent() {
     }
   };
 
-  // Função para fazer upload da imagem
+  // Função para fazer upload da imagem (capa)
   const handleImageUpload = async (file: File) => {
     setUploading(true);
-    
+    setCompressionInfo('');
+
     try {
-      // Gera um nome único para o arquivo
-      const fileExt = file.name.split('.').pop();
+      const compressed = await compressImage(file);
+      setCompressionInfo(
+        compressed.skipped
+          ? `Imagem já era pequena (${formatFileSize(compressed.originalSize)}) — enviada sem reprocessar.`
+          : `${formatFileSize(compressed.originalSize)} → ${formatFileSize(compressed.compressedSize)} (WebP)`
+      );
+
+      const fileExt = compressed.file.name.split('.').pop();
       const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
       const filePath = `products/${fileName}`;
 
-      // Faz upload para o Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('product-images')
-        .upload(filePath, file);
+        .upload(filePath, compressed.file);
 
       if (uploadError) throw uploadError;
 
-      // Pega a URL pública da imagem
       const { data: urlData } = supabase.storage
         .from('product-images')
         .getPublicUrl(filePath);
 
       setFormData(prev => ({ ...prev, image_url: urlData.publicUrl }));
       setPreviewUrl(urlData.publicUrl);
-      
+
     } catch (error) {
       console.error("Erro no upload:", error);
       alert("Erro ao fazer upload da imagem");
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleGalleryFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert("Por favor, selecione apenas imagens");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert("A imagem deve ter no máximo 5MB");
+      return;
+    }
+
+    setUploadingGallery(true);
+    setGalleryCompressionInfo('');
+
+    try {
+      const compressed = await compressImage(file);
+      setGalleryCompressionInfo(
+        compressed.skipped
+          ? `Imagem já era pequena (${formatFileSize(compressed.originalSize)}) — enviada sem reprocessar.`
+          : `${formatFileSize(compressed.originalSize)} → ${formatFileSize(compressed.compressedSize)} (WebP)`
+      );
+
+      const fileExt = compressed.file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
+      const filePath = `products/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(filePath, compressed.file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(filePath);
+
+      setGalleryUrls(prev => [...prev, urlData.publicUrl]);
+    } catch (error) {
+      console.error("Erro no upload da galeria:", error);
+      alert("Erro ao fazer upload da imagem");
+    } finally {
+      setUploadingGallery(false);
+      if (galleryInputRef.current) galleryInputRef.current.value = "";
+    }
+  };
+
+  const removeGalleryImage = (index: number) => {
+    setGalleryUrls(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const moveGalleryImage = (index: number, direction: -1 | 1) => {
+    setGalleryUrls(prev => {
+      const next = [...prev];
+      const target = index + direction;
+      if (target < 0 || target >= next.length) return next;
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -298,6 +372,7 @@ function EditProductContent() {
         original_price: formData.on_sale && formData.original_price ? parseFloat(formData.original_price) : null,
         sale_price: formData.on_sale && formData.sale_price ? parseFloat(formData.sale_price) : null,
         is_preorder: formData.is_preorder, // 🆕 SALVAR ESTADO DE PRÉ-VENDA
+        gallery_urls: galleryUrls.length > 0 ? galleryUrls : null, // 🆕 GALERIA DA PÁGINA DE PRODUTO
         updated_at: new Date().toISOString()
       };
 
@@ -1077,6 +1152,7 @@ function EditProductContent() {
                 }}
               />
               {uploading && <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>Fazendo upload...</p>}
+              {!uploading && compressionInfo && <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>📦 {compressionInfo}</p>}
             </div>
 
             {/* Ou por URL */}
@@ -1144,6 +1220,74 @@ function EditProductContent() {
               />
             </div>
           )}
+
+          {/* 🆕 GALERIA — imagens extras que só aparecem na página individual do produto */}
+          <div>
+            <label style={labelStyle}>
+              Imagens Extras (galeria da página do produto)
+            </label>
+            <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
+              A imagem de capa acima continua sendo a que aparece na vitrine, no feed do Google e no carrinho. Estas aqui só aparecem como miniaturas na página do produto.
+            </p>
+            <input
+              ref={galleryInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleGalleryFileChange}
+              disabled={uploadingGallery}
+              style={{
+                width: "100%",
+                padding: "8px",
+                border: "1px dashed var(--border-color)",
+                borderRadius: 6,
+                background: uploadingGallery ? 'var(--bg-secondary)' : 'var(--bg-card)',
+                color: 'var(--text-primary)',
+                opacity: uploadingGallery ? 0.6 : 1,
+                marginBottom: 8
+              }}
+            />
+            {uploadingGallery && <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Fazendo upload...</p>}
+            {!uploadingGallery && galleryCompressionInfo && <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>📦 {galleryCompressionInfo}</p>}
+
+            {galleryUrls.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 12 }}>
+                {galleryUrls.map((url, index) => (
+                  <div key={url + index} style={{ position: 'relative', width: 100 }}>
+                    <img
+                      src={url}
+                      alt={`Imagem extra ${index + 1}`}
+                      style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 8, border: "1px solid var(--border-color)" }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, gap: 4 }}>
+                      <button
+                        type="button"
+                        onClick={() => moveGalleryImage(index, -1)}
+                        disabled={index === 0}
+                        style={{ flex: 1, padding: '2px 4px', fontSize: 12, cursor: index === 0 ? 'default' : 'pointer', opacity: index === 0 ? 0.4 : 1 }}
+                      >
+                        ◀
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeGalleryImage(index)}
+                        style={{ flex: 1, padding: '2px 4px', fontSize: 12, background: '#ef4444', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+                      >
+                        Remover
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveGalleryImage(index, 1)}
+                        disabled={index === galleryUrls.length - 1}
+                        style={{ flex: 1, padding: '2px 4px', fontSize: 12, cursor: index === galleryUrls.length - 1 ? 'default' : 'pointer', opacity: index === galleryUrls.length - 1 ? 0.4 : 1 }}
+                      >
+                        ▶
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Botões */}
           <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
