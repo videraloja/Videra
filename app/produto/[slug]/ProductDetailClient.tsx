@@ -290,7 +290,9 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
     ) : kind === 'search' ? (
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
     ) : (
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8a3 3 0 1 0-2.83-4M18 8a3 3 0 0 1-2.83-4M6 15a3 3 0 1 0 0-6M18 22a3 3 0 1 0-2.83-4M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98" /></svg>
+      // Nós em <circle> fechado, não em arco de <path>: como arco eles não
+      // fechavam a circunferência e saíam como meias-luas partidas.
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></svg>
     );
 
     const commonStyle: React.CSSProperties = {
