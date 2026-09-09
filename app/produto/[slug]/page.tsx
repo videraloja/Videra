@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { SITE_URL } from '@/lib/siteConfig';
 import { Product } from '@/app/types';
 import { resolveBrand } from '@/lib/productBrand';
+import { CATEGORY_ROUTES } from '@/lib/categoryRoutes';
 import ProductDetailClient from './ProductDetailClient';
 
 export const revalidate = 300;
@@ -84,13 +85,6 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   };
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  pokemon: 'Pokémon TCG',
-  'board-games': 'Jogos de Tabuleiro',
-  acessorios: 'Acessórios',
-  'hot-wheels': 'Hot Wheels',
-};
-
 export default async function ProdutoPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
@@ -134,17 +128,17 @@ export default async function ProdutoPage({ params }: { params: Promise<{ slug: 
     '@type': 'BreadcrumbList',
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'Início', item: SITE_URL },
-      ...(product.category && CATEGORY_LABELS[product.category]
+      ...(product.category && CATEGORY_ROUTES[product.category]
         ? [{
             '@type': 'ListItem',
             position: 2,
-            name: CATEGORY_LABELS[product.category],
+            name: CATEGORY_ROUTES[product.category].label,
             item: `${SITE_URL}${categoryPath(product.category)}`,
           }]
         : []),
       {
         '@type': 'ListItem',
-        position: product.category && CATEGORY_LABELS[product.category] ? 3 : 2,
+        position: product.category && CATEGORY_ROUTES[product.category] ? 3 : 2,
         name: product.name,
         item: `${SITE_URL}/produto/${slug}`,
       },
@@ -167,11 +161,5 @@ export default async function ProdutoPage({ params }: { params: Promise<{ slug: 
 }
 
 function categoryPath(category: string): string {
-  const routes: Record<string, string> = {
-    pokemon: '/pokemontcg',
-    'board-games': '/jogosdetabuleiro',
-    acessorios: '/acessorios',
-    'hot-wheels': '/hotwheels',
-  };
-  return routes[category] || '/';
+  return CATEGORY_ROUTES[category]?.path || '/';
 }

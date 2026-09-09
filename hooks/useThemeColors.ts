@@ -132,6 +132,13 @@ export const useThemeColors = () => {
   const fetching = useRef(false);
   const lastFetchTime = useRef(0);
   const lastFetchedPage = useRef<string>('');
+  // Sempre aponta pra versão mais recente de fetchEffectiveTheme (que muda de
+  // identidade quando currentPageId muda). O efeito de polling abaixo só
+  // monta o setInterval UMA vez (depende só de isMounted) — sem esse ref, a
+  // chamada inicial e o intervalo de 10s ficavam presos pra sempre com o
+  // currentPageId de quando a página abriu, ignorando qualquer mudança
+  // posterior (ex.: quando a página de produto define o tema da categoria).
+  const fetchEffectiveThemeRef = useRef<(forceRefresh?: boolean) => Promise<void>>(async () => {});
 
   // MONTA/DESMONTA
   useEffect(() => {
@@ -182,6 +189,12 @@ export const useThemeColors = () => {
     }
   }, [isMounted, pageThemeContext?.currentPageId]);
 
+  // Mantém o ref sempre na versão mais nova (mesma renderização em que
+  // fetchEffectiveTheme muda de identidade).
+  useEffect(() => {
+    fetchEffectiveThemeRef.current = fetchEffectiveTheme;
+  }, [fetchEffectiveTheme]);
+
   // INICIAR POLLING (APENAS UMA VEZ)
   useEffect(() => {
     if (!isMounted) return;
@@ -194,10 +207,14 @@ export const useThemeColors = () => {
       clearInterval(pollingRef.current);
     }
 
-    fetchEffectiveTheme();
-
+    // A busca inicial fica só por conta do efeito "ATUALIZA QUANDO A PÁGINA
+    // MUDA" abaixo (reage direto a currentPageId, sem closure presa) — chamar
+    // aqui também competia com aquele, e como os dois rodam quase juntos no
+    // mount, essa chamada (com o currentPageId de quando a página abriu,
+    // antes de qualquer override de tema aplicar) marcava fetching.current
+    // e fazia o outro efeito ser silenciosamente ignorado.
     pollingRef.current = setInterval(() => {
-      fetchEffectiveTheme(true);
+      fetchEffectiveThemeRef.current(true);
     }, 10000);
 
     return () => {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import Header from '@/app/components/Header';
@@ -14,13 +14,8 @@ import { trackViewItem, trackAddToCart } from '@/lib/analytics';
 import { carouselService } from '@/app/lib/carouselService';
 import { CarouselConfig } from '@/app/types';
 import { getCollectionName } from '@/lib/collections';
-
-const CATEGORY_ROUTES: Record<string, { path: string; label: string }> = {
-  pokemon: { path: '/pokemontcg', label: 'Pokémon TCG' },
-  'board-games': { path: '/jogosdetabuleiro', label: 'Jogos de Tabuleiro' },
-  acessorios: { path: '/acessorios', label: 'Acessórios' },
-  'hot-wheels': { path: '/hotwheels', label: 'Hot Wheels' },
-};
+import { CATEGORY_ROUTES } from '@/lib/categoryRoutes';
+import { usePageTheme } from '@/app/contexts/PageThemeContext';
 
 // Fallback usado enquanto a config de aparência não chegou do banco (ou pra quando
 // ainda não existe uma linha salva) — mesmos valores que já estavam hardcoded aqui.
@@ -50,9 +45,15 @@ interface ProductDetailClientProps {
 
 export default function ProductDetailClient({ product, relatedProducts, brandName }: ProductDetailClientProps) {
   const { colors, getCategoryConfig, applyDetailStyles, getDetailStyles, getShadow } = useThemeColors();
+  const { setPageIdOverride } = usePageTheme();
   const { stockLabel } = useStock();
   const { addToCart, isInCart, getItemQuantity } = useCartContext();
-  const { syncedProducts } = useAvailableStock([product]);
+  // [product] cru recriava um array novo a cada render, quebrando a comparação
+  // de dependência do useEffect dentro de useAvailableStock e disparando um
+  // loop de fetch a cada ~200-300ms (achado ao medir o polling de tema — ver
+  // resposta sobre o item 1). useMemo trava a referência ao id do produto.
+  const productArray = useMemo(() => [product], [product.id]);
+  const { syncedProducts } = useAvailableStock(productArray);
   const { syncedProducts: syncedRelated } = useAvailableStock(relatedProducts);
 
   const currentProduct = syncedProducts[0] || product;
@@ -67,6 +68,40 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
   const [quantityInCart, setQuantityInCart] = useState(0);
   const [currentStock, setCurrentStock] = useState(currentProduct.stock);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [descExpanded, setDescExpanded] = useState(false);
+  const [descTruncated, setDescTruncated] = useState(false);
+  const descRef = useRef<HTMLParagraphElement>(null);
+
+  // Estado sólido/translúcido da barra fixa mobile (Problema 4) — troca depois
+  // de ~100px de rolagem, com uma pequena folga pra não "piscar" no limiar.
+  const [isBarSolid, setIsBarSolid] = useState(false);
+  useEffect(() => {
+    // O <body> do site tem overflow-x:hidden, o que força overflow-y:auto
+    // (regra do CSS) — ele vira o próprio contêiner de rolagem, não a
+    // window/viewport. Por isso escuta no body (com fallback pra window,
+    // caso esse comportamento mude), em vez de só window.scrollY.
+    const getScrollTop = () => Math.max(document.body.scrollTop, document.documentElement.scrollTop, window.scrollY);
+    const handleScroll = () => setIsBarSolid(getScrollTop() > 100);
+    handleScroll();
+    document.body.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      document.body.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  // Mede se as 2 linhas colapsadas cortam o texto de verdade — só aí mostra
+  // "Ver mais". Roda com a descrição ainda colapsada (descExpanded começa
+  // false), então clientHeight reflete o clamp de 2 linhas nesse momento.
+  useEffect(() => {
+    const el = descRef.current;
+    if (!el) { setDescTruncated(false); return; }
+    const check = () => setDescTruncated(el.scrollHeight > el.clientHeight + 1);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, [currentProduct.description]);
   const [carouselConfigs, setCarouselConfigs] = useState<CarouselConfig[]>([]);
 
   useEffect(() => {
@@ -114,6 +149,21 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
   const originalPrice = currentProduct.on_sale ? currentProduct.original_price : undefined;
   const detailStyles = getDetailStyles();
   const categoryRoute = currentProduct.category ? CATEGORY_ROUTES[currentProduct.category] : undefined;
+
+  // A página de produto não tem PAGE_ID próprio, então sem isso ela sempre caía
+  // no tema global — um produto de Jogos de Tabuleiro tem que parecer que está
+  // em /jogosdetabuleiro pra fins de tema (Header, botões, carrossel incluídos,
+  // já que todos leem do mesmo PageThemeContext). Sem categoria reconhecida,
+  // não define override nenhum e cai no tema global, como sempre foi.
+  // useLayoutEffect (não useEffect): precisa aplicar o override ANTES do
+  // primeiro efeito passivo do PageThemeContext rodar, senão ele calcula
+  // currentPageId uma vez sem o override (mostra o tema global por um
+  // instante) e só corrige depois — ficando visível como um flash.
+  useLayoutEffect(() => {
+    setPageIdOverride(categoryRoute?.path || null);
+    return () => setPageIdOverride(null);
+  }, [categoryRoute?.path, setPageIdOverride]);
+
   const isPreorder = (currentProduct as any).is_preorder;
   const backHref = categoryRoute?.path || '/';
   // Nome digitado no admin (com acento/maiúsculas) tem prioridade; a lista fixa de
@@ -158,13 +208,89 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
   const relatedAvailable = syncedRelated.filter(p => p.stock > 0);
   const relatedConfig = carouselConfigs.find(c => c.carousel_type === 'all') || RELATED_CAROUSEL_FALLBACK(colors);
 
-  return (
-    <div style={{ minHeight: '100vh', background: colors.background, color: colors.text }}>
-      <Header />
+  // Não é a mensagem de pedido do carrinho — é só um "compartilhar produto"
+  // que abre o WhatsApp com o nome e o link da página, sem número fixo (o
+  // cliente escolhe pra quem manda). Calculado num efeito, não inline no
+  // render, pra garantir window.location.href definitivamente pronto.
+  const [shareUrl, setShareUrl] = useState('');
+  useEffect(() => {
+    const text = `${currentProduct.name} — ${window.location.href}`;
+    setShareUrl(`https://wa.me/?text=${encodeURIComponent(text)}`);
+  }, [currentProduct.name]);
 
-      <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '20px' }}>
-        {/* Voltar — pílula alinhada à direita, fácil de alcançar com o polegar no celular */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '24px' }}>
+  return (
+    <div style={{ minHeight: '100vh', background: colors.background, color: colors.text, display: 'flex', flexDirection: 'column' }}>
+      {/* Barra fixa — só mobile (ver CSS .pd-mobile-bar). Some acima de tudo,
+          translúcida sobre a imagem no topo e sólida (cor do tema da
+          categoria) depois de rolar — ver handleScroll/isBarSolid. */}
+      <div
+        className="pd-mobile-bar"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 1000,
+          display: 'none',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '8px 12px',
+          background: isBarSolid ? colors.background : 'rgba(0,0,0,0.32)',
+          boxShadow: isBarSolid ? '0 2px 12px rgba(0,0,0,0.15)' : 'none',
+          transition: 'background 0.25s ease, box-shadow 0.25s ease',
+        }}
+      >
+        <Link
+          href={backHref}
+          aria-label="Voltar"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: '44px', height: '44px', borderRadius: '50%',
+            background: isBarSolid ? 'transparent' : 'rgba(0,0,0,0.35)',
+            color: isBarSolid ? colors.text : '#ffffff',
+            textDecoration: 'none', fontSize: '20px', flexShrink: 0,
+          }}
+        >
+          ←
+        </Link>
+        <Link
+          href="/"
+          aria-label="Buscar"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: '44px', height: '44px', borderRadius: '50%',
+            background: isBarSolid ? 'transparent' : 'rgba(0,0,0,0.35)',
+            color: isBarSolid ? colors.text : '#ffffff',
+            textDecoration: 'none', fontSize: '18px', flexShrink: 0,
+          }}
+        >
+          🔍
+        </Link>
+        <a
+          href={shareUrl || '#'}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Compartilhar no WhatsApp"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: '44px', height: '44px', borderRadius: '50%',
+            background: isBarSolid ? 'transparent' : 'rgba(0,0,0,0.35)',
+            color: isBarSolid ? colors.text : '#ffffff',
+            textDecoration: 'none', fontSize: '18px', flexShrink: 0,
+          }}
+        >
+          ↗️
+        </a>
+      </div>
+
+      <div className="pd-header-wrap">
+        <Header />
+      </div>
+
+      <main className="pd-main-content" style={{ maxWidth: '1400px', margin: '0 auto', padding: '20px', width: '100%' }}>
+        {/* Voltar — pílula alinhada à direita. Só desktop: no mobile a barra
+            fixa acima já cobre a volta pra categoria. */}
+        <div className="pd-desktop-back" style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '24px' }}>
           <Link
             href={backHref}
             style={{
@@ -232,9 +358,11 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
               />
             </div>
 
-            {/* Galeria — só existe quando há imagens extras. Sem elas, nada aqui. */}
+            {/* Galeria — só existe quando há imagens extras. Sem elas, nada aqui.
+                Faixa única rolável na horizontal (não quebra linha) — a rolagem
+                fica contida aqui dentro, nunca vaza pra página. */}
             {hasGallery && (
-              <div style={{ display: 'flex', gap: '10px', marginTop: '12px', flexWrap: 'wrap' }}>
+              <div className="gallery-strip" style={{ display: 'flex', gap: '10px', marginTop: '12px', overflowX: 'auto', overflowY: 'hidden' }}>
                 {images.map((url, index) => (
                   <button
                     key={url + index}
@@ -251,6 +379,7 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
                       background: 'none',
                       border: `2px solid ${index === selectedImageIndex ? detailStyles.galleryThumbnailActiveBorderColor : detailStyles.galleryThumbnailBorderColor}`,
                       flexShrink: 0,
+                      scrollSnapAlign: 'start',
                     }}
                   >
                     <Image src={url} alt={`${currentProduct.name} ${index + 1}`} fill sizes="64px" style={{ objectFit: 'cover' }} />
@@ -331,9 +460,41 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
             )}
 
             {currentProduct.description && (
-              <p style={applyDetailStyles('description', { lineHeight: '1.6', marginBottom: '24px' })}>
-                {currentProduct.description}
-              </p>
+              <div style={{ marginBottom: '24px' }}>
+                <p
+                  ref={descRef}
+                  style={{
+                    ...applyDetailStyles('description', { lineHeight: '1.6', margin: 0 }),
+                    whiteSpace: 'pre-line',
+                    ...(descExpanded ? {} : {
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical' as const,
+                      overflow: 'hidden',
+                    }),
+                  }}
+                >
+                  {currentProduct.description}
+                </p>
+                {descTruncated && (
+                  <button
+                    onClick={() => setDescExpanded(prev => !prev)}
+                    style={{
+                      marginTop: '4px',
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      color: colors.primary,
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                    }}
+                  >
+                    {descExpanded ? 'Ver menos' : 'Ver mais'}
+                  </button>
+                )}
+              </div>
             )}
 
             <button
@@ -381,10 +542,29 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
       </main>
 
       <style jsx>{`
+        .pd-header-wrap { order: 0; }
+        .pd-main-content { order: 1; }
         @media (max-width: 768px) {
           .product-detail-grid {
             grid-template-columns: 1fr !important;
           }
+          /* Produto primeiro, Header depois — a barra fixa já cobre voltar/buscar/compartilhar */
+          .pd-header-wrap { order: 2; }
+          .pd-main-content { order: 1; }
+          .pd-mobile-bar { display: flex !important; }
+          .pd-desktop-back { display: none !important; }
+        }
+        .gallery-strip {
+          scroll-snap-type: x proximity;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: thin;
+        }
+        .gallery-strip::-webkit-scrollbar {
+          height: 4px;
+        }
+        .gallery-strip::-webkit-scrollbar-thumb {
+          background: rgba(0, 0, 0, 0.15);
+          border-radius: 4px;
         }
       `}</style>
     </div>

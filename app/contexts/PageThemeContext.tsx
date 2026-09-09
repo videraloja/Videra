@@ -1,7 +1,7 @@
 // app/contexts/PageThemeContext.tsx - VERSÃO OTIMIZADA (SEM LOGS)
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 
 export const PAGE_IDS = {
@@ -26,6 +26,11 @@ interface PageThemeContextType {
   setPageTheme: (pageId: string, themeId: string | null) => void;
   getPageTheme: (pageId: string) => string | null;
   clearPageTheme: (pageId: string) => void;
+  // Deixa uma página "se passar" pela página de outra pra fins de tema — usado
+  // pela página de produto, que não tem PAGE_ID próprio: um produto de
+  // category='board-games' resolve o tema como se estivesse em
+  // /jogosdetabuleiro, em vez de cair sempre no tema global.
+  setPageIdOverride: (pageId: string | null) => void;
 }
 
 const PageThemeContext = createContext<PageThemeContextType | undefined>(undefined);
@@ -33,15 +38,20 @@ const PageThemeContext = createContext<PageThemeContextType | undefined>(undefin
 export function PageThemeProvider({ children }: { children: React.ReactNode }) {
   const [pageThemes, setPageThemes] = useState<Record<string, PageThemeConfig>>({});
   const pathname = usePathname();
-  const [currentPageId, setCurrentPageId] = useState<string | null>(null);
+  const [pageIdOverride, setPageIdOverride] = useState<string | null>(null);
 
-  useEffect(() => {
-    const pageId = Object.keys(PAGE_IDS).find(key =>
+  // Valor derivado direto (não estado+efeito): precisa estar pronto na MESMA
+  // renderização em que pageIdOverride muda, sem esperar outro ciclo de
+  // efeito passivo — senão componentes descendentes (Header, etc., que
+  // rodam seus próprios efeitos antes deste Provider por serem mais
+  // internos na árvore) veem por um instante o valor de antes do override.
+  const currentPageId = useMemo(() => {
+    if (pageIdOverride) return pageIdOverride;
+
+    return Object.keys(PAGE_IDS).find(key =>
       pathname === key || pathname.startsWith(key + '/')
     ) || pathname;
-
-    setCurrentPageId(pageId);
-  }, [pathname]);
+  }, [pathname, pageIdOverride]);
 
   useEffect(() => {
     const savedPageThemes = localStorage.getItem('videra-page-themes');
@@ -93,6 +103,7 @@ export function PageThemeProvider({ children }: { children: React.ReactNode }) {
       pageThemes,
       currentPageId,
       setPageTheme,
+      setPageIdOverride,
       getPageTheme,
       clearPageTheme
     }}>
