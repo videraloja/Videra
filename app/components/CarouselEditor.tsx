@@ -15,7 +15,8 @@ interface CarouselEditorProps {
   { value: 'pokemontcg', label: 'Pokémon TCG', icon: '🎴' },
   { value: 'jogosdetabuleiro', label: 'Jogos de Tabuleiro', icon: '🎲' },
   { value: 'acessorios', label: 'Acessórios', icon: '🎒' },
-  { value: 'hotwheels', label: 'Hot Wheels', icon: '🏎️' }
+  { value: 'hotwheels', label: 'Hot Wheels', icon: '🏎️' },
+  { value: 'produto', label: 'Página de Produto (Relacionados)', icon: '📄' }
 ];
 
 const CAROUSEL_TYPES = [

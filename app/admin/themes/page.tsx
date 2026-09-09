@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useTheme } from '../../contexts/ThemeContext';
 import { usePageTheme, PAGE_IDS } from '../../contexts/PageThemeContext';
 import { ThemeEditor } from '../../components/ThemeEditor';
+import { ProductDetailStyleEditor } from '../../components/ProductDetailStyleEditor';
 import { supabase } from '@/lib/supabaseClient';
 import CarouselEditor from '../../components/CarouselEditor';
 import AuthGuard from '../../components/AuthGuard'; // 🆕 IMPORT DO AUTHGUARD
@@ -24,7 +25,7 @@ function ThemesAdminPageContent() {
   const [newThemeName, setNewThemeName] = useState('');
   const [baseThemeId, setBaseThemeId] = useState('default');
   const [isCreating, setIsCreating] = useState(false);
-  const [activeSection, setActiveSection] = useState<'themes' | 'editor' | 'carrosséis' | 'hero' | 'promo'>('themes');
+  const [activeSection, setActiveSection] = useState<'themes' | 'editor' | 'produto' | 'carrosséis' | 'hero' | 'promo'>('themes');
   const [isActivating, setIsActivating] = useState<string | null>(null);
 
   const handleActivateTheme = async (themeId: string, themeName: string) => {
@@ -590,6 +591,12 @@ function ThemesAdminPageContent() {
     </div>
   );
 
+  const renderProductDetailSection = () => (
+    <div style={{ marginTop: '20px' }}>
+      <ProductDetailStyleEditor />
+    </div>
+  );
+
   const renderCarouselsSection = () => (
     <div style={{ marginTop: '20px' }}>
       <CarouselEditor pageSlug="pokemontcg" />
@@ -658,6 +665,23 @@ function ThemesAdminPageContent() {
             }}
           >
             🎴 Editor Granular (Cards)
+          </button>
+          <button
+            onClick={() => setActiveSection('produto')}
+            style={{
+              flex: 1,
+              padding: '12px 16px',
+              background: activeSection === 'produto' ? '#7c3aed' : 'transparent',
+              color: activeSection === 'produto' ? 'white' : '#6b7280',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            🖼️ Página de Produto
           </button>
           <button
             onClick={() => setActiveSection('carrosséis')}
@@ -1032,6 +1056,7 @@ function ThemesAdminPageContent() {
 
       {activeSection === 'themes' && renderThemesSection()}
       {activeSection === 'editor' && renderEditorSection()}
+      {activeSection === 'produto' && renderProductDetailSection()}
       {activeSection === 'carrosséis' && renderCarouselsSection()}
       {activeSection === 'hero' && renderHeroSection()}
       {activeSection === 'promo' && (

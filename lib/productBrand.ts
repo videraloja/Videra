@@ -3,7 +3,10 @@ import { Product } from '@/app/types';
 // Só categorias em que o fabricante é conhecido com certeza. Usado tanto no
 // JSON-LD (app/produto/[slug]/page.tsx) quanto no feed de produtos (app/feed.xml).
 const CATEGORY_BRANDS: Record<string, string> = {
-  pokemon: 'Pokémon',
+  // Copag, não "Pokémon": todo Pokémon TCG vendido aqui é da edição nacional
+  // da Copag. Um importado de outra marca se resolve preenchendo a coluna
+  // `brand` daquele produto no admin, que tem prioridade sobre este mapa.
+  pokemon: 'Copag',
   'hot-wheels': 'Hot Wheels',
 };
 

@@ -8,10 +8,12 @@ export interface Product {
   sale_price?: number;
   on_sale: boolean;
   image_url: string;
+  gallery_urls?: string[];
   stock: number;
   category?: string;
   product_type?: string;
   collection?: string;
+  collection_name?: string;
   rarity?: string;
   description?: string;
   tags?: string[];
@@ -98,8 +100,62 @@ export interface ProductCardStyles {
   border?: string;
 }
 
+// Linha simples "Rótulo: valor" (Coleção / Marca) — texto puro, sem fundo/borda/ícone.
+export interface ProductDetailInfoLineStyles {
+  labelColor: string;
+  valueColor: string;
+  fontSize?: string;
+  fontWeight?: string;
+}
+
+export interface ProductDetailStyles {
+  productName: ProductCardTextStyles;
+  price: ProductCardTextStyles;
+  originalPrice: ProductCardTextStyles & { strikethrough?: boolean };
+  salePrice: ProductCardTextStyles;
+  stockInfo: ProductCardTextStyles;
+  description: ProductCardTextStyles;
+  // Cor do link "Ver mais" / "Ver menos" da descrição — separada da cor do
+  // texto da descrição em si, porque precisa de contraste próprio. Opcional:
+  // sem valor definido, a página usa colors.text (a cor que o próprio tema
+  // já escolheu pra texto legível contra o fundo dele — é o único ponto da
+  // paleta com essa garantia; colors.primary é uma cor de marca/destaque,
+  // sem garantia nenhuma de contraste contra o fundo).
+  descriptionLinkColor?: string;
+
+  // Linhas "Coleção: X" / "Marca: Y" — cada uma só aparece quando o produto tem valor.
+  collectionLine: ProductDetailInfoLineStyles;
+  brandLine: ProductDetailInfoLineStyles;
+
+  // 📦 TARJA DE PRÉ-VENDA
+  preorderBadge: {
+    backgroundColor: string;
+    textColor: string;
+    borderColor: string;
+  };
+
+  addToCart: ProductCardButtonStyles;
+
+  // 🔘 ÍCONES DE NAVEGAÇÃO (voltar / buscar / compartilhar) — um só sistema,
+  // usado na barra fixa mobile E no botão de voltar do desktop (que agora é
+  // o mesmo círculo com o mesmo ícone, não uma pílula à parte). Cada ícone
+  // aceita uma imagem enviada pelo admin; sem imagem, cai num SVG padrão.
+  navIcons: {
+    backgroundColor: string;
+    iconColor: string;
+    backIconUrl?: string;
+    searchIconUrl?: string;
+    shareIconUrl?: string;
+  };
+
+  // 🖼️ GALERIA DE IMAGENS (miniaturas extras, só aparece quando o produto tem)
+  galleryThumbnailBorderColor: string;
+  galleryThumbnailActiveBorderColor: string;
+}
+
 export interface ComponentStyles {
   productCard: ProductCardStyles;
+  productDetail?: ProductDetailStyles;
   // FUTURO: header, filters, buttons, etc.
 }
 

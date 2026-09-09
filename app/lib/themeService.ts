@@ -6,7 +6,13 @@ import { ThemeConfig, ComponentStyles, BackgroundImage } from '@/app/types';
 // CACHE EM MEMÓRIA (evita buscas repetidas)
 // ============================================
 const themeCache = new Map<string, { theme: ThemeConfig; timestamp: number }>();
-const CACHE_TTL = 2000; // 2 segundos
+// Fora do admin, o tema não é mais buscado num intervalo fixo (ver
+// hooks/useThemeColors.ts) — só uma vez ao montar e ao voltar o foco da aba,
+// no máximo 1x a cada 5min. O TTL do cache acompanha essa janela: 2s fazia
+// sentido quando havia um poll de 10 em 10 segundos batendo nele; sem esse
+// poll, 2s não protege nada. saveTheme() já invalida o cache na hora (abaixo),
+// então uma edição no admin nunca fica presa atrás desse TTL.
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
 
 function getCachedTheme(key: string): ThemeConfig | null {
   const cached = themeCache.get(key);
@@ -143,11 +149,12 @@ export async function getThemeById(themeId: string): Promise<ThemeConfig | null>
 
   return dedupeInFlight(`themeById:${themeId}`, async () => {
   try {
-    const [themeResult, colorsResult, emojisResult, stylesResult] = await Promise.all([
+    const [themeResult, colorsResult, emojisResult, cardStylesResult, detailStylesResult] = await Promise.all([
       supabase.from('themes').select('*').eq('id', themeId).single(),
       supabase.from('theme_colors').select('color_type, color_value').eq('theme_id', themeId),
       supabase.from('theme_emojis').select('emoji_type, emoji_value').eq('theme_id', themeId),
-      supabase.from('component_styles').select('styles').eq('theme_id', themeId).eq('component_type', 'productCard').limit(1)
+      supabase.from('component_styles').select('styles').eq('theme_id', themeId).eq('component_type', 'productCard').limit(1),
+      supabase.from('component_styles').select('styles').eq('theme_id', themeId).eq('component_type', 'productDetail').limit(1)
     ]);
 
     if (themeResult.error || !themeResult.data) {
@@ -193,7 +200,16 @@ export async function getThemeById(themeId: string): Promise<ThemeConfig | null>
       category: emojisRecord.category || '📁'
     };
 
-    const componentStyles = stylesResult.data?.[0]?.styles as ComponentStyles | undefined;
+    // 🆕 productDetail é uma chave extra dentro do MESMO objeto que já guarda os
+    // campos "achatados" do productCard (price, shadow, addToCart, etc. direto na
+    // raiz) — é assim que este objeto já é persistido/lido hoje, então não
+    // reformatamos o que já existe pra productCard, só acrescentamos ao lado.
+    const componentStyles = cardStylesResult.data?.[0]?.styles as any | undefined;
+    const detailStyles = detailStylesResult.data?.[0]?.styles;
+    let finalComponentStyles: ComponentStyles | undefined = componentStyles;
+    if (detailStyles) {
+      finalComponentStyles = { ...(componentStyles || {}), productDetail: detailStyles };
+    }
 
     // Background image
     let backgroundImage = undefined;
@@ -231,7 +247,7 @@ export async function getThemeById(themeId: string): Promise<ThemeConfig | null>
       priority: themeData.priority,
       colors,
       emojis,
-      componentStyles,
+      componentStyles: finalComponentStyles,
       backgroundImage,
       createdAt: themeData.created_at,
       updatedAt: themeData.updated_at
@@ -345,16 +361,36 @@ export async function saveTheme(theme: ThemeConfig): Promise<boolean> {
       }
     }
 
-    // Salvar estilos
+    // Salvar estilos. O objeto theme.componentStyles guarda os campos do
+    // productCard "achatados" na raiz (price, shadow, addToCart, etc. — é assim
+    // que já era gravado antes) e productDetail como uma chave própria dentro
+    // dele. Separamos as duas antes de gravar pra não misturar uma dentro da
+    // outra: productDetail sai como sua própria linha, e a linha de productCard
+    // fica idêntica ao formato de sempre (sem a chave productDetail dentro).
     if (theme.componentStyles) {
-      await supabase
-        .from('component_styles')
-        .upsert({
+      const { productDetail, ...cardOnlyStyles } = theme.componentStyles as any;
+      const now = new Date().toISOString();
+      const styleRows: { theme_id: string; component_type: string; styles: any; updated_at: string }[] = [
+        {
           theme_id: theme.id,
           component_type: 'productCard',
-          styles: theme.componentStyles,
-          updated_at: new Date().toISOString()
-        }, {
+          styles: cardOnlyStyles,
+          updated_at: now
+        }
+      ];
+
+      if (productDetail) {
+        styleRows.push({
+          theme_id: theme.id,
+          component_type: 'productDetail',
+          styles: productDetail,
+          updated_at: now
+        });
+      }
+
+      await supabase
+        .from('component_styles')
+        .upsert(styleRows, {
           onConflict: 'theme_id,component_type'
         });
     }

@@ -1,34 +1,97 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import Header from '@/app/components/Header';
 import Carousel from '@/app/components/Carousel';
+import SearchField from '@/app/components/SearchField';
 import { Product } from '@/app/types';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useStock } from '@/hooks/useStock';
 import { useCartContext } from '@/app/contexts/CartContext';
 import { useAvailableStock } from '@/hooks/useAvailableStock';
 import { trackViewItem, trackAddToCart } from '@/lib/analytics';
+import { carouselService } from '@/app/lib/carouselService';
+import { CarouselConfig } from '@/app/types';
+import { getCollectionName } from '@/lib/collections';
+import { CATEGORY_ROUTES } from '@/lib/categoryRoutes';
+import { usePageTheme } from '@/app/contexts/PageThemeContext';
+import { supabase } from '@/lib/supabaseClient';
+import { accessibleColor } from '@/lib/colorContrast';
 
-const CATEGORY_ROUTES: Record<string, { path: string; label: string }> = {
-  pokemon: { path: '/pokemontcg', label: 'Pokémon TCG' },
-  'board-games': { path: '/jogosdetabuleiro', label: 'Jogos de Tabuleiro' },
-  acessorios: { path: '/acessorios', label: 'Acessórios' },
-  'hot-wheels': { path: '/hotwheels', label: 'Hot Wheels' },
-};
+// Fallback usado enquanto a config de aparência não chegou do banco (ou pra quando
+// ainda não existe uma linha salva) — mesmos valores que já estavam hardcoded aqui.
+// Os PRODUTOS do carrossel nunca vêm dessa config: são sempre calculados no server
+// component pela categoria do produto atual (getRelatedProducts), então trocar de
+// produto sempre mostra os relacionados certos, independente do que está salvo aqui.
+const RELATED_CAROUSEL_FALLBACK = (colors: { text: string; primary: string }): CarouselConfig => ({
+  page_slug: 'produto', carousel_type: 'all',
+  title_text_color: colors.text, title_font_size: 24, title_font_weight: '700',
+  badge_bg_color: colors.primary, badge_text_color: '#ffffff',
+  arrow_bg_color: colors.primary, arrow_text_color: '#ffffff', arrow_hover_bg_color: colors.primary, arrow_hover_text_color: '#ffffff',
+  show_arrows: true, show_badges: true, items_per_view: 4, auto_scroll: false, auto_scroll_interval: 5000,
+  view_all_title_color: colors.text, view_all_title_font_size: 28, view_all_title_font_weight: '700',
+  view_all_badge_bg_color: colors.primary, view_all_badge_text_color: '#ffffff',
+  view_all_button_bg_color: 'transparent', view_all_button_text_color: colors.primary, view_all_button_border_color: colors.primary,
+  view_all_button_hover_bg_color: colors.primary, view_all_button_hover_text_color: '#ffffff', view_all_button_hover_border_color: colors.primary,
+  view_all_back_button_bg_color: 'transparent', view_all_back_button_text_color: colors.primary,
+  view_all_back_button_hover_bg_color: colors.primary, view_all_back_button_hover_text_color: '#ffffff',
+  id: 'produto-relacionados-fallback', created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+});
 
 interface ProductDetailClientProps {
   product: Product;
   relatedProducts: Product[];
+  brandName?: string;
 }
 
-export default function ProductDetailClient({ product, relatedProducts }: ProductDetailClientProps) {
-  const { colors, getCategoryConfig, getCardStyles, applyCardStyles, getShadow } = useThemeColors();
+export default function ProductDetailClient({ product, relatedProducts, brandName }: ProductDetailClientProps) {
+  const { colors, getCategoryConfig, applyDetailStyles, getDetailStyles, getShadow } = useThemeColors();
+  const { setPageIdOverride } = usePageTheme();
   const { stockLabel } = useStock();
+  const router = useRouter();
+
+  // Overlay de busca — reaproveita o SearchField (mesmo campo do Header),
+  // mas em vez de filtrar uma lista já carregada (o que o Header faz nas
+  // outras páginas), busca direto no banco: a página de produto não tem uma
+  // lista de produtos carregada pra filtrar localmente.
+  const [showSearchOverlay, setShowSearchOverlay] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<{ id: number; name: string; slug: string; image_url: string; price: number }[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    const term = searchQuery.trim();
+    if (term.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    setSearching(true);
+    const timeout = setTimeout(async () => {
+      const { data } = await supabase
+        .from('products')
+        .select('id, name, slug, image_url, price')
+        .ilike('name', `%${term}%`)
+        .limit(6);
+      setSearchResults(data || []);
+      setSearching(false);
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [searchQuery]);
+
+  const handleSearchEnter = (value: string) => {
+    if (!value) return;
+    router.push(`/?q=${encodeURIComponent(value)}`);
+  };
   const { addToCart, isInCart, getItemQuantity } = useCartContext();
-  const { syncedProducts } = useAvailableStock([product]);
+  // [product] cru recriava um array novo a cada render, quebrando a comparação
+  // de dependência do useEffect dentro de useAvailableStock e disparando um
+  // loop de fetch a cada ~200-300ms (achado ao medir o polling de tema — ver
+  // resposta sobre o item 1). useMemo trava a referência ao id do produto.
+  const productArray = useMemo(() => [product], [product.id]);
+  const { syncedProducts } = useAvailableStock(productArray);
   const { syncedProducts: syncedRelated } = useAvailableStock(relatedProducts);
 
   const currentProduct = syncedProducts[0] || product;
@@ -42,6 +105,46 @@ export default function ProductDetailClient({ product, relatedProducts }: Produc
   const [isAdded, setIsAdded] = useState(false);
   const [quantityInCart, setQuantityInCart] = useState(0);
   const [currentStock, setCurrentStock] = useState(currentProduct.stock);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [descExpanded, setDescExpanded] = useState(false);
+  const [descTruncated, setDescTruncated] = useState(false);
+  const descRef = useRef<HTMLParagraphElement>(null);
+
+  // Estado sólido/translúcido da barra fixa mobile (Problema 4) — troca depois
+  // de ~100px de rolagem, com uma pequena folga pra não "piscar" no limiar.
+  const [isBarSolid, setIsBarSolid] = useState(false);
+  useEffect(() => {
+    // O <body> do site tem overflow-x:hidden, o que força overflow-y:auto
+    // (regra do CSS) — ele vira o próprio contêiner de rolagem, não a
+    // window/viewport. Por isso escuta no body (com fallback pra window,
+    // caso esse comportamento mude), em vez de só window.scrollY.
+    const getScrollTop = () => Math.max(document.body.scrollTop, document.documentElement.scrollTop, window.scrollY);
+    const handleScroll = () => setIsBarSolid(getScrollTop() > 100);
+    handleScroll();
+    document.body.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      document.body.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  // Mede se as 2 linhas colapsadas cortam o texto de verdade — só aí mostra
+  // "Ver mais". Roda com a descrição ainda colapsada (descExpanded começa
+  // false), então clientHeight reflete o clamp de 2 linhas nesse momento.
+  useEffect(() => {
+    const el = descRef.current;
+    if (!el) { setDescTruncated(false); return; }
+    const check = () => setDescTruncated(el.scrollHeight > el.clientHeight + 1);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, [currentProduct.description]);
+  const [carouselConfigs, setCarouselConfigs] = useState<CarouselConfig[]>([]);
+
+  useEffect(() => {
+    carouselService.getCarouselConfigs('produto').then(setCarouselConfigs);
+  }, []);
 
   useEffect(() => {
     const productId = String(currentProduct.id);
@@ -82,9 +185,37 @@ export default function ProductDetailClient({ product, relatedProducts }: Produc
   const stockInfo = stockLabel(currentStock);
   const displayPrice = currentProduct.on_sale ? currentProduct.sale_price! : currentProduct.price;
   const originalPrice = currentProduct.on_sale ? currentProduct.original_price : undefined;
-  const cardStyles = getCardStyles();
+  const detailStyles = getDetailStyles();
   const categoryRoute = currentProduct.category ? CATEGORY_ROUTES[currentProduct.category] : undefined;
+
+  // A página de produto não tem PAGE_ID próprio, então sem isso ela sempre caía
+  // no tema global — um produto de Jogos de Tabuleiro tem que parecer que está
+  // em /jogosdetabuleiro pra fins de tema (Header, botões, carrossel incluídos,
+  // já que todos leem do mesmo PageThemeContext). Sem categoria reconhecida,
+  // não define override nenhum e cai no tema global, como sempre foi.
+  // useLayoutEffect (não useEffect): precisa aplicar o override ANTES do
+  // primeiro efeito passivo do PageThemeContext rodar, senão ele calcula
+  // currentPageId uma vez sem o override (mostra o tema global por um
+  // instante) e só corrige depois — ficando visível como um flash.
+  useLayoutEffect(() => {
+    setPageIdOverride(categoryRoute?.path || null);
+    return () => setPageIdOverride(null);
+  }, [categoryRoute?.path, setPageIdOverride]);
+
   const isPreorder = (currentProduct as any).is_preorder;
+  const backHref = categoryRoute?.path || '/';
+  // Nome digitado no admin (com acento/maiúsculas) tem prioridade; a lista fixa de
+  // lib/collections só cobre produtos antigos que nunca tiveram collection_name salvo.
+  const collectionDisplayName = currentProduct.collection_name
+    || (currentProduct.collection ? getCollectionName(currentProduct.collection) : undefined);
+
+  // Capa sempre em primeiro — é o que alimenta vitrine/feed/carrinho/og:image, e
+  // aqui também é sempre a primeira imagem mostrada. As extras (gallery_urls) só
+  // aparecem como miniaturas; produto sem elas fica idêntico a antes (sem galeria).
+  const galleryExtras = currentProduct.gallery_urls || [];
+  const images = [currentProduct.image_url, ...galleryExtras].filter(Boolean) as string[];
+  const hasGallery = galleryExtras.length > 0;
+  const mainImage = images[selectedImageIndex] || currentProduct.image_url || '/placeholder.png';
 
   const handleAddToCart = () => {
     if (currentStock <= 0) return;
@@ -103,34 +234,195 @@ export default function ProductDetailClient({ product, relatedProducts }: Produc
   };
 
   const getButtonColor = () => {
-    if (currentStock === 0) return cardStyles.addToCart.disabledBackgroundColor;
-    return cardStyles.addToCart.backgroundColor;
+    if (currentStock === 0) return detailStyles.addToCart.disabledBackgroundColor;
+    return detailStyles.addToCart.backgroundColor;
   };
 
   const getButtonHoverColor = () => {
-    if (currentStock === 0) return cardStyles.addToCart.disabledBackgroundColor;
-    return cardStyles.addToCart.hoverBackgroundColor;
+    if (currentStock === 0) return detailStyles.addToCart.disabledBackgroundColor;
+    return detailStyles.addToCart.hoverBackgroundColor;
   };
 
   const relatedAvailable = syncedRelated.filter(p => p.stock > 0);
+  const relatedConfig = carouselConfigs.find(c => c.carousel_type === 'all') || RELATED_CAROUSEL_FALLBACK(colors);
+
+  // Cor de destaque só entra se realmente passar em contraste (>=4.5:1) contra
+  // o fundo em uso — senão cai em colors.text, a única cor da paleta do tema
+  // com garantia de legibilidade. Foi usar colors.primary sem essa checagem
+  // que deixou o "Ver mais" roxo-em-roxo no tema escuro.
+  const accentTextColor = accessibleColor(colors.primary, colors.text, colors.background);
+  const linkColor = detailStyles.descriptionLinkColor
+    ? accessibleColor(detailStyles.descriptionLinkColor, colors.text, colors.background)
+    : colors.text;
+
+  // Não é a mensagem de pedido do carrinho — é só um "compartilhar produto"
+  // que abre o WhatsApp com o nome e o link da página, sem número fixo (o
+  // cliente escolhe pra quem manda). Calculado num efeito, não inline no
+  // render, pra garantir window.location.href definitivamente pronto.
+  const [shareUrl, setShareUrl] = useState('');
+  useEffect(() => {
+    const text = `${currentProduct.name} — ${window.location.href}`;
+    setShareUrl(`https://wa.me/?text=${encodeURIComponent(text)}`);
+  }, [currentProduct.name]);
+
+  // Ícone redondo compartilhado — mesmo componente pra barra fixa mobile
+  // (translúcido/sólido conforme rolagem) e pro botão de voltar do desktop
+  // (sempre sólido). Usa a imagem enviada no editor; sem imagem, cai no SVG
+  // padrão de cada um.
+  const NavIcon = ({
+    kind, onClick, href, target, translucent, ariaLabel,
+  }: {
+    kind: 'back' | 'search' | 'share';
+    onClick?: () => void;
+    href?: string;
+    target?: string;
+    translucent: boolean;
+    ariaLabel: string;
+  }) => {
+    const uploadedUrl = kind === 'back' ? detailStyles.navIcons.backIconUrl
+      : kind === 'search' ? detailStyles.navIcons.searchIconUrl
+      : detailStyles.navIcons.shareIconUrl;
+
+    const content = uploadedUrl ? (
+      <Image src={uploadedUrl} alt={ariaLabel} width={22} height={22} style={{ objectFit: 'contain' }} />
+    ) : kind === 'back' ? (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
+    ) : kind === 'search' ? (
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+    ) : (
+      // Nós em <circle> fechado, não em arco de <path>: como arco eles não
+      // fechavam a circunferência e saíam como meias-luas partidas.
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></svg>
+    );
+
+    const commonStyle: React.CSSProperties = {
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      width: '44px', height: '44px', borderRadius: '50%',
+      background: translucent ? 'rgba(0,0,0,0.35)' : detailStyles.navIcons.backgroundColor,
+      color: translucent ? '#ffffff' : detailStyles.navIcons.iconColor,
+      textDecoration: 'none', flexShrink: 0, border: 'none', cursor: 'pointer',
+    };
+
+    if (onClick) {
+      return <button type="button" onClick={onClick} aria-label={ariaLabel} style={commonStyle}>{content}</button>;
+    }
+    if (target) {
+      return <a href={href} target={target} rel="noopener noreferrer" aria-label={ariaLabel} style={commonStyle}>{content}</a>;
+    }
+    return <Link href={href || '/'} aria-label={ariaLabel} style={commonStyle}>{content}</Link>;
+  };
 
   return (
-    <div style={{ minHeight: '100vh', background: colors.background, color: colors.text }}>
-      <Header />
+    <div style={{ minHeight: '100vh', background: colors.background, color: colors.text, display: 'flex', flexDirection: 'column' }}>
+      {/* Barra fixa — só mobile (ver CSS .pd-mobile-bar). Some acima de tudo,
+          translúcida sobre a imagem no topo e sólida (cor do tema da
+          categoria) depois de rolar — ver handleScroll/isBarSolid. */}
+      <div
+        className="pd-mobile-bar"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 1000,
+          display: 'none',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '8px 12px',
+          background: isBarSolid ? colors.background : 'rgba(0,0,0,0.32)',
+          boxShadow: isBarSolid ? '0 2px 12px rgba(0,0,0,0.15)' : 'none',
+          transition: 'background 0.25s ease, box-shadow 0.25s ease',
+        }}
+      >
+        <NavIcon kind="back" href={backHref} translucent={!isBarSolid} ariaLabel="Voltar" />
+        {/* Buscar e compartilhar agrupados à direita — voltar fica isolado
+            à esquerda, sem dividir o espaço em três partes iguais. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <NavIcon kind="search" onClick={() => setShowSearchOverlay(true)} translucent={!isBarSolid} ariaLabel="Buscar" />
+          <NavIcon kind="share" href={shareUrl || '#'} target="_blank" translucent={!isBarSolid} ariaLabel="Compartilhar no WhatsApp" />
+        </div>
+      </div>
 
-      <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '20px' }}>
-        {/* Breadcrumb */}
-        <nav style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontSize: '14px', color: colors.text, opacity: 0.75, marginBottom: '24px' }}>
-          <Link href="/" style={{ color: 'inherit', textDecoration: 'none' }}>Início</Link>
-          {categoryRoute && (
-            <>
-              <span>›</span>
-              <Link href={categoryRoute.path} style={{ color: 'inherit', textDecoration: 'none' }}>{categoryRoute.label}</Link>
-            </>
-          )}
-          <span>›</span>
-          <span style={{ opacity: 0.6 }}>{currentProduct.name}</span>
-        </nav>
+      {/* Overlay de busca — some com o conteúdo pra baixo, sem sair da página.
+          Some="pd-search-overlay" fica acima da barra fixa (z-index maior). */}
+      {showSearchOverlay && (
+        <div
+          className="pd-search-overlay"
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1100,
+            background: 'rgba(0,0,0,0.5)',
+          }}
+          onClick={() => setShowSearchOverlay(false)}
+        >
+          <div
+            style={{ background: colors.background, padding: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', maxWidth: '600px', margin: '0 auto' }}>
+              <div style={{ flex: 1 }}>
+                <SearchField
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  onEnter={handleSearchEnter}
+                  placeholder="Buscar produtos..."
+                  autoFocus
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSearchOverlay(false)}
+                aria-label="Fechar busca"
+                style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', color: colors.text, fontSize: '20px', cursor: 'pointer', flexShrink: 0 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {searchQuery.trim().length >= 2 && (
+              <div style={{ maxWidth: '600px', margin: '12px auto 0' }}>
+                {searching && <p style={{ fontSize: '13px', color: colors.text }}>Buscando...</p>}
+                {!searching && searchResults.length === 0 && (
+                  <p style={{ fontSize: '13px', color: colors.text }}>Nenhum produto encontrado.</p>
+                )}
+                {!searching && searchResults.map((r) => (
+                  <Link
+                    key={r.id}
+                    href={`/produto/${r.slug}`}
+                    onClick={() => setShowSearchOverlay(false)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px', textDecoration: 'none', color: colors.text, borderRadius: '8px' }}
+                  >
+                    <div style={{ position: 'relative', width: 40, height: 40, borderRadius: '8px', overflow: 'hidden', flexShrink: 0, background: '#f1f5f9' }}>
+                      <Image src={r.image_url || '/placeholder.png'} alt={r.name} fill sizes="40px" style={{ objectFit: 'cover' }} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '14px', fontWeight: 500, color: colors.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
+                      <div style={{ fontSize: '13px', color: accentTextColor, fontWeight: 600 }}>R$ {r.price.toFixed(2)}</div>
+                    </div>
+                  </Link>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => handleSearchEnter(searchQuery.trim())}
+                  style={{ marginTop: '8px', background: 'none', border: 'none', color: linkColor, fontSize: '13px', fontWeight: 600, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                >
+                  Ver todos os resultados →
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="pd-header-wrap">
+        <Header />
+      </div>
+
+      <main className="pd-main-content" style={{ maxWidth: '1400px', margin: '0 auto', padding: '20px', width: '100%' }}>
+        {/* Voltar — círculo alinhado à direita, mesmo ícone/sistema da barra
+            fixa mobile. Só desktop: no mobile a barra fixa já cobre a volta. */}
+        <div className="pd-desktop-back" style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '24px' }}>
+          <NavIcon kind="back" href={backHref} translucent={false} ariaLabel="Voltar" />
+        </div>
 
         {/* Detalhe do produto */}
         <div style={{
@@ -141,18 +433,23 @@ export default function ProductDetailClient({ product, relatedProducts }: Produc
         }}
         className="product-detail-grid"
         >
-          <div style={{
-            position: 'relative',
-            width: '100%',
-            aspectRatio: '1 / 1',
-            borderRadius: '20px',
-            overflow: 'hidden',
-            background: cardStyles.imageOverlay,
-            boxShadow: getShadow('medium'),
-          }}>
-            {currentProduct.on_sale && originalPrice && (
-              <div style={{
-                ...applyCardStyles('badgeDiscount', {
+          {/* minWidth:0 é o pulo do gato — sem isso, um item de grid nunca
+              encolhe além do min-content dos filhos (regra do próprio CSS
+              Grid), então com miniaturas suficientes pra passar da largura
+              da coluna, a coluna INTEIRA (e a imagem dentro dela) esticava
+              pra caber tudo, em vez de deixar a faixa rolar por baixo. */}
+          <div style={{ alignSelf: 'start', minWidth: 0 }}>
+            <div style={{
+              position: 'relative',
+              width: '100%',
+              aspectRatio: '1 / 1',
+              borderRadius: '20px',
+              overflow: 'hidden',
+              background: 'transparent',
+              boxShadow: getShadow('medium'),
+            }}>
+              {currentProduct.on_sale && originalPrice && (
+                <div style={{
                   position: 'absolute',
                   top: '16px',
                   right: '16px',
@@ -161,91 +458,181 @@ export default function ProductDetailClient({ product, relatedProducts }: Produc
                   fontSize: '13px',
                   fontWeight: '700',
                   zIndex: 2,
-                })
-              }}>
-                🔥 {Math.round(((originalPrice - displayPrice) / originalPrice) * 100)}% OFF
+                  background: '#dc2626',
+                  color: '#ffffff',
+                }}>
+                  🔥 {Math.round(((originalPrice - displayPrice) / originalPrice) * 100)}% OFF
+                </div>
+              )}
+              <Image
+                src={mainImage}
+                alt={currentProduct.name}
+                fill
+                sizes="(max-width: 768px) 100vw, 480px"
+                style={{ objectFit: 'cover' }}
+                priority
+              />
+            </div>
+
+            {/* Galeria — só existe quando há imagens extras. Sem elas, nada aqui.
+                Faixa única rolável na horizontal (não quebra linha) — a rolagem
+                fica contida aqui dentro, nunca vaza pra página. */}
+            {hasGallery && (
+              <div className="gallery-strip" style={{ display: 'flex', gap: '10px', marginTop: '12px', overflowX: 'auto', overflowY: 'hidden', width: '100%', minWidth: 0 }}>
+                {images.map((url, index) => (
+                  <button
+                    key={url + index}
+                    onClick={() => setSelectedImageIndex(index)}
+                    aria-label={`Ver imagem ${index + 1}`}
+                    style={{
+                      width: '64px',
+                      height: '64px',
+                      borderRadius: '10px',
+                      overflow: 'hidden',
+                      position: 'relative',
+                      cursor: 'pointer',
+                      padding: 0,
+                      background: 'none',
+                      border: `2px solid ${index === selectedImageIndex ? detailStyles.galleryThumbnailActiveBorderColor : detailStyles.galleryThumbnailBorderColor}`,
+                      flexShrink: 0,
+                      scrollSnapAlign: 'start',
+                    }}
+                  >
+                    <Image src={url} alt={`${currentProduct.name} ${index + 1}`} fill sizes="64px" style={{ objectFit: 'cover' }} />
+                  </button>
+                ))}
               </div>
             )}
-            <Image
-              src={currentProduct.image_url || '/placeholder.png'}
-              alt={currentProduct.name}
-              fill
-              sizes="(max-width: 768px) 100vw, 480px"
-              style={{ objectFit: 'cover' }}
-              priority
-            />
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <h1 style={{
-              // Aplica o tema primeiro (pega a COR), depois sobrescreve o tamanho:
-              // applyCardStyles usa o fontSize do tema pensado pro card pequeno,
-              // que aqui precisa ser bem maior por ser o título da página.
-              ...applyCardStyles('productName', { lineHeight: '1.3', marginBottom: '16px' }),
-              fontSize: 'clamp(1.5rem, 3vw, 2.25rem)',
-              fontWeight: '700',
+              ...applyDetailStyles('productName', { lineHeight: '1.3', marginBottom: '8px' }),
+              fontSize: `clamp(1.5rem, 3vw, ${detailStyles.productName.fontSize || '36px'})`,
             }}>
               {currentProduct.name}
             </h1>
 
+            {(collectionDisplayName || brandName) && (
+              <div style={{ marginBottom: '16px' }}>
+                {collectionDisplayName && (
+                  <p style={{
+                    margin: 0,
+                    fontSize: detailStyles.collectionLine.fontSize || '14px',
+                    fontWeight: (detailStyles.collectionLine.fontWeight as any) || '500',
+                  }}>
+                    <span style={{ color: detailStyles.collectionLine.labelColor }}>Coleção: </span>
+                    <span style={{ color: detailStyles.collectionLine.valueColor }}>{collectionDisplayName}</span>
+                  </p>
+                )}
+                {brandName && (
+                  <p style={{
+                    margin: collectionDisplayName ? '2px 0 0 0' : 0,
+                    fontSize: detailStyles.brandLine.fontSize || '14px',
+                    fontWeight: (detailStyles.brandLine.fontWeight as any) || '500',
+                  }}>
+                    <span style={{ color: detailStyles.brandLine.labelColor }}>Marca: </span>
+                    <span style={{ color: detailStyles.brandLine.valueColor }}>{brandName}</span>
+                  </p>
+                )}
+              </div>
+            )}
+
             <div style={{ marginBottom: '20px' }}>
               {currentProduct.on_sale && originalPrice ? (
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap' }}>
-                  <span style={{ ...applyCardStyles('originalPrice', {}), fontSize: '18px', fontWeight: '500' }}>
+                  <span style={applyDetailStyles('originalPrice', {})}>
                     R$ {originalPrice.toFixed(2)}
                   </span>
-                  <span style={{ ...applyCardStyles('salePrice', {}), fontSize: '32px', fontWeight: '700' }}>
+                  <span style={applyDetailStyles('salePrice', {})}>
                     R$ {displayPrice.toFixed(2)}
                   </span>
                 </div>
               ) : (
-                <span style={{ ...applyCardStyles('price', {}), fontSize: '32px', fontWeight: '700' }}>
+                <span style={applyDetailStyles('price', {})}>
                   R$ {displayPrice.toFixed(2)}
                 </span>
               )}
             </div>
 
             {isPreorder ? (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginBottom: '24px', background: '#f3e8ff', color: '#7c3aed', padding: '10px 16px', borderRadius: '10px', border: '1px solid #e9d5ff', width: 'fit-content' }}>
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: '8px', marginBottom: '24px',
+                background: detailStyles.preorderBadge.backgroundColor,
+                color: detailStyles.preorderBadge.textColor,
+                border: `1px solid ${detailStyles.preorderBadge.borderColor}`,
+                padding: '10px 16px', borderRadius: '10px', width: 'fit-content'
+              }}>
                 <span style={{ fontSize: '16px' }}>📦</span>
                 <span style={{ fontSize: '15px', fontWeight: '600' }}>Pré-venda</span>
               </div>
             ) : (
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginBottom: '24px', width: 'fit-content' }}>
                 <span style={{ fontSize: '16px' }}>{stockInfo.icon}</span>
-                <span style={{ ...applyCardStyles('stockInfo', {}), fontSize: '15px', fontWeight: '500' }}>
+                <span style={applyDetailStyles('stockInfo', {})}>
                   {stockInfo.text}
                 </span>
               </div>
             )}
 
             {currentProduct.description && (
-              <p style={{ ...applyCardStyles('description', { lineHeight: '1.6', marginBottom: '24px' }), fontSize: '15px' }}>
-                {currentProduct.description}
-              </p>
+              <div style={{ marginBottom: '24px' }}>
+                <p
+                  ref={descRef}
+                  style={{
+                    ...applyDetailStyles('description', { lineHeight: '1.6', margin: 0 }),
+                    whiteSpace: 'pre-line',
+                    ...(descExpanded ? {} : {
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical' as const,
+                      overflow: 'hidden',
+                    }),
+                  }}
+                >
+                  {currentProduct.description}
+                </p>
+                {descTruncated && (
+                  <button
+                    onClick={() => setDescExpanded(prev => !prev)}
+                    style={{
+                      marginTop: '4px',
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      color: linkColor,
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                    }}
+                  >
+                    {descExpanded ? 'Ver menos' : 'Ver mais'}
+                  </button>
+                )}
+              </div>
             )}
 
             <button
               onClick={handleAddToCart}
               disabled={currentStock === 0}
               style={{
-                ...applyCardStyles('addToCart', {
-                  width: '100%',
-                  maxWidth: '360px',
-                  height: '52px',
-                  padding: '12px 24px',
-                  border: 'none',
-                  borderRadius: '14px',
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  cursor: currentStock === 0 ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.2s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: getButtonColor(),
-                  marginTop: 'auto',
-                })
+                width: '100%',
+                maxWidth: '360px',
+                height: '52px',
+                padding: '12px 24px',
+                border: 'none',
+                borderRadius: '14px',
+                fontSize: '16px',
+                fontWeight: '600',
+                cursor: currentStock === 0 ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: getButtonColor(),
+                color: detailStyles.addToCart.textColor,
+                marginTop: 'auto',
               }}
               onMouseEnter={(e) => {
                 if (currentStock > 0) e.currentTarget.style.background = getButtonHoverColor();
@@ -263,20 +650,7 @@ export default function ProductDetailClient({ product, relatedProducts }: Produc
           <Carousel
             title="Produtos Relacionados"
             products={relatedAvailable}
-            config={{
-              page_slug: 'produto', carousel_type: 'all',
-              title_text_color: colors.text, title_font_size: 24, title_font_weight: '700',
-              badge_bg_color: colors.primary, badge_text_color: '#ffffff',
-              arrow_bg_color: colors.primary, arrow_text_color: '#ffffff', arrow_hover_bg_color: colors.primary, arrow_hover_text_color: '#ffffff',
-              show_arrows: true, show_badges: true, items_per_view: 4, auto_scroll: false, auto_scroll_interval: 5000,
-              view_all_title_color: colors.text, view_all_title_font_size: 28, view_all_title_font_weight: '700',
-              view_all_badge_bg_color: colors.primary, view_all_badge_text_color: '#ffffff',
-              view_all_button_bg_color: 'transparent', view_all_button_text_color: colors.primary, view_all_button_border_color: colors.primary,
-              view_all_button_hover_bg_color: colors.primary, view_all_button_hover_text_color: '#ffffff', view_all_button_hover_border_color: colors.primary,
-              view_all_back_button_bg_color: 'transparent', view_all_back_button_text_color: colors.primary,
-              view_all_back_button_hover_bg_color: colors.primary, view_all_back_button_hover_text_color: '#ffffff',
-              id: 'produto-relacionados-temp', created_at: new Date().toISOString(), updated_at: new Date().toISOString()
-            }}
+            config={relatedConfig}
             categoryConfig={getCategoryConfig(currentProduct.category || 'default')}
             onAddToCart={addToCart}
           />
@@ -288,6 +662,40 @@ export default function ProductDetailClient({ product, relatedProducts }: Produc
           .product-detail-grid {
             grid-template-columns: 1fr !important;
           }
+          /* Sem Header nenhum no mobile — nem em cima, nem embaixo. A barra
+             fixa já cobre voltar/buscar/compartilhar. */
+          .pd-header-wrap { display: none !important; }
+          /* Reserva o espaço da barra fixa (44px de ícone + 8px de padding
+             de cada lado = 60px) somado ao respiro que a página já tinha —
+             o conteúdo começa abaixo da barra, nunca por baixo dela. */
+          .pd-main-content { padding-top: 80px !important; }
+          .pd-mobile-bar { display: flex !important; }
+          .pd-desktop-back { display: none !important; }
+        }
+        .gallery-strip {
+          scroll-snap-type: x proximity;
+          -webkit-overflow-scrolling: touch;
+          /* Barra de rolagem escondida em todo navegador. O indicador de "tem
+             mais pro lado" é a própria miniatura seguinte aparecendo cortada
+             na borda: a faixa tem 335px em tela de 375px e cada miniatura
+             ocupa 78px (64 + 2x2 de borda + 10 de gap), então sobram 39px
+             de uma quinta miniatura pela metade. Isso não depende de quantas
+             imagens o produto tem — só da largura da faixa. */
+          scrollbar-width: none; /* Firefox */
+          -ms-overflow-style: none; /* Edge legado */
+          /* pan-x explícito: sem isso, alguns navegadores mobile herdam um
+             touch-action mais restritivo do body e ignoram o gesto horizontal
+             de arrastar, mesmo com overflow-x:auto. */
+          touch-action: pan-x;
+          overscroll-behavior-x: contain;
+        }
+        .gallery-strip::-webkit-scrollbar {
+          display: none; /* Chrome, Safari, Edge novo */
+          width: 0;
+          height: 0;
+        }
+        .gallery-strip button {
+          touch-action: pan-x;
         }
       `}</style>
     </div>

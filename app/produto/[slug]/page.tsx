@@ -4,11 +4,13 @@ import { supabase } from '@/lib/supabaseClient';
 import { SITE_URL } from '@/lib/siteConfig';
 import { Product } from '@/app/types';
 import { resolveBrand } from '@/lib/productBrand';
+import { CATEGORY_ROUTES } from '@/lib/categoryRoutes';
 import ProductDetailClient from './ProductDetailClient';
 
-export const revalidate = 3600;
+export const revalidate = 300;
 
-const PRODUCT_COLUMNS = 'id, name, slug, price, original_price, sale_price, on_sale, image_url, category, stock, collection, is_preorder, description, brand';
+const PRODUCT_COLUMNS = 'id, name, slug, price, original_price, sale_price, on_sale, image_url, gallery_urls, category, product_type, stock, collection, collection_name, is_preorder, description, brand';
+const RELATED_LIMIT = 10;
 
 async function getProductBySlug(slug: string): Promise<Product | null> {
   const { data, error } = await supabase
@@ -21,19 +23,45 @@ async function getProductBySlug(slug: string): Promise<Product | null> {
   return data as Product;
 }
 
-async function getRelatedProducts(category: string | undefined, excludeId: number): Promise<Product[]> {
-  if (!category) return [];
+// Relevância em 3 níveis, só completando com o próximo quando o anterior não
+// preenche o limite: mesma coleção primeiro (é o critério mais específico —
+// dois produtos da mesma coleção são o "relacionado" mais óbvio), depois
+// mesmo tipo de produto (ETB, Deck, Booster...), e só por último a categoria
+// inteira (comportamento antigo), como complemento genérico.
+async function getRelatedProducts(product: Product, excludeId: number): Promise<Product[]> {
+  const results: Product[] = [];
+  const seenIds = new Set<number>([excludeId]);
 
-  const { data } = await supabase
-    .from('products')
-    .select(PRODUCT_COLUMNS)
-    .eq('category', category)
-    .eq('is_preorder', false)
-    .neq('id', excludeId)
-    .gt('stock', 0)
-    .limit(10);
+  async function fetchTier(applyFilter: (q: any) => any) {
+    const remaining = RELATED_LIMIT - results.length;
+    if (remaining <= 0) return;
 
-  return (data || []) as Product[];
+    let query = supabase
+      .from('products')
+      .select(PRODUCT_COLUMNS)
+      .eq('is_preorder', false)
+      .gt('stock', 0);
+    query = applyFilter(query);
+    query = query.not('id', 'in', `(${Array.from(seenIds).join(',')})`);
+
+    const { data } = await query.limit(remaining);
+    (data || []).forEach((p: any) => {
+      seenIds.add(p.id);
+      results.push(p as Product);
+    });
+  }
+
+  if (product.collection) {
+    await fetchTier((q) => q.eq('collection', product.collection));
+  }
+  if (product.product_type) {
+    await fetchTier((q) => q.eq('product_type', product.product_type));
+  }
+  if (product.category) {
+    await fetchTier((q) => q.eq('category', product.category));
+  }
+
+  return results;
 }
 
 export async function generateStaticParams() {
@@ -84,13 +112,6 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   };
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  pokemon: 'Pokémon TCG',
-  'board-games': 'Jogos de Tabuleiro',
-  acessorios: 'Acessórios',
-  'hot-wheels': 'Hot Wheels',
-};
-
 export default async function ProdutoPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
@@ -99,7 +120,7 @@ export default async function ProdutoPage({ params }: { params: Promise<{ slug: 
     notFound();
   }
 
-  const relatedProducts = await getRelatedProducts(product.category, product.id);
+  const relatedProducts = await getRelatedProducts(product, product.id);
   const price = product.on_sale && product.sale_price ? product.sale_price : product.price;
   const brandName = resolveBrand(product);
 
@@ -134,17 +155,17 @@ export default async function ProdutoPage({ params }: { params: Promise<{ slug: 
     '@type': 'BreadcrumbList',
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'Início', item: SITE_URL },
-      ...(product.category && CATEGORY_LABELS[product.category]
+      ...(product.category && CATEGORY_ROUTES[product.category]
         ? [{
             '@type': 'ListItem',
             position: 2,
-            name: CATEGORY_LABELS[product.category],
+            name: CATEGORY_ROUTES[product.category].label,
             item: `${SITE_URL}${categoryPath(product.category)}`,
           }]
         : []),
       {
         '@type': 'ListItem',
-        position: product.category && CATEGORY_LABELS[product.category] ? 3 : 2,
+        position: product.category && CATEGORY_ROUTES[product.category] ? 3 : 2,
         name: product.name,
         item: `${SITE_URL}/produto/${slug}`,
       },
@@ -161,17 +182,11 @@ export default async function ProdutoPage({ params }: { params: Promise<{ slug: 
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
-      <ProductDetailClient product={product} relatedProducts={relatedProducts} />
+      <ProductDetailClient product={product} relatedProducts={relatedProducts} brandName={brandName} />
     </>
   );
 }
 
 function categoryPath(category: string): string {
-  const routes: Record<string, string> = {
-    pokemon: '/pokemontcg',
-    'board-games': '/jogosdetabuleiro',
-    acessorios: '/acessorios',
-    'hot-wheels': '/hotwheels',
-  };
-  return routes[category] || '/';
+  return CATEGORY_ROUTES[category]?.path || '/';
 }
