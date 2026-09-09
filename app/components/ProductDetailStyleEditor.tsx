@@ -299,7 +299,9 @@ export function ProductDetailStyleEditor() {
               <h5 style={{ fontSize: '13px', color: '#4b5563', marginBottom: '8px', fontWeight: 600 }}>{label}</h5>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 {url && (
-                  <img src={url} alt={label} style={{ width: 36, height: 36, borderRadius: '50%', border: '1px solid #e5e7eb', objectFit: 'cover' }} />
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: '50%', border: '1px solid #e5e7eb', overflow: 'hidden', background: '#f9fafb' }}>
+                    <img src={url} alt={label} style={{ width: '68%', height: '68%', objectFit: 'contain' }} />
+                  </span>
                 )}
                 <input
                   type="file"
@@ -318,6 +320,7 @@ export function ProductDetailStyleEditor() {
                   </button>
                 )}
               </div>
+              <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Formato ideal: PNG quadrado com fundo transparente, 128×128.</p>
               {uploadingIcon === key && <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Enviando...</p>}
               {uploadingIcon !== key && iconCompressionInfo[key] && <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>📦 {iconCompressionInfo[key]}</p>}
             </div>
@@ -342,7 +345,7 @@ export function ProductDetailStyleEditor() {
         <p style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '16px' }}>Pré-visualização simplificada — abra a página de um produto real pra ver o resultado completo.</p>
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: '50%', background: styles.navIcons.backgroundColor, color: styles.navIcons.iconColor, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
-            {styles.navIcons.backIconUrl ? <img src={styles.navIcons.backIconUrl} alt="Voltar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '←'}
+            {styles.navIcons.backIconUrl ? <img src={styles.navIcons.backIconUrl} alt="Voltar" style={{ width: '50%', height: '50%', objectFit: 'contain' }} /> : '←'}
           </span>
         </div>
         <h1 style={{ color: styles.productName.color, fontSize: styles.productName.fontSize, fontWeight: styles.productName.fontWeight as any, marginBottom: '8px' }}>Produto de Exemplo</h1>

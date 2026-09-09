@@ -19,6 +19,7 @@ import { getCollectionName } from '@/lib/collections';
 import { CATEGORY_ROUTES } from '@/lib/categoryRoutes';
 import { usePageTheme } from '@/app/contexts/PageThemeContext';
 import { supabase } from '@/lib/supabaseClient';
+import { accessibleColor } from '@/lib/colorContrast';
 
 // Fallback usado enquanto a config de aparência não chegou do banco (ou pra quando
 // ainda não existe uma linha salva) — mesmos valores que já estavam hardcoded aqui.
@@ -245,6 +246,15 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
   const relatedAvailable = syncedRelated.filter(p => p.stock > 0);
   const relatedConfig = carouselConfigs.find(c => c.carousel_type === 'all') || RELATED_CAROUSEL_FALLBACK(colors);
 
+  // Cor de destaque só entra se realmente passar em contraste (>=4.5:1) contra
+  // o fundo em uso — senão cai em colors.text, a única cor da paleta do tema
+  // com garantia de legibilidade. Foi usar colors.primary sem essa checagem
+  // que deixou o "Ver mais" roxo-em-roxo no tema escuro.
+  const accentTextColor = accessibleColor(colors.primary, colors.text, colors.background);
+  const linkColor = detailStyles.descriptionLinkColor
+    ? accessibleColor(detailStyles.descriptionLinkColor, colors.text, colors.background)
+    : colors.text;
+
   // Não é a mensagem de pedido do carrinho — é só um "compartilhar produto"
   // que abre o WhatsApp com o nome e o link da página, sem número fixo (o
   // cliente escolhe pra quem manda). Calculado num efeito, não inline no
@@ -323,8 +333,12 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
         }}
       >
         <NavIcon kind="back" href={backHref} translucent={!isBarSolid} ariaLabel="Voltar" />
-        <NavIcon kind="search" onClick={() => setShowSearchOverlay(true)} translucent={!isBarSolid} ariaLabel="Buscar" />
-        <NavIcon kind="share" href={shareUrl || '#'} target="_blank" translucent={!isBarSolid} ariaLabel="Compartilhar no WhatsApp" />
+        {/* Buscar e compartilhar agrupados à direita — voltar fica isolado
+            à esquerda, sem dividir o espaço em três partes iguais. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <NavIcon kind="search" onClick={() => setShowSearchOverlay(true)} translucent={!isBarSolid} ariaLabel="Buscar" />
+          <NavIcon kind="share" href={shareUrl || '#'} target="_blank" translucent={!isBarSolid} ariaLabel="Compartilhar no WhatsApp" />
+        </div>
       </div>
 
       {/* Overlay de busca — some com o conteúdo pra baixo, sem sair da página.
@@ -364,9 +378,9 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
 
             {searchQuery.trim().length >= 2 && (
               <div style={{ maxWidth: '600px', margin: '12px auto 0' }}>
-                {searching && <p style={{ fontSize: '13px', color: colors.text, opacity: 0.6 }}>Buscando...</p>}
+                {searching && <p style={{ fontSize: '13px', color: colors.text }}>Buscando...</p>}
                 {!searching && searchResults.length === 0 && (
-                  <p style={{ fontSize: '13px', color: colors.text, opacity: 0.6 }}>Nenhum produto encontrado.</p>
+                  <p style={{ fontSize: '13px', color: colors.text }}>Nenhum produto encontrado.</p>
                 )}
                 {!searching && searchResults.map((r) => (
                   <Link
@@ -379,15 +393,15 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
                       <Image src={r.image_url || '/placeholder.png'} alt={r.name} fill sizes="40px" style={{ objectFit: 'cover' }} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '14px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
-                      <div style={{ fontSize: '13px', color: colors.primary, fontWeight: 600 }}>R$ {r.price.toFixed(2)}</div>
+                      <div style={{ fontSize: '14px', fontWeight: 500, color: colors.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
+                      <div style={{ fontSize: '13px', color: accentTextColor, fontWeight: 600 }}>R$ {r.price.toFixed(2)}</div>
                     </div>
                   </Link>
                 ))}
                 <button
                   type="button"
                   onClick={() => handleSearchEnter(searchQuery.trim())}
-                  style={{ marginTop: '8px', background: 'none', border: 'none', color: detailStyles.descriptionLinkColor || colors.text, fontSize: '13px', fontWeight: 600, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                  style={{ marginTop: '8px', background: 'none', border: 'none', color: linkColor, fontSize: '13px', fontWeight: 600, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
                 >
                   Ver todos os resultados →
                 </button>
@@ -584,7 +598,7 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
                       background: 'none',
                       border: 'none',
                       padding: 0,
-                      color: detailStyles.descriptionLinkColor || colors.text,
+                      color: linkColor,
                       fontSize: '14px',
                       fontWeight: 600,
                       cursor: 'pointer',
@@ -659,22 +673,27 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
         .gallery-strip {
           scroll-snap-type: x proximity;
           -webkit-overflow-scrolling: touch;
-          scrollbar-width: thin;
+          /* Barra de rolagem escondida em todo navegador. O indicador de "tem
+             mais pro lado" é a própria miniatura seguinte aparecendo cortada
+             na borda: a faixa tem 335px em tela de 375px e cada miniatura
+             ocupa 78px (64 + 2x2 de borda + 10 de gap), então sobram 39px
+             de uma quinta miniatura pela metade. Isso não depende de quantas
+             imagens o produto tem — só da largura da faixa. */
+          scrollbar-width: none; /* Firefox */
+          -ms-overflow-style: none; /* Edge legado */
           /* pan-x explícito: sem isso, alguns navegadores mobile herdam um
              touch-action mais restritivo do body e ignoram o gesto horizontal
              de arrastar, mesmo com overflow-x:auto. */
           touch-action: pan-x;
           overscroll-behavior-x: contain;
         }
+        .gallery-strip::-webkit-scrollbar {
+          display: none; /* Chrome, Safari, Edge novo */
+          width: 0;
+          height: 0;
+        }
         .gallery-strip button {
           touch-action: pan-x;
-        }
-        .gallery-strip::-webkit-scrollbar {
-          height: 4px;
-        }
-        .gallery-strip::-webkit-scrollbar-thumb {
-          background: rgba(0, 0, 0, 0.15);
-          border-radius: 4px;
         }
       `}</style>
     </div>
