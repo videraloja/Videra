@@ -6,9 +6,9 @@ import { Product } from '@/app/types';
 import { resolveBrand } from '@/lib/productBrand';
 import ProductDetailClient from './ProductDetailClient';
 
-export const revalidate = 3600;
+export const revalidate = 300;
 
-const PRODUCT_COLUMNS = 'id, name, slug, price, original_price, sale_price, on_sale, image_url, gallery_urls, category, stock, collection, is_preorder, description, brand';
+const PRODUCT_COLUMNS = 'id, name, slug, price, original_price, sale_price, on_sale, image_url, gallery_urls, category, stock, collection, collection_name, is_preorder, description, brand';
 
 async function getProductBySlug(slug: string): Promise<Product | null> {
   const { data, error } = await supabase

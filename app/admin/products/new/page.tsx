@@ -7,6 +7,7 @@ import AuthGuard from "@/app/components/AuthGuard";
 import ThemeToggle from "@/app/components/ThemeToggle";
 import { getPokemonCollectionsForAdmin } from '@/lib/collections';
 import { compressImage, formatFileSize } from '@/lib/imageCompression';
+import { revalidateProductPages } from '@/lib/revalidateProduct';
 
 // Componente principal com toda a lógica existente
 function NewProductContent() {
@@ -30,10 +31,12 @@ function NewProductContent() {
     category: "", // 🆕 NOVO CAMPO
     product_type: "", // 🆕 NOVO CAMPO
     collection: "", // 🆕 NOVO CAMPO
+    collection_name: "",
     rarity: "", // 🆕 NOVO CAMPO
     card_set: "", // 🆕 NOVO CAMPO
     brand: "", // 🆕 MARCA/FABRICANTE (usado no JSON-LD e no feed do Google Merchant Center)
     gtin: "", // 🆕 CÓDIGO DE BARRAS (EAN-13) impresso na embalagem
+    description: "",
     tags: [] as string[], // 🆕 NOVO CAMPO
     is_preorder: false // 🆕 CAMPO PARA PRÉ-VENDA
   });
@@ -208,9 +211,11 @@ function NewProductContent() {
         category: formData.category || null, // 🆕 NOVO CAMPO
         product_type: formData.product_type || null, // 🆕 NOVO CAMPO
         collection: formData.collection || null, // 🆕 NOVO CAMPO
+        collection_name: formData.collection_name || null,
         rarity: formData.rarity || null, // 🆕 NOVO CAMPO
         card_set: formData.card_set || null, // 🆕 NOVO CAMPO
         brand: formData.brand || null, // 🆕 MARCA/FABRICANTE
+        description: formData.description || null,
         gtin: formData.gtin || null, // 🆕 CÓDIGO DE BARRAS (EAN-13)
         tags: formData.tags.length > 0 ? formData.tags : null, // 🆕 NOVO CAMPO
         is_preorder: formData.is_preorder, // 🆕 SALVAR ESTADO DE PRÉ-VENDA
@@ -222,6 +227,9 @@ function NewProductContent() {
         .insert([productData]);
 
       if (error) throw error;
+
+      // Não bloqueia nem quebra o salvamento se falhar — só loga.
+      await revalidateProductPages(slug, formData.category);
 
       alert("Produto adicionado com sucesso!");
       router.back();
@@ -235,7 +243,7 @@ function NewProductContent() {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
 
     if (type === 'checkbox') {
@@ -268,9 +276,11 @@ function NewProductContent() {
     const newName = e.target.value;
     setCollectionName(newName);
 
-    // Atualiza o ID da coleção (slug) no formulário
+    // Slug (collection) é só o identificador técnico; collection_name guarda o
+    // nome exatamente como digitado (com acento e maiúsculas), pra exibir na
+    // página do produto sem depender de uma lista fixa no código.
     const slug = generateSlug(newName);
-    setFormData(prev => ({ ...prev, collection: slug }));
+    setFormData(prev => ({ ...prev, collection: slug, collection_name: newName }));
   };
 
   // 🆕 FUNÇÃO PARA LIDAR COM TAGS
@@ -443,6 +453,24 @@ function NewProductContent() {
             />
             <small style={{ color: 'var(--text-secondary)', fontSize: '12px', display: 'block', marginTop: '4px' }}>
               O código de barras impresso na embalagem do produto. Usado no feed do Google Merchant Center. Deixe em branco se não tiver à mão.
+            </small>
+          </div>
+
+          {/* 🆕 DESCRIÇÃO */}
+          <div>
+            <label style={labelStyle}>
+              Descrição do Produto
+            </label>
+            <textarea
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              rows={6}
+              style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit', minHeight: 140 }}
+              placeholder="Texto que aparece na página individual do produto..."
+            />
+            <small style={{ color: 'var(--text-secondary)', fontSize: '12px', display: 'block', marginTop: '4px' }}>
+              {formData.description.length} caracteres
             </small>
           </div>
 

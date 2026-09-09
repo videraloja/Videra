@@ -78,16 +78,8 @@ const emergencyComponentStyles: ComponentStyles = {
     salePrice: { color: '#dc2626', fontSize: '32px', fontWeight: '700' },
     stockInfo: { color: '#6b7280', fontSize: '15px', fontWeight: '500' },
     description: { color: '#6b7280', fontSize: '15px', fontWeight: '400' },
-    collectionName: { color: '#7c3aed', fontSize: '13px', fontWeight: '600' },
-    brandBadge: {
-      backgroundColor: '#ede9fe',
-      textColor: '#5b21b6',
-      position: 'left' as const,
-      fontSize: '13px',
-      fontWeight: '700',
-      borderRadius: '8px',
-      padding: '6px 12px'
-    },
+    collectionLine: { labelColor: '#6b7280', valueColor: '#1f2937', fontSize: '14px', fontWeight: '500' },
+    brandLine: { labelColor: '#6b7280', valueColor: '#1f2937', fontSize: '14px', fontWeight: '500' },
     preorderBadge: {
       backgroundColor: '#f3e8ff',
       textColor: '#7c3aed',
@@ -100,14 +92,31 @@ const emergencyComponentStyles: ComponentStyles = {
       disabledBackgroundColor: '#9ca3af'
     },
     backButton: {
-      backgroundColor: '#ffffff',
-      textColor: '#1f2937',
-      size: '40px'
+      backgroundColor: 'transparent',
+      textColor: '#7c3aed',
+      borderColor: '#7c3aed'
     },
     galleryThumbnailBorderColor: '#e5e7eb',
     galleryThumbnailActiveBorderColor: '#7c3aed'
   }
 };
+
+// Mescla com os padrões em vez de substituir — um tema salvo antes de um campo
+// novo existir (ex.: collectionLine/brandLine, ou backButton sem borderColor)
+// não pode quebrar a página; os campos que faltam caem no padrão.
+export function mergeDetailStyles(raw: Partial<ProductDetailStyles> | undefined | null): ProductDetailStyles {
+  const defaults = emergencyComponentStyles.productDetail!;
+  if (!raw) return defaults;
+  return {
+    ...defaults,
+    ...raw,
+    collectionLine: raw.collectionLine || defaults.collectionLine,
+    brandLine: raw.brandLine || defaults.brandLine,
+    preorderBadge: raw.preorderBadge ? { ...defaults.preorderBadge, ...raw.preorderBadge } : defaults.preorderBadge,
+    addToCart: raw.addToCart ? { ...defaults.addToCart, ...raw.addToCart } : defaults.addToCart,
+    backButton: raw.backButton ? { ...defaults.backButton, ...raw.backButton } : defaults.backButton,
+  };
+}
 
 export const useThemeColors = () => {
   const themeContext = useContext(ThemeContext);
@@ -343,7 +352,8 @@ export const useThemeColors = () => {
   };
 
   const getDetailStyles = (usePageTheme: boolean = true): ProductDetailStyles => {
-    return getComponentStyles('productDetail', usePageTheme) as ProductDetailStyles;
+    const raw = getComponentStyles('productDetail', usePageTheme) as Partial<ProductDetailStyles> | undefined;
+    return mergeDetailStyles(raw);
   };
 
   const applyDetailStyles = (

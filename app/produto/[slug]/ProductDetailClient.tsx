@@ -116,6 +116,10 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
   const categoryRoute = currentProduct.category ? CATEGORY_ROUTES[currentProduct.category] : undefined;
   const isPreorder = (currentProduct as any).is_preorder;
   const backHref = categoryRoute?.path || '/';
+  // Nome digitado no admin (com acento/maiúsculas) tem prioridade; a lista fixa de
+  // lib/collections só cobre produtos antigos que nunca tiveram collection_name salvo.
+  const collectionDisplayName = currentProduct.collection_name
+    || (currentProduct.collection ? getCollectionName(currentProduct.collection) : undefined);
 
   // Capa sempre em primeiro — é o que alimenta vitrine/feed/carrinho/og:image, e
   // aqui também é sempre a primeira imagem mostrada. As extras (gallery_urls) só
@@ -159,40 +163,28 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
       <Header />
 
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '20px' }}>
-        {/* Voltar + Breadcrumb */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
+        {/* Voltar — pílula alinhada à direita, fácil de alcançar com o polegar no celular */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '24px' }}>
           <Link
             href={backHref}
-            aria-label="Voltar"
             style={{
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: detailStyles.backButton.size,
-              height: detailStyles.backButton.size,
-              minWidth: detailStyles.backButton.size,
-              borderRadius: '50%',
+              minHeight: '44px',
+              padding: '8px 16px',
               background: detailStyles.backButton.backgroundColor,
               color: detailStyles.backButton.textColor,
+              border: `1px solid ${detailStyles.backButton.borderColor}`,
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '600',
               textDecoration: 'none',
-              boxShadow: getShadow('small'),
-              fontSize: '18px',
-              flexShrink: 0,
+              whiteSpace: 'nowrap',
             }}
           >
-            ←
+            ↩ Voltar
           </Link>
-          <nav style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontSize: '14px', color: colors.text, opacity: 0.75 }}>
-            <Link href="/" style={{ color: 'inherit', textDecoration: 'none' }}>Início</Link>
-            {categoryRoute && (
-              <>
-                <span>›</span>
-                <Link href={categoryRoute.path} style={{ color: 'inherit', textDecoration: 'none' }}>{categoryRoute.label}</Link>
-              </>
-            )}
-            <span>›</span>
-            <span style={{ opacity: 0.6 }}>{currentProduct.name}</span>
-          </nav>
         </div>
 
         {/* Detalhe do produto */}
@@ -269,23 +261,6 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {brandName && (
-              <div style={{ marginBottom: '12px' }}>
-                <span style={{
-                  ...applyDetailStyles('brandBadge', {
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '6px 12px',
-                    borderRadius: '8px',
-                    width: 'fit-content',
-                  })
-                }}>
-                  ✓ {brandName}
-                </span>
-              </div>
-            )}
-
             <h1 style={{
               ...applyDetailStyles('productName', { lineHeight: '1.3', marginBottom: '8px' }),
               fontSize: `clamp(1.5rem, 3vw, ${detailStyles.productName.fontSize || '36px'})`,
@@ -293,10 +268,29 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
               {currentProduct.name}
             </h1>
 
-            {currentProduct.collection && (
-              <p style={{ ...applyDetailStyles('collectionName', { marginBottom: '16px' }) }}>
-                {getCollectionName(currentProduct.collection)}
-              </p>
+            {(collectionDisplayName || brandName) && (
+              <div style={{ marginBottom: '16px' }}>
+                {collectionDisplayName && (
+                  <p style={{
+                    margin: 0,
+                    fontSize: detailStyles.collectionLine.fontSize || '14px',
+                    fontWeight: (detailStyles.collectionLine.fontWeight as any) || '500',
+                  }}>
+                    <span style={{ color: detailStyles.collectionLine.labelColor }}>Coleção: </span>
+                    <span style={{ color: detailStyles.collectionLine.valueColor }}>{collectionDisplayName}</span>
+                  </p>
+                )}
+                {brandName && (
+                  <p style={{
+                    margin: collectionDisplayName ? '2px 0 0 0' : 0,
+                    fontSize: detailStyles.brandLine.fontSize || '14px',
+                    fontWeight: (detailStyles.brandLine.fontWeight as any) || '500',
+                  }}>
+                    <span style={{ color: detailStyles.brandLine.labelColor }}>Marca: </span>
+                    <span style={{ color: detailStyles.brandLine.valueColor }}>{brandName}</span>
+                  </p>
+                )}
+              </div>
             )}
 
             <div style={{ marginBottom: '20px' }}>

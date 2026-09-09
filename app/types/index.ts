@@ -13,6 +13,7 @@ export interface Product {
   category?: string;
   product_type?: string;
   collection?: string;
+  collection_name?: string;
   rarity?: string;
   description?: string;
   tags?: string[];
@@ -99,6 +100,14 @@ export interface ProductCardStyles {
   border?: string;
 }
 
+// Linha simples "Rótulo: valor" (Coleção / Marca) — texto puro, sem fundo/borda/ícone.
+export interface ProductDetailInfoLineStyles {
+  labelColor: string;
+  valueColor: string;
+  fontSize?: string;
+  fontWeight?: string;
+}
+
 export interface ProductDetailStyles {
   productName: ProductCardTextStyles;
   price: ProductCardTextStyles;
@@ -106,10 +115,10 @@ export interface ProductDetailStyles {
   salePrice: ProductCardTextStyles;
   stockInfo: ProductCardTextStyles;
   description: ProductCardTextStyles;
-  collectionName: ProductCardTextStyles;
 
-  // 🏷️ MARCA (sinal de confiança — tratada como destaque, não texto solto)
-  brandBadge: ProductCardBadgeStyles;
+  // Linhas "Coleção: X" / "Marca: Y" — cada uma só aparece quando o produto tem valor.
+  collectionLine: ProductDetailInfoLineStyles;
+  brandLine: ProductDetailInfoLineStyles;
 
   // 📦 TARJA DE PRÉ-VENDA
   preorderBadge: {
@@ -120,11 +129,12 @@ export interface ProductDetailStyles {
 
   addToCart: ProductCardButtonStyles;
 
-  // ⬅️ BOTÃO VOLTAR (leva pra categoria do produto, nunca histórico do navegador)
+  // ⬅️ BOTÃO VOLTAR (pílula com borda, leva pra categoria do produto — nunca
+  // histórico do navegador)
   backButton: {
     backgroundColor: string;
     textColor: string;
-    size: string;
+    borderColor: string;
   };
 
   // 🖼️ GALERIA DE IMAGENS (miniaturas extras, só aparece quando o produto tem)

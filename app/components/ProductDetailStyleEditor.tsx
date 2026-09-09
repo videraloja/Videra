@@ -8,6 +8,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useThemeEditor } from '../contexts/ThemeEditorContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { ProductDetailStyles } from '../types';
+import { mergeDetailStyles } from '@/hooks/useThemeColors';
 
 const fontWeightOptions = [
   { value: '400', label: 'Normal' },
@@ -17,22 +18,12 @@ const fontWeightOptions = [
   { value: '800', label: 'Extra Bold' }
 ];
 
-function getDefaultDetailStyles(): ProductDetailStyles {
-  return {
-    productName: { color: '#1f2937', fontSize: '32px', fontWeight: '700' },
-    price: { color: '#059669', fontSize: '32px', fontWeight: '700' },
-    originalPrice: { color: '#6b7280', fontSize: '18px', fontWeight: '500', strikethrough: true },
-    salePrice: { color: '#dc2626', fontSize: '32px', fontWeight: '700' },
-    stockInfo: { color: '#6b7280', fontSize: '15px', fontWeight: '500' },
-    description: { color: '#6b7280', fontSize: '15px', fontWeight: '400' },
-    collectionName: { color: '#7c3aed', fontSize: '13px', fontWeight: '600' },
-    brandBadge: { backgroundColor: '#ede9fe', textColor: '#5b21b6', position: 'left', fontSize: '13px', fontWeight: '700', borderRadius: '8px', padding: '6px 12px' },
-    preorderBadge: { backgroundColor: '#f3e8ff', textColor: '#7c3aed', borderColor: '#e9d5ff' },
-    addToCart: { backgroundColor: '#7c3aed', textColor: '#ffffff', hoverBackgroundColor: '#6d28d9', disabledBackgroundColor: '#9ca3af' },
-    backButton: { backgroundColor: '#ffffff', textColor: '#1f2937', size: '40px' },
-    galleryThumbnailBorderColor: '#e5e7eb',
-    galleryThumbnailActiveBorderColor: '#7c3aed'
-  };
+// Sempre mescla com os padrões (nunca usa um productDetail salvo cru): um tema
+// salvo com o formato antigo (de antes de collectionLine/brandLine existirem)
+// não pode quebrar o editor — os campos que faltam caem no padrão, e ao salvar
+// de novo o tema já sai migrado pro formato atual.
+function getDefaultDetailStyles(raw?: Partial<ProductDetailStyles> | null): ProductDetailStyles {
+  return mergeDetailStyles(raw);
 }
 
 export function ProductDetailStyleEditor() {
@@ -58,7 +49,7 @@ export function ProductDetailStyleEditor() {
           ...themeToLoad,
           componentStyles: {
             ...(themeToLoad.componentStyles || {}),
-            productDetail: themeToLoad.componentStyles?.productDetail || getDefaultDetailStyles()
+            productDetail: getDefaultDetailStyles(themeToLoad.componentStyles?.productDetail)
           }
         });
         setIsInitialized(true);
@@ -74,7 +65,7 @@ export function ProductDetailStyleEditor() {
         ...theme,
         componentStyles: {
           ...(theme.componentStyles || {}),
-          productDetail: theme.componentStyles?.productDetail || getDefaultDetailStyles()
+          productDetail: getDefaultDetailStyles(theme.componentStyles?.productDetail)
         }
       });
     }
@@ -102,7 +93,7 @@ export function ProductDetailStyleEditor() {
     );
   }
 
-  const styles: ProductDetailStyles = editorState.draftTheme?.componentStyles?.productDetail || getDefaultDetailStyles();
+  const styles: ProductDetailStyles = getDefaultDetailStyles(editorState.draftTheme?.componentStyles?.productDetail);
 
   const ColorControl = ({ label, value, property }: { label: string; value: string; property: string }) => (
     <div style={{ marginBottom: '12px' }}>
@@ -191,16 +182,34 @@ export function ProductDetailStyleEditor() {
           <ColorControl label="Cor (preço riscado)" value={styles.originalPrice.color} property="originalPrice.color" />
           <FontSizeControl label="Tamanho" value={styles.price.fontSize || '32px'} property="price.fontSize" />
 
-          <h5 style={{ fontSize: '13px', color: '#4b5563', marginBottom: '8px', fontWeight: 600, marginTop: '16px' }}>Coleção e Descrição</h5>
-          <ColorControl label="Cor da Coleção" value={styles.collectionName.color} property="collectionName.color" />
+          <h5 style={{ fontSize: '13px', color: '#4b5563', marginBottom: '8px', fontWeight: 600, marginTop: '16px' }}>Descrição e Estoque</h5>
           <ColorControl label="Cor da Descrição" value={styles.description.color} property="description.color" />
           <ColorControl label="Cor do Estoque" value={styles.stockInfo.color} property="stockInfo.color" />
         </ExpandableSection>
 
-        <ExpandableSection title="Marca" icon="🏷️" sectionKey="brand">
-          <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '12px' }}>Selo de marca/fabricante — mostrado só quando o produto tem marca conhecida.</p>
-          <ColorControl label="Fundo" value={styles.brandBadge.backgroundColor} property="brandBadge.backgroundColor" />
-          <ColorControl label="Texto" value={styles.brandBadge.textColor} property="brandBadge.textColor" />
+        <ExpandableSection title="Coleção e Marca" icon="🏷️" sectionKey="brand">
+          <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '12px' }}>Duas linhas de texto simples ("Coleção: X" / "Marca: Y"), cada uma só aparece quando o produto tem o valor preenchido.</p>
+          <h5 style={{ fontSize: '13px', color: '#4b5563', marginBottom: '8px', fontWeight: 600 }}>Linha "Coleção:"</h5>
+          <ColorControl label="Cor do rótulo (Coleção:)" value={styles.collectionLine.labelColor} property="collectionLine.labelColor" />
+          <ColorControl label="Cor do valor" value={styles.collectionLine.valueColor} property="collectionLine.valueColor" />
+          <FontSizeControl label="Tamanho" value={styles.collectionLine.fontSize || '14px'} property="collectionLine.fontSize" />
+          <SelectControl
+            label="Peso da fonte"
+            value={styles.collectionLine.fontWeight || '500'}
+            onChange={(v) => updateStyle('collectionLine.fontWeight', v)}
+            options={fontWeightOptions}
+          />
+
+          <h5 style={{ fontSize: '13px', color: '#4b5563', marginBottom: '8px', fontWeight: 600, marginTop: '16px' }}>Linha "Marca:"</h5>
+          <ColorControl label="Cor do rótulo (Marca:)" value={styles.brandLine.labelColor} property="brandLine.labelColor" />
+          <ColorControl label="Cor do valor" value={styles.brandLine.valueColor} property="brandLine.valueColor" />
+          <FontSizeControl label="Tamanho" value={styles.brandLine.fontSize || '14px'} property="brandLine.fontSize" />
+          <SelectControl
+            label="Peso da fonte"
+            value={styles.brandLine.fontWeight || '500'}
+            onChange={(v) => updateStyle('brandLine.fontWeight', v)}
+            options={fontWeightOptions}
+          />
         </ExpandableSection>
 
         <ExpandableSection title="Tarja de Pré-venda" icon="📦" sectionKey="preorder">
@@ -216,16 +225,11 @@ export function ProductDetailStyleEditor() {
           <ColorControl label="Fundo (desabilitado)" value={styles.addToCart.disabledBackgroundColor} property="addToCart.disabledBackgroundColor" />
         </ExpandableSection>
 
-        <ExpandableSection title="Botão Voltar" icon="⬅️" sectionKey="back">
-          <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '12px' }}>Leva sempre para a categoria do produto (ou início, se não tiver categoria).</p>
+        <ExpandableSection title="Botão Voltar" icon="↩️" sectionKey="back">
+          <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '12px' }}>Pílula "↩ Voltar", alinhada à direita da tela. Leva sempre para a categoria do produto (ou início, se não tiver categoria).</p>
           <ColorControl label="Fundo" value={styles.backButton.backgroundColor} property="backButton.backgroundColor" />
-          <ColorControl label="Ícone" value={styles.backButton.textColor} property="backButton.textColor" />
-          <SelectControl
-            label="Tamanho"
-            value={styles.backButton.size}
-            onChange={(v) => updateStyle('backButton.size', v)}
-            options={[{ value: '32px', label: 'Pequeno (32px)' }, { value: '40px', label: 'Médio (40px)' }, { value: '48px', label: 'Grande (48px)' }]}
-          />
+          <ColorControl label="Texto" value={styles.backButton.textColor} property="backButton.textColor" />
+          <ColorControl label="Borda" value={styles.backButton.borderColor} property="backButton.borderColor" />
         </ExpandableSection>
 
         <ExpandableSection title="Galeria de Imagens" icon="🖼️" sectionKey="gallery">
@@ -244,11 +248,18 @@ export function ProductDetailStyleEditor() {
 
       <div style={{ backgroundColor: '#ffffff', padding: '32px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
         <p style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '16px' }}>Pré-visualização simplificada — abra a página de um produto real pra ver o resultado completo.</p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-          <div style={{ width: styles.backButton.size, height: styles.backButton.size, borderRadius: '50%', background: styles.backButton.backgroundColor, color: styles.backButton.textColor, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e5e7eb' }}>←</div>
-          <span style={{ backgroundColor: styles.brandBadge.backgroundColor, color: styles.brandBadge.textColor, padding: '6px 12px', borderRadius: '8px', fontSize: styles.brandBadge.fontSize, fontWeight: styles.brandBadge.fontWeight as any }}>Marca Exemplo</span>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', minHeight: '44px', padding: '8px 16px', background: styles.backButton.backgroundColor, color: styles.backButton.textColor, border: `1px solid ${styles.backButton.borderColor}`, borderRadius: '8px', fontSize: '14px', fontWeight: 600 }}>↩ Voltar</span>
         </div>
-        <h1 style={{ color: styles.productName.color, fontSize: styles.productName.fontSize, fontWeight: styles.productName.fontWeight as any, marginBottom: '12px' }}>Produto de Exemplo</h1>
+        <h1 style={{ color: styles.productName.color, fontSize: styles.productName.fontSize, fontWeight: styles.productName.fontWeight as any, marginBottom: '8px' }}>Produto de Exemplo</h1>
+        <p style={{ margin: '0 0 4px 0', fontSize: styles.collectionLine.fontSize, fontWeight: styles.collectionLine.fontWeight as any }}>
+          <span style={{ color: styles.collectionLine.labelColor }}>Coleção: </span>
+          <span style={{ color: styles.collectionLine.valueColor }}>Coleção Exemplo</span>
+        </p>
+        <p style={{ margin: '0 0 16px 0', fontSize: styles.brandLine.fontSize, fontWeight: styles.brandLine.fontWeight as any }}>
+          <span style={{ color: styles.brandLine.labelColor }}>Marca: </span>
+          <span style={{ color: styles.brandLine.valueColor }}>Marca Exemplo</span>
+        </p>
         <div style={{ color: styles.price.color, fontSize: styles.price.fontSize, fontWeight: styles.price.fontWeight as any, marginBottom: '16px' }}>R$ 99,90</div>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: styles.preorderBadge.backgroundColor, color: styles.preorderBadge.textColor, border: `1px solid ${styles.preorderBadge.borderColor}`, padding: '10px 16px', borderRadius: '10px', marginBottom: '16px' }}>
           📦 Pré-venda

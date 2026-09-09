@@ -8,6 +8,7 @@ import ThemeToggle from "@/app/components/ThemeToggle";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { getPokemonCollectionsForAdmin } from '@/lib/collections';
 import { compressImage, formatFileSize } from '@/lib/imageCompression';
+import { revalidateProductPages } from '@/lib/revalidateProduct';
 
 interface Product {
   id: number;
@@ -60,10 +61,12 @@ function EditProductContent() {
     category: "",
     product_type: "",
     collection: "",
+    collection_name: "",
     rarity: "",
     card_set: "",
     brand: "",
     gtin: "",
+    description: "",
     tags: [] as string[],
     // 🆕 CAMPOS PARA PROMOÇÕES
     on_sale: false,
@@ -103,10 +106,12 @@ function EditProductContent() {
             category: data.category || "",
             product_type: data.product_type || "",
             collection: data.collection || "",
+            collection_name: data.collection_name || "",
             rarity: data.rarity || "",
             card_set: data.card_set || "",
             brand: data.brand || "",
             gtin: data.gtin || "",
+            description: data.description || "",
             tags: data.tags || [],
             // 🆕 CAMPOS PARA PROMOÇÕES
             on_sale: data.on_sale || false,
@@ -116,6 +121,7 @@ function EditProductContent() {
           });
           setPreviewUrl(data.image_url || "");
           setGalleryUrls(data.gallery_urls || []);
+          setCollectionName(data.collection_name || (data.collection ? deriveCollectionDisplayName(data.collection) : ''));
         }
       } catch (error: any) {
         const isAbortError = error.name === 'AbortError' || (error.message && error.message.includes('AbortError'));
@@ -166,21 +172,14 @@ function EditProductContent() {
     }
   };
 
-  // 🆕 Efeito para popular o nome da coleção quando o produto é carregado
-  useEffect(() => {
-    if (formData.collection) {
-      const collections = getPokemonCollectionsForAdmin();
-      const currentCollection = collections.find(c => c.id === formData.collection);
-      if (currentCollection) {
-        setCollectionName(currentCollection.name);
-      } else {
-        const deSlugifiedName = formData.collection.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-        setCollectionName(deSlugifiedName);
-      }
-    } else {
-      setCollectionName('');
-    }
-  }, [formData.collection]);
+  // Deriva um nome de exibição a partir do slug — só usado como último recurso,
+  // pra produtos antigos que não têm collection_name preenchido ainda.
+  const deriveCollectionDisplayName = (collectionSlug: string): string => {
+    const collections = getPokemonCollectionsForAdmin();
+    const known = collections.find(c => c.id === collectionSlug);
+    if (known) return known.name;
+    return collectionSlug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+  };
 
   // 🆕 FUNÇÃO PARA CALCULAR DESCONTO AUTOMATICAMENTE
   const calculateDiscount = () => {
@@ -337,9 +336,11 @@ function EditProductContent() {
     const newName = e.target.value;
     setCollectionName(newName);
 
-    // Atualiza o ID da coleção (slug) no formulário
+    // Slug (collection) é só o identificador técnico; collection_name guarda o
+    // nome exatamente como digitado (com acento e maiúsculas), pra exibir na
+    // página do produto sem depender de uma lista fixa no código.
     const slug = generateSlug(newName);
-    setFormData(prev => ({ ...prev, collection: slug }));
+    setFormData(prev => ({ ...prev, collection: slug, collection_name: newName }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -362,10 +363,12 @@ function EditProductContent() {
         category: formData.category || null,
         product_type: formData.product_type || null,
         collection: formData.collection || null,
+        collection_name: formData.collection_name || null,
         rarity: formData.rarity || null,
         card_set: formData.card_set || null,
         brand: formData.brand || null,
         gtin: formData.gtin || null,
+        description: formData.description || null,
         tags: formData.tags.length > 0 ? formData.tags : null,
         // 🆕 DADOS DE PROMOÇÃO
         on_sale: formData.on_sale,
@@ -383,6 +386,9 @@ function EditProductContent() {
 
       if (error) throw error;
 
+      // Não bloqueia nem quebra o salvamento se falhar — só loga.
+      await revalidateProductPages(slug, formData.category);
+
       alert("Produto atualizado com sucesso!");
       router.back();
 
@@ -395,7 +401,7 @@ function EditProductContent() {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     
     if (type === 'checkbox') {
@@ -641,6 +647,24 @@ function EditProductContent() {
             />
             <small style={{ color: 'var(--text-secondary)', fontSize: '12px', display: 'block', marginTop: '4px' }}>
               O código de barras impresso na embalagem do produto. Usado no feed do Google Merchant Center. Deixe em branco se não tiver à mão.
+            </small>
+          </div>
+
+          {/* 🆕 DESCRIÇÃO */}
+          <div>
+            <label style={labelStyle}>
+              Descrição do Produto
+            </label>
+            <textarea
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              rows={6}
+              style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit', minHeight: 140 }}
+              placeholder="Texto que aparece na página individual do produto..."
+            />
+            <small style={{ color: 'var(--text-secondary)', fontSize: '12px', display: 'block', marginTop: '4px' }}>
+              {formData.description.length} caracteres
             </small>
           </div>
 
