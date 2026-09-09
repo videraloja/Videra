@@ -6,7 +6,13 @@ import { ThemeConfig, ComponentStyles, BackgroundImage } from '@/app/types';
 // CACHE EM MEMÓRIA (evita buscas repetidas)
 // ============================================
 const themeCache = new Map<string, { theme: ThemeConfig; timestamp: number }>();
-const CACHE_TTL = 2000; // 2 segundos
+// Fora do admin, o tema não é mais buscado num intervalo fixo (ver
+// hooks/useThemeColors.ts) — só uma vez ao montar e ao voltar o foco da aba,
+// no máximo 1x a cada 5min. O TTL do cache acompanha essa janela: 2s fazia
+// sentido quando havia um poll de 10 em 10 segundos batendo nele; sem esse
+// poll, 2s não protege nada. saveTheme() já invalida o cache na hora (abaixo),
+// então uma edição no admin nunca fica presa atrás desse TTL.
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
 
 function getCachedTheme(key: string): ThemeConfig | null {
   const cached = themeCache.get(key);

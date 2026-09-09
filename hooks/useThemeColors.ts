@@ -91,10 +91,9 @@ const emergencyComponentStyles: ComponentStyles = {
       hoverBackgroundColor: '#6d28d9',
       disabledBackgroundColor: '#9ca3af'
     },
-    backButton: {
-      backgroundColor: 'transparent',
-      textColor: '#7c3aed',
-      borderColor: '#7c3aed'
+    navIcons: {
+      backgroundColor: '#ffffff',
+      iconColor: '#1f2937',
     },
     galleryThumbnailBorderColor: '#e5e7eb',
     galleryThumbnailActiveBorderColor: '#7c3aed'
@@ -102,8 +101,8 @@ const emergencyComponentStyles: ComponentStyles = {
 };
 
 // Mescla com os padrões em vez de substituir — um tema salvo antes de um campo
-// novo existir (ex.: collectionLine/brandLine, ou backButton sem borderColor)
-// não pode quebrar a página; os campos que faltam caem no padrão.
+// novo existir (ex.: collectionLine/brandLine, ou o antigo backButton que
+// virou navIcons) não pode quebrar a página; os campos que faltam caem no padrão.
 export function mergeDetailStyles(raw: Partial<ProductDetailStyles> | undefined | null): ProductDetailStyles {
   const defaults = emergencyComponentStyles.productDetail!;
   if (!raw) return defaults;
@@ -114,7 +113,7 @@ export function mergeDetailStyles(raw: Partial<ProductDetailStyles> | undefined 
     brandLine: raw.brandLine || defaults.brandLine,
     preorderBadge: raw.preorderBadge ? { ...defaults.preorderBadge, ...raw.preorderBadge } : defaults.preorderBadge,
     addToCart: raw.addToCart ? { ...defaults.addToCart, ...raw.addToCart } : defaults.addToCart,
-    backButton: raw.backButton ? { ...defaults.backButton, ...raw.backButton } : defaults.backButton,
+    navIcons: raw.navIcons ? { ...defaults.navIcons, ...raw.navIcons } : defaults.navIcons,
   };
 }
 
@@ -127,28 +126,20 @@ export const useThemeColors = () => {
   const [lastUpdate, setLastUpdate] = useState<number>(Date.now());
 
   // REFS PARA CONTROLE
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const previousThemeId = useRef<string | null>(null);
   const fetching = useRef(false);
   const lastFetchTime = useRef(0);
   const lastFetchedPage = useRef<string>('');
   // Sempre aponta pra versão mais recente de fetchEffectiveTheme (que muda de
-  // identidade quando currentPageId muda). O efeito de polling abaixo só
-  // monta o setInterval UMA vez (depende só de isMounted) — sem esse ref, a
-  // chamada inicial e o intervalo de 10s ficavam presos pra sempre com o
-  // currentPageId de quando a página abriu, ignorando qualquer mudança
-  // posterior (ex.: quando a página de produto define o tema da categoria).
+  // identidade quando currentPageId muda) — sem esse ref, a revalidação por
+  // foco/visibilidade abaixo ficava presa pra sempre com o currentPageId de
+  // quando a página abriu, ignorando qualquer mudança posterior (ex.: quando
+  // a página de produto define o tema da categoria).
   const fetchEffectiveThemeRef = useRef<(forceRefresh?: boolean) => Promise<void>>(async () => {});
 
   // MONTA/DESMONTA
   useEffect(() => {
     setIsMounted(true);
-    return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
-      }
-    };
   }, []);
 
   // FUNÇÃO PRINCIPAL OTIMIZADA - evita buscas repetidas
@@ -195,33 +186,37 @@ export const useThemeColors = () => {
     fetchEffectiveThemeRef.current = fetchEffectiveTheme;
   }, [fetchEffectiveTheme]);
 
-  // INICIAR POLLING (APENAS UMA VEZ)
+  // FORA DO ADMIN: sem intervalo fixo. A busca inicial fica por conta do
+  // efeito "ATUALIZA QUANDO A PÁGINA MUDA" logo abaixo (reage direto a
+  // currentPageId, sem closure presa). Aqui só revalida quando a aba volta a
+  // ficar em foco/visível — no máximo 1x a cada 5 minutos, pra não gerar
+  // rajada se o cliente ficar trocando de aba. Uma loja onde o tema muda uma
+  // vez por mês não precisa reconsultar o Supabase a cada 10s por aba aberta
+  // (medido: 36 requisições/minuto/aba, sem nenhuma proteção de cache real,
+  // já que o TTL de então — 2s — era menor que o próprio intervalo).
+  // DENTRO do admin, esse efeito nem chega a rodar (return abaixo) — o admin
+  // nunca usou esse polling, ele edita a partir do draft local do editor.
   useEffect(() => {
     if (!isMounted) return;
 
     const currentPage = pageThemeContext?.currentPageId || window.location.pathname;
-
     if (currentPage.startsWith('/admin')) return;
 
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-    }
-
-    // A busca inicial fica só por conta do efeito "ATUALIZA QUANDO A PÁGINA
-    // MUDA" abaixo (reage direto a currentPageId, sem closure presa) — chamar
-    // aqui também competia com aquele, e como os dois rodam quase juntos no
-    // mount, essa chamada (com o currentPageId de quando a página abriu,
-    // antes de qualquer override de tema aplicar) marcava fetching.current
-    // e fazia o outro efeito ser silenciosamente ignorado.
-    pollingRef.current = setInterval(() => {
+    let lastRefresh = Date.now();
+    const maybeRefresh = () => {
+      if (document.visibilityState !== 'visible') return;
+      const now = Date.now();
+      if (now - lastRefresh < 5 * 60 * 1000) return;
+      lastRefresh = now;
       fetchEffectiveThemeRef.current(true);
-    }, 10000);
+    };
+
+    window.addEventListener('focus', maybeRefresh);
+    document.addEventListener('visibilitychange', maybeRefresh);
 
     return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
-      }
+      window.removeEventListener('focus', maybeRefresh);
+      document.removeEventListener('visibilitychange', maybeRefresh);
     };
   }, [isMounted]);
 
@@ -448,12 +443,6 @@ export const useThemeColors = () => {
     getCurrentTheme: () => effectiveTheme,
     refreshTheme: fetchEffectiveTheme,
     forceRefreshTheme,
-    stopPolling: () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
-      }
-    }
   };
 };
 

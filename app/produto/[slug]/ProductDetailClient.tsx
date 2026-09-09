@@ -3,8 +3,10 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import Header from '@/app/components/Header';
 import Carousel from '@/app/components/Carousel';
+import SearchField from '@/app/components/SearchField';
 import { Product } from '@/app/types';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useStock } from '@/hooks/useStock';
@@ -16,6 +18,7 @@ import { CarouselConfig } from '@/app/types';
 import { getCollectionName } from '@/lib/collections';
 import { CATEGORY_ROUTES } from '@/lib/categoryRoutes';
 import { usePageTheme } from '@/app/contexts/PageThemeContext';
+import { supabase } from '@/lib/supabaseClient';
 
 // Fallback usado enquanto a config de aparência não chegou do banco (ou pra quando
 // ainda não existe uma linha salva) — mesmos valores que já estavam hardcoded aqui.
@@ -47,6 +50,40 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
   const { colors, getCategoryConfig, applyDetailStyles, getDetailStyles, getShadow } = useThemeColors();
   const { setPageIdOverride } = usePageTheme();
   const { stockLabel } = useStock();
+  const router = useRouter();
+
+  // Overlay de busca — reaproveita o SearchField (mesmo campo do Header),
+  // mas em vez de filtrar uma lista já carregada (o que o Header faz nas
+  // outras páginas), busca direto no banco: a página de produto não tem uma
+  // lista de produtos carregada pra filtrar localmente.
+  const [showSearchOverlay, setShowSearchOverlay] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<{ id: number; name: string; slug: string; image_url: string; price: number }[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    const term = searchQuery.trim();
+    if (term.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    setSearching(true);
+    const timeout = setTimeout(async () => {
+      const { data } = await supabase
+        .from('products')
+        .select('id, name, slug, image_url, price')
+        .ilike('name', `%${term}%`)
+        .limit(6);
+      setSearchResults(data || []);
+      setSearching(false);
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [searchQuery]);
+
+  const handleSearchEnter = (value: string) => {
+    if (!value) return;
+    router.push(`/?q=${encodeURIComponent(value)}`);
+  };
   const { addToCart, isInCart, getItemQuantity } = useCartContext();
   // [product] cru recriava um array novo a cada render, quebrando a comparação
   // de dependência do useEffect dentro de useAvailableStock e disparando um
@@ -218,6 +255,51 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
     setShareUrl(`https://wa.me/?text=${encodeURIComponent(text)}`);
   }, [currentProduct.name]);
 
+  // Ícone redondo compartilhado — mesmo componente pra barra fixa mobile
+  // (translúcido/sólido conforme rolagem) e pro botão de voltar do desktop
+  // (sempre sólido). Usa a imagem enviada no editor; sem imagem, cai no SVG
+  // padrão de cada um.
+  const NavIcon = ({
+    kind, onClick, href, target, translucent, ariaLabel,
+  }: {
+    kind: 'back' | 'search' | 'share';
+    onClick?: () => void;
+    href?: string;
+    target?: string;
+    translucent: boolean;
+    ariaLabel: string;
+  }) => {
+    const uploadedUrl = kind === 'back' ? detailStyles.navIcons.backIconUrl
+      : kind === 'search' ? detailStyles.navIcons.searchIconUrl
+      : detailStyles.navIcons.shareIconUrl;
+
+    const content = uploadedUrl ? (
+      <Image src={uploadedUrl} alt={ariaLabel} width={22} height={22} style={{ objectFit: 'contain' }} />
+    ) : kind === 'back' ? (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
+    ) : kind === 'search' ? (
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+    ) : (
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8a3 3 0 1 0-2.83-4M18 8a3 3 0 0 1-2.83-4M6 15a3 3 0 1 0 0-6M18 22a3 3 0 1 0-2.83-4M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98" /></svg>
+    );
+
+    const commonStyle: React.CSSProperties = {
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      width: '44px', height: '44px', borderRadius: '50%',
+      background: translucent ? 'rgba(0,0,0,0.35)' : detailStyles.navIcons.backgroundColor,
+      color: translucent ? '#ffffff' : detailStyles.navIcons.iconColor,
+      textDecoration: 'none', flexShrink: 0, border: 'none', cursor: 'pointer',
+    };
+
+    if (onClick) {
+      return <button type="button" onClick={onClick} aria-label={ariaLabel} style={commonStyle}>{content}</button>;
+    }
+    if (target) {
+      return <a href={href} target={target} rel="noopener noreferrer" aria-label={ariaLabel} style={commonStyle}>{content}</a>;
+    }
+    return <Link href={href || '/'} aria-label={ariaLabel} style={commonStyle}>{content}</Link>;
+  };
+
   return (
     <div style={{ minHeight: '100vh', background: colors.background, color: colors.text, display: 'flex', flexDirection: 'column' }}>
       {/* Barra fixa — só mobile (ver CSS .pd-mobile-bar). Some acima de tudo,
@@ -240,77 +322,90 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
           transition: 'background 0.25s ease, box-shadow 0.25s ease',
         }}
       >
-        <Link
-          href={backHref}
-          aria-label="Voltar"
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: '44px', height: '44px', borderRadius: '50%',
-            background: isBarSolid ? 'transparent' : 'rgba(0,0,0,0.35)',
-            color: isBarSolid ? colors.text : '#ffffff',
-            textDecoration: 'none', fontSize: '20px', flexShrink: 0,
-          }}
-        >
-          ←
-        </Link>
-        <Link
-          href="/"
-          aria-label="Buscar"
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: '44px', height: '44px', borderRadius: '50%',
-            background: isBarSolid ? 'transparent' : 'rgba(0,0,0,0.35)',
-            color: isBarSolid ? colors.text : '#ffffff',
-            textDecoration: 'none', fontSize: '18px', flexShrink: 0,
-          }}
-        >
-          🔍
-        </Link>
-        <a
-          href={shareUrl || '#'}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Compartilhar no WhatsApp"
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: '44px', height: '44px', borderRadius: '50%',
-            background: isBarSolid ? 'transparent' : 'rgba(0,0,0,0.35)',
-            color: isBarSolid ? colors.text : '#ffffff',
-            textDecoration: 'none', fontSize: '18px', flexShrink: 0,
-          }}
-        >
-          ↗️
-        </a>
+        <NavIcon kind="back" href={backHref} translucent={!isBarSolid} ariaLabel="Voltar" />
+        <NavIcon kind="search" onClick={() => setShowSearchOverlay(true)} translucent={!isBarSolid} ariaLabel="Buscar" />
+        <NavIcon kind="share" href={shareUrl || '#'} target="_blank" translucent={!isBarSolid} ariaLabel="Compartilhar no WhatsApp" />
       </div>
+
+      {/* Overlay de busca — some com o conteúdo pra baixo, sem sair da página.
+          Some="pd-search-overlay" fica acima da barra fixa (z-index maior). */}
+      {showSearchOverlay && (
+        <div
+          className="pd-search-overlay"
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1100,
+            background: 'rgba(0,0,0,0.5)',
+          }}
+          onClick={() => setShowSearchOverlay(false)}
+        >
+          <div
+            style={{ background: colors.background, padding: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', maxWidth: '600px', margin: '0 auto' }}>
+              <div style={{ flex: 1 }}>
+                <SearchField
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  onEnter={handleSearchEnter}
+                  placeholder="Buscar produtos..."
+                  autoFocus
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSearchOverlay(false)}
+                aria-label="Fechar busca"
+                style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', color: colors.text, fontSize: '20px', cursor: 'pointer', flexShrink: 0 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {searchQuery.trim().length >= 2 && (
+              <div style={{ maxWidth: '600px', margin: '12px auto 0' }}>
+                {searching && <p style={{ fontSize: '13px', color: colors.text, opacity: 0.6 }}>Buscando...</p>}
+                {!searching && searchResults.length === 0 && (
+                  <p style={{ fontSize: '13px', color: colors.text, opacity: 0.6 }}>Nenhum produto encontrado.</p>
+                )}
+                {!searching && searchResults.map((r) => (
+                  <Link
+                    key={r.id}
+                    href={`/produto/${r.slug}`}
+                    onClick={() => setShowSearchOverlay(false)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px', textDecoration: 'none', color: colors.text, borderRadius: '8px' }}
+                  >
+                    <div style={{ position: 'relative', width: 40, height: 40, borderRadius: '8px', overflow: 'hidden', flexShrink: 0, background: '#f1f5f9' }}>
+                      <Image src={r.image_url || '/placeholder.png'} alt={r.name} fill sizes="40px" style={{ objectFit: 'cover' }} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '14px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
+                      <div style={{ fontSize: '13px', color: colors.primary, fontWeight: 600 }}>R$ {r.price.toFixed(2)}</div>
+                    </div>
+                  </Link>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => handleSearchEnter(searchQuery.trim())}
+                  style={{ marginTop: '8px', background: 'none', border: 'none', color: detailStyles.descriptionLinkColor || colors.text, fontSize: '13px', fontWeight: 600, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                >
+                  Ver todos os resultados →
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="pd-header-wrap">
         <Header />
       </div>
 
       <main className="pd-main-content" style={{ maxWidth: '1400px', margin: '0 auto', padding: '20px', width: '100%' }}>
-        {/* Voltar — pílula alinhada à direita. Só desktop: no mobile a barra
-            fixa acima já cobre a volta pra categoria. */}
+        {/* Voltar — círculo alinhado à direita, mesmo ícone/sistema da barra
+            fixa mobile. Só desktop: no mobile a barra fixa já cobre a volta. */}
         <div className="pd-desktop-back" style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '24px' }}>
-          <Link
-            href={backHref}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              minHeight: '44px',
-              padding: '8px 16px',
-              background: detailStyles.backButton.backgroundColor,
-              color: detailStyles.backButton.textColor,
-              border: `1px solid ${detailStyles.backButton.borderColor}`,
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: '600',
-              textDecoration: 'none',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            ↩ Voltar
-          </Link>
+          <NavIcon kind="back" href={backHref} translucent={false} ariaLabel="Voltar" />
         </div>
 
         {/* Detalhe do produto */}
@@ -322,7 +417,12 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
         }}
         className="product-detail-grid"
         >
-          <div>
+          {/* minWidth:0 é o pulo do gato — sem isso, um item de grid nunca
+              encolhe além do min-content dos filhos (regra do próprio CSS
+              Grid), então com miniaturas suficientes pra passar da largura
+              da coluna, a coluna INTEIRA (e a imagem dentro dela) esticava
+              pra caber tudo, em vez de deixar a faixa rolar por baixo. */}
+          <div style={{ alignSelf: 'start', minWidth: 0 }}>
             <div style={{
               position: 'relative',
               width: '100%',
@@ -362,7 +462,7 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
                 Faixa única rolável na horizontal (não quebra linha) — a rolagem
                 fica contida aqui dentro, nunca vaza pra página. */}
             {hasGallery && (
-              <div className="gallery-strip" style={{ display: 'flex', gap: '10px', marginTop: '12px', overflowX: 'auto', overflowY: 'hidden' }}>
+              <div className="gallery-strip" style={{ display: 'flex', gap: '10px', marginTop: '12px', overflowX: 'auto', overflowY: 'hidden', width: '100%', minWidth: 0 }}>
                 {images.map((url, index) => (
                   <button
                     key={url + index}
@@ -484,7 +584,7 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
                       background: 'none',
                       border: 'none',
                       padding: 0,
-                      color: colors.primary,
+                      color: detailStyles.descriptionLinkColor || colors.text,
                       fontSize: '14px',
                       fontWeight: 600,
                       cursor: 'pointer',
@@ -542,15 +642,17 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
       </main>
 
       <style jsx>{`
-        .pd-header-wrap { order: 0; }
-        .pd-main-content { order: 1; }
         @media (max-width: 768px) {
           .product-detail-grid {
             grid-template-columns: 1fr !important;
           }
-          /* Produto primeiro, Header depois — a barra fixa já cobre voltar/buscar/compartilhar */
-          .pd-header-wrap { order: 2; }
-          .pd-main-content { order: 1; }
+          /* Sem Header nenhum no mobile — nem em cima, nem embaixo. A barra
+             fixa já cobre voltar/buscar/compartilhar. */
+          .pd-header-wrap { display: none !important; }
+          /* Reserva o espaço da barra fixa (44px de ícone + 8px de padding
+             de cada lado = 60px) somado ao respiro que a página já tinha —
+             o conteúdo começa abaixo da barra, nunca por baixo dela. */
+          .pd-main-content { padding-top: 80px !important; }
           .pd-mobile-bar { display: flex !important; }
           .pd-desktop-back { display: none !important; }
         }
@@ -558,6 +660,14 @@ export default function ProductDetailClient({ product, relatedProducts, brandNam
           scroll-snap-type: x proximity;
           -webkit-overflow-scrolling: touch;
           scrollbar-width: thin;
+          /* pan-x explícito: sem isso, alguns navegadores mobile herdam um
+             touch-action mais restritivo do body e ignoram o gesto horizontal
+             de arrastar, mesmo com overflow-x:auto. */
+          touch-action: pan-x;
+          overscroll-behavior-x: contain;
+        }
+        .gallery-strip button {
+          touch-action: pan-x;
         }
         .gallery-strip::-webkit-scrollbar {
           height: 4px;

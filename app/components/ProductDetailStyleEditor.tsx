@@ -9,6 +9,8 @@ import { useThemeEditor } from '../contexts/ThemeEditorContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { ProductDetailStyles } from '../types';
 import { mergeDetailStyles } from '@/hooks/useThemeColors';
+import { supabase } from '@/lib/supabaseClient';
+import { compressImage, formatFileSize } from '@/lib/imageCompression';
 
 const fontWeightOptions = [
   { value: '400', label: 'Normal' },
@@ -78,6 +80,57 @@ export function ProductDetailStyleEditor() {
   const toggleSection = useCallback((section: string) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
   }, []);
+
+  // Upload de ícone — mesmo bucket (product-images) e mesma compressão
+  // (lib/imageCompression.ts) já usados pra imagem de capa e galeria dos
+  // produtos. Não é um sistema novo, só outra pasta dentro do mesmo bucket.
+  const [uploadingIcon, setUploadingIcon] = useState<'back' | 'search' | 'share' | null>(null);
+  const [iconCompressionInfo, setIconCompressionInfo] = useState<Record<string, string>>({});
+
+  const handleIconUpload = useCallback(async (file: File, icon: 'back' | 'search' | 'share') => {
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor, selecione apenas imagens');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('A imagem deve ter no máximo 5MB');
+      return;
+    }
+
+    setUploadingIcon(icon);
+    try {
+      const compressed = await compressImage(file);
+      setIconCompressionInfo(prev => ({
+        ...prev,
+        [icon]: compressed.skipped
+          ? `Imagem já era pequena (${formatFileSize(compressed.originalSize)}) — enviada sem reprocessar.`
+          : `${formatFileSize(compressed.originalSize)} → ${formatFileSize(compressed.compressedSize)} (WebP)`
+      }));
+
+      const fileExt = compressed.file.name.split('.').pop();
+      const fileName = `${icon}-${Date.now()}.${fileExt}`;
+      const filePath = `nav-icons/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(filePath, compressed.file);
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(filePath);
+      const propertyKey = icon === 'back' ? 'backIconUrl' : icon === 'search' ? 'searchIconUrl' : 'shareIconUrl';
+      updateStyle(`navIcons.${propertyKey}`, urlData.publicUrl);
+    } catch (err) {
+      console.error('Erro no upload do ícone:', err);
+      alert('Erro ao enviar imagem');
+    } finally {
+      setUploadingIcon(null);
+    }
+  }, [updateStyle]);
+
+  const removeIcon = useCallback((icon: 'back' | 'search' | 'share') => {
+    const propertyKey = icon === 'back' ? 'backIconUrl' : icon === 'search' ? 'searchIconUrl' : 'shareIconUrl';
+    updateStyle(`navIcons.${propertyKey}`, undefined);
+  }, [updateStyle]);
 
   const handleSave = useCallback(() => {
     if (!editorState.draftTheme) return;
@@ -184,6 +237,11 @@ export function ProductDetailStyleEditor() {
 
           <h5 style={{ fontSize: '13px', color: '#4b5563', marginBottom: '8px', fontWeight: 600, marginTop: '16px' }}>Descrição e Estoque</h5>
           <ColorControl label="Cor da Descrição" value={styles.description.color} property="description.color" />
+          <ColorControl
+            label={`Cor do link "Ver mais" ${styles.descriptionLinkColor ? '' : '(usando a cor de texto do tema — sem cor própria definida)'}`}
+            value={styles.descriptionLinkColor || ''}
+            property="descriptionLinkColor"
+          />
           <ColorControl label="Cor do Estoque" value={styles.stockInfo.color} property="stockInfo.color" />
         </ExpandableSection>
 
@@ -225,11 +283,45 @@ export function ProductDetailStyleEditor() {
           <ColorControl label="Fundo (desabilitado)" value={styles.addToCart.disabledBackgroundColor} property="addToCart.disabledBackgroundColor" />
         </ExpandableSection>
 
-        <ExpandableSection title="Botão Voltar" icon="↩️" sectionKey="back">
-          <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '12px' }}>Pílula "↩ Voltar", alinhada à direita da tela. Leva sempre para a categoria do produto (ou início, se não tiver categoria).</p>
-          <ColorControl label="Fundo" value={styles.backButton.backgroundColor} property="backButton.backgroundColor" />
-          <ColorControl label="Texto" value={styles.backButton.textColor} property="backButton.textColor" />
-          <ColorControl label="Borda" value={styles.backButton.borderColor} property="backButton.borderColor" />
+        <ExpandableSection title="Ícones de Navegação" icon="🔘" sectionKey="navicons">
+          <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '12px' }}>
+            Voltar (leva pra categoria do produto), Buscar e Compartilhar — usados na barra fixa do celular e no botão de voltar do desktop (o mesmo ícone de "Voltar" aparece nos dois lugares). Sem imagem enviada, cada um usa um desenho padrão.
+          </p>
+          <ColorControl label="Fundo do círculo" value={styles.navIcons.backgroundColor} property="navIcons.backgroundColor" />
+          <ColorControl label="Cor do ícone padrão (quando não há imagem)" value={styles.navIcons.iconColor} property="navIcons.iconColor" />
+
+          {([
+            { key: 'back' as const, label: 'Voltar', url: styles.navIcons.backIconUrl },
+            { key: 'search' as const, label: 'Buscar', url: styles.navIcons.searchIconUrl },
+            { key: 'share' as const, label: 'Compartilhar', url: styles.navIcons.shareIconUrl },
+          ]).map(({ key, label, url }) => (
+            <div key={key} style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #f1f5f9' }}>
+              <h5 style={{ fontSize: '13px', color: '#4b5563', marginBottom: '8px', fontWeight: 600 }}>{label}</h5>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {url && (
+                  <img src={url} alt={label} style={{ width: 36, height: 36, borderRadius: '50%', border: '1px solid #e5e7eb', objectFit: 'cover' }} />
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  disabled={uploadingIcon === key}
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleIconUpload(f, key); }}
+                  style={{ flex: 1, fontSize: '12px' }}
+                />
+                {url && (
+                  <button
+                    type="button"
+                    onClick={() => removeIcon(key)}
+                    style={{ padding: '4px 10px', fontSize: '12px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+                  >
+                    Remover
+                  </button>
+                )}
+              </div>
+              {uploadingIcon === key && <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Enviando...</p>}
+              {uploadingIcon !== key && iconCompressionInfo[key] && <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>📦 {iconCompressionInfo[key]}</p>}
+            </div>
+          ))}
         </ExpandableSection>
 
         <ExpandableSection title="Galeria de Imagens" icon="🖼️" sectionKey="gallery">
@@ -249,7 +341,9 @@ export function ProductDetailStyleEditor() {
       <div style={{ backgroundColor: '#ffffff', padding: '32px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
         <p style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '16px' }}>Pré-visualização simplificada — abra a página de um produto real pra ver o resultado completo.</p>
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', minHeight: '44px', padding: '8px 16px', background: styles.backButton.backgroundColor, color: styles.backButton.textColor, border: `1px solid ${styles.backButton.borderColor}`, borderRadius: '8px', fontSize: '14px', fontWeight: 600 }}>↩ Voltar</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: '50%', background: styles.navIcons.backgroundColor, color: styles.navIcons.iconColor, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+            {styles.navIcons.backIconUrl ? <img src={styles.navIcons.backIconUrl} alt="Voltar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '←'}
+          </span>
         </div>
         <h1 style={{ color: styles.productName.color, fontSize: styles.productName.fontSize, fontWeight: styles.productName.fontWeight as any, marginBottom: '8px' }}>Produto de Exemplo</h1>
         <p style={{ margin: '0 0 4px 0', fontSize: styles.collectionLine.fontSize, fontWeight: styles.collectionLine.fontWeight as any }}>

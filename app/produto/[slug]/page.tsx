@@ -9,7 +9,8 @@ import ProductDetailClient from './ProductDetailClient';
 
 export const revalidate = 300;
 
-const PRODUCT_COLUMNS = 'id, name, slug, price, original_price, sale_price, on_sale, image_url, gallery_urls, category, stock, collection, collection_name, is_preorder, description, brand';
+const PRODUCT_COLUMNS = 'id, name, slug, price, original_price, sale_price, on_sale, image_url, gallery_urls, category, product_type, stock, collection, collection_name, is_preorder, description, brand';
+const RELATED_LIMIT = 10;
 
 async function getProductBySlug(slug: string): Promise<Product | null> {
   const { data, error } = await supabase
@@ -22,19 +23,45 @@ async function getProductBySlug(slug: string): Promise<Product | null> {
   return data as Product;
 }
 
-async function getRelatedProducts(category: string | undefined, excludeId: number): Promise<Product[]> {
-  if (!category) return [];
+// Relevância em 3 níveis, só completando com o próximo quando o anterior não
+// preenche o limite: mesma coleção primeiro (é o critério mais específico —
+// dois produtos da mesma coleção são o "relacionado" mais óbvio), depois
+// mesmo tipo de produto (ETB, Deck, Booster...), e só por último a categoria
+// inteira (comportamento antigo), como complemento genérico.
+async function getRelatedProducts(product: Product, excludeId: number): Promise<Product[]> {
+  const results: Product[] = [];
+  const seenIds = new Set<number>([excludeId]);
 
-  const { data } = await supabase
-    .from('products')
-    .select(PRODUCT_COLUMNS)
-    .eq('category', category)
-    .eq('is_preorder', false)
-    .neq('id', excludeId)
-    .gt('stock', 0)
-    .limit(10);
+  async function fetchTier(applyFilter: (q: any) => any) {
+    const remaining = RELATED_LIMIT - results.length;
+    if (remaining <= 0) return;
 
-  return (data || []) as Product[];
+    let query = supabase
+      .from('products')
+      .select(PRODUCT_COLUMNS)
+      .eq('is_preorder', false)
+      .gt('stock', 0);
+    query = applyFilter(query);
+    query = query.not('id', 'in', `(${Array.from(seenIds).join(',')})`);
+
+    const { data } = await query.limit(remaining);
+    (data || []).forEach((p: any) => {
+      seenIds.add(p.id);
+      results.push(p as Product);
+    });
+  }
+
+  if (product.collection) {
+    await fetchTier((q) => q.eq('collection', product.collection));
+  }
+  if (product.product_type) {
+    await fetchTier((q) => q.eq('product_type', product.product_type));
+  }
+  if (product.category) {
+    await fetchTier((q) => q.eq('category', product.category));
+  }
+
+  return results;
 }
 
 export async function generateStaticParams() {
@@ -93,7 +120,7 @@ export default async function ProdutoPage({ params }: { params: Promise<{ slug: 
     notFound();
   }
 
-  const relatedProducts = await getRelatedProducts(product.category, product.id);
+  const relatedProducts = await getRelatedProducts(product, product.id);
   const price = product.on_sale && product.sale_price ? product.sale_price : product.price;
   const brandName = resolveBrand(product);
 

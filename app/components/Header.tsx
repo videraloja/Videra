@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import SearchField from './SearchField';
 import './header.css';
 
 const NICHO_ICONS = {
@@ -222,12 +223,6 @@ export default function Header({ onSearch, searchTerm = '', hideSearch = false }
     return () => window.removeEventListener('scroll', handleScroll);
   }, [isMounted]);
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setLocalSearchTerm(value);
-    if (onSearch) onSearch(value);
-  };
-
   const clearSearch = () => {
     setLocalSearchTerm('');
     if (onSearch) onSearch('');
@@ -378,33 +373,13 @@ export default function Header({ onSearch, searchTerm = '', hideSearch = false }
           boxShadow: `0 4px 12px ${colors.primary}10`,
           zIndex: 99,
         }}>
-          <div style={{ maxWidth: '600px', margin: '0 auto', position: 'relative' }}>
-            <input
-              ref={searchInputRef}
-              type="text"
-              placeholder={searchPlaceholder}
-              value={localSearchTerm}
-              onChange={handleSearchChange}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur(); if (onSearch) onSearch(localSearchTerm.trim()); } }}
-              style={applyThemeStyles({
-                width: '100%',
-                padding: '12px 20px 12px 40px',
-                border: `2px solid ${colors.primary}`,
-                borderRadius: '50px',
-                fontSize: '15px',
-                background: colors.cardBg,
-                color: colors.text,
-                boxShadow: `0 2px 10px ${colors.primary}20`,
-              }, 'filter')}
-            />
-            <div style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
-              <SearchIconImg />
-            </div>
-            {localSearchTerm && (
-              <button type="button" onClick={clearSearch}
-                style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
-            )}
-          </div>
+          <SearchField
+            inputRef={searchInputRef}
+            value={localSearchTerm}
+            onChange={(v) => { setLocalSearchTerm(v); if (onSearch) onSearch(v); }}
+            onEnter={(v) => { if (onSearch) onSearch(v); }}
+            placeholder={searchPlaceholder}
+          />
         </div>
       )}
     </>
