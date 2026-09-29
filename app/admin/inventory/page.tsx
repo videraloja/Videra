@@ -49,6 +49,14 @@ interface StockLog {
   note?: string | null;   // o porquê, quando applied = false
 }
 
+// stock_log.created_at é `timestamp without time zone` gravado em UTC. Sem o
+// "Z" no fim, o navegador lê a string como hora local e mostra 4h adiantado.
+// O teste do fim da string evita o bug inverso caso a coluna vire timestamptz.
+const dataHoraManaus = (valor: string) => {
+  const comFuso = /[Zz]|[+-]\d{2}:?\d{2}$/.test(valor) ? valor : `${valor}Z`;
+  return new Date(comFuso).toLocaleString('pt-BR', { timeZone: 'America/Manaus' });
+};
+
 // Rótulo em português pra cada reason que as funções do banco gravam.
 const REASON_LABELS: Record<string, string> = {
   order_paid: 'Venda (pedido pago)',
@@ -952,7 +960,7 @@ function InventoryContent() {
                           <div style={{ fontSize: 12, color: '#dc2626', marginTop: 2 }}>{log.note}</div>
                         )}
                         <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                          {new Date(log.created_at).toLocaleString('pt-BR')}
+                          {dataHoraManaus(log.created_at)}
                           {log.performed_by_email ? ` · ${log.performed_by_email}` : ''}
                         </div>
                       </div>
