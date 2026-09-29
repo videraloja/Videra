@@ -33,15 +33,35 @@ interface Reservation {
   quantity: number;
 }
 
+// Espelha as colunas REAIS de stock_log. `change` é a variação (sempre
+// existiu); stock_after / order_id / performed_by_email entraram na correção
+// de estoque — linhas anteriores a ela vêm com esses três em null.
 interface StockLog {
   id: string;
   product_id: number;
-  quantity_changed: number;
-  new_stock: number;
+  change: number;
+  stock_after: number | null;
   reason: string;
   created_at: string;
-  user_email?: string;
+  order_id?: string | null;
+  performed_by_email?: string | null;
+  applied?: boolean;      // false = registrado, mas o estoque NÃO mudou
+  note?: string | null;   // o porquê, quando applied = false
 }
+
+// Rótulo em português pra cada reason que as funções do banco gravam.
+const REASON_LABELS: Record<string, string> = {
+  order_paid: 'Venda (pedido pago)',
+  order_cancelled: 'Devolução (pedido cancelado)',
+  order_unpaid: 'Devolução (pedido voltou a pendente)',
+  decrease: 'Baixa manual',
+  increase: 'Entrada manual',
+  inventory_adjustment: 'Ajuste por contagem física',
+};
+
+// Reposição de verdade é entrada manual. Devolução de pedido cancelado é
+// estoque que já era da loja voltando — não é compra, não conta como entrada.
+const ENTRY_REASONS = ['increase'];
 
 // Componente principal com toda a lógica existente
 function InventoryContent() {
@@ -77,48 +97,53 @@ function InventoryContent() {
       // 🏗️ Técnica Pro: Busca produtos e cruza com reservas ativas via RPC
       const productsWithStock = await getProductsWithAvailableStock();
       
-      // Buscar reservas detalhadas para mostrar no breakdown
-      const { data: reservations } = await supabase
+      // Toda consulta abaixo checa `error`. Antes, só `data` era lido e uma
+      // coluna errada virava silenciosamente "0 entradas" na tela — e decisão
+      // de compra era tomada em cima disso.
+      const { data: reservations, error: reservationsError } = await supabase
         .from('reservations')
         .select('product_id, quantity')
         .gte('expires_at', new Date().toISOString());
+      if (reservationsError) throw new Error(`reservas: ${reservationsError.message}`);
 
       const resMap = new Map<number, number>();
       reservations?.forEach((r: Reservation) => {
         resMap.set(r.product_id, (resMap.get(r.product_id) || 0) + r.quantity);
       });
 
-      // 📈 Técnica Pro: Busca vendas e entradas do mês atual para a UI
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      
-      // Buscar vendas reais das ordens (pago ou pendente)
-      const { data: ordersThisMonth } = await supabase
+
+      const { data: ordersThisMonth, error: ordersError } = await supabase
         .from('orders')
         .select('id')
         .gte('created_at', startOfMonth)
         .eq('status', 'pago');
-      
+      if (ordersError) throw new Error(`pedidos do mês: ${ordersError.message}`);
+
       const orderIdsThisMonth = ordersThisMonth?.map(o => o.id) || [];
       const salesMap = new Map<number, number>();
-      
+
       if (orderIdsThisMonth.length > 0) {
-        const { data: items } = await supabase
+        const { data: items, error: itemsError } = await supabase
           .from('order_items')
           .select('product_id, quantity')
           .in('order_id', orderIdsThisMonth);
+        if (itemsError) throw new Error(`itens dos pedidos: ${itemsError.message}`);
         items?.forEach(i => salesMap.set(i.product_id, (salesMap.get(i.product_id) || 0) + i.quantity));
       }
 
-      // Buscar entradas (Reposição filtrando logs positivos)
-      const { data: entriesThisMonth } = await supabase
+      const { data: entriesThisMonth, error: entriesError } = await supabase
         .from('stock_log')
-        .select('product_id, quantity_changed')
+        .select('product_id, change')
         .gte('created_at', startOfMonth)
-        .gt('quantity_changed', 0);
-      
+        .gt('change', 0)
+        .in('reason', ENTRY_REASONS)
+        .eq('applied', true);
+      if (entriesError) throw new Error(`entradas do mês: ${entriesError.message}`);
+
       const entriesMap = new Map<number, number>();
-      entriesThisMonth?.forEach(e => entriesMap.set(e.product_id, (entriesMap.get(e.product_id) || 0) + e.quantity_changed));
+      entriesThisMonth?.forEach(e => entriesMap.set(e.product_id, (entriesMap.get(e.product_id) || 0) + e.change));
 
       const enrichedProducts = productsWithStock.map(p => {
         const currentPrice = p.on_sale && p.sale_price && p.sale_price > 0 ? p.sale_price : p.price;
@@ -135,9 +160,9 @@ function InventoryContent() {
       });
 
       setProducts(enrichedProducts);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao carregar produtos:", error);
-      alert("Erro ao carregar estoque");
+      alert(`Erro ao carregar o estoque — os números da tela podem estar incompletos.\n\n${error?.message || error}`);
     } finally {
       setLoading(false);
     }
@@ -228,10 +253,14 @@ function InventoryContent() {
         });
       }
 
-      // 3. Mapear entradas (Reposição) do log
+      // 3. Mapear entradas (Reposição) do log — só entrada manual conta.
+      // Antes somava `quantity_changed` (coluna inexistente): a soma dava NaN
+      // e a coluna ENTRADAS saía vazia/errada na planilha.
       const entriesMap = new Map<number, number>();
-      logsData?.forEach(log => {
-        entriesMap.set(log.product_id, (entriesMap.get(log.product_id) || 0) + log.quantity_changed);
+      (logsData as StockLog[] | null)?.forEach(log => {
+        if (log.change > 0 && ENTRY_REASONS.includes(log.reason) && log.applied !== false) {
+          entriesMap.set(log.product_id, (entriesMap.get(log.product_id) || 0) + log.change);
+        }
       });
 
       // 4. Preparar os dados consolidados (ordenados por categoria)
@@ -353,8 +382,11 @@ function InventoryContent() {
       const fileName = `Videra_Conferencia_Estoque_${exportStartDate}_a_${exportEndDate}.xlsx`;
       XLSX.writeFile(workbook, fileName);
       alert("✅ Relatório de conferência gerado com sucesso!");
-    } catch (error) {
+    } catch (error: any) {
+      // Antes o erro só ia pro console e a tela ficava muda — parecia que o
+      // botão não tinha feito nada.
       console.error("Erro ao exportar:", error);
+      alert(`Não foi possível gerar o relatório. Nenhum arquivo foi criado.\n\n${error?.message || error}`);
     } finally {
       setLoading(false);
     }
@@ -905,26 +937,31 @@ function InventoryContent() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                       <div style={{
                         width: 40, height: 40, borderRadius: '50%',
-                        background: log.quantity_changed > 0 ? '#dcfce7' : '#fee2e2',
-                        color: log.quantity_changed > 0 ? '#059669' : '#dc2626',
+                        background: log.change > 0 ? '#dcfce7' : '#fee2e2',
+                        color: log.change > 0 ? '#059669' : '#dc2626',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontWeight: 800, fontSize: 14
                       }}>
-                        {log.quantity_changed > 0 ? `+${log.quantity_changed}` : log.quantity_changed}
+                        {log.change > 0 ? `+${log.change}` : log.change}
                       </div>
                       <div>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-                          {log.reason}
+                        <div style={{ fontSize: 14, fontWeight: 600, color: log.applied === false ? '#dc2626' : 'var(--text-primary)' }}>
+                          {log.applied === false ? 'NÃO APLICADA — ' : ''}{REASON_LABELS[log.reason] || log.reason}
                         </div>
+                        {log.note && (
+                          <div style={{ fontSize: 12, color: '#dc2626', marginTop: 2 }}>{log.note}</div>
+                        )}
                         <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                           {new Date(log.created_at).toLocaleString('pt-BR')}
+                          {log.performed_by_email ? ` · ${log.performed_by_email}` : ''}
                         </div>
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Saldo Final</div>
                       <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
-                        {log.new_stock} UN
+                        {/* Linhas anteriores à correção não têm saldo gravado — e não dá pra reconstruir. */}
+                        {log.stock_after === null || log.stock_after === undefined ? '—' : `${log.stock_after} UN`}
                       </div>
                     </div>
                   </div>

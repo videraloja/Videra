@@ -70,57 +70,72 @@ function OrderDetailsContent() {
     fetchOrderDetails();
   }, [id]);
 
+  // Traduz a exceção da função set_order_status pra uma frase em português
+  // com os números reais. Os códigos são os mesmos que create_reservations
+  // já usa (INSUFFICIENT_STOCK:produto:pedido:existe).
+  const explainStatusError = (rawMessage: string): string => {
+    const msg = rawMessage || '';
+
+    if (msg.includes('INSUFFICIENT_STOCK:')) {
+      const [, productIdStr, requestedStr, availableStr] = msg.slice(msg.indexOf('INSUFFICIENT_STOCK:')).split(':');
+      const productId = Number(productIdStr);
+      const item = items.find(i => Number(i.products?.id) === productId);
+      const name = item?.products?.name || `produto #${productIdStr}`;
+      return `Estoque insuficiente para "${name}": o pedido pede ${requestedStr}, mas existem ${availableStr} em estoque. Nenhum item foi baixado e o status não mudou.`;
+    }
+    if (msg.includes('PRODUCT_MISSING:')) {
+      // Só acontece ENTRANDO em pago — não dá pra vender o que não existe.
+      const name = msg.slice(msg.indexOf('PRODUCT_MISSING:') + 'PRODUCT_MISSING:'.length).trim();
+      return `O item "${name}" deste pedido aponta pra um produto que não existe mais no cadastro, então ele não pode ser marcado como pago. Nada foi alterado.`;
+    }
+    if (msg.includes('ORDER_NOT_FOUND')) return 'Este pedido não foi encontrado no banco. Recarregue a página.';
+    if (msg.includes('NOT_AUTHENTICATED')) return 'Sua sessão expirou. Faça login de novo no admin.';
+    if (msg.includes('INVALID_STATUS')) return 'Status inválido.';
+    return `Não foi possível mudar o status. Nada foi alterado. Detalhe técnico: ${msg}`;
+  };
+
+  // Uma chamada só: a função set_order_status lê o status atual do banco,
+  // confere todos os itens, baixa/devolve tudo ou nada, apaga a reserva ao
+  // pagar e grava o log — tudo numa transação. O navegador não decide nada.
   const handleStatusChange = async (newStatus: string) => {
     if (!order || isUpdating || order.status === newStatus) return;
-  
+
     setIsUpdating(true);
     try {
-      const wasStockDebited = order.status === 'pago'; // 'entregue' is now visual only
-      const willStockBeDebited = newStatus === 'pago'; // 'entregue' is now visual only
-  
-      // Case 1: Decrement stock (e.g., pendente -> pago)
-      if (!wasStockDebited && willStockBeDebited) {
-        for (const item of items) {
-          const productId = Number(item.products?.id);
-          if (isNaN(productId)) continue;
-          
-          const { error } = await supabase.rpc('decrease_stock', {
-            product_id_input: productId,
-            quantity_input: item.quantity
-          });
+      const { data, error } = await supabase.rpc('set_order_status', {
+        p_order_id: order.id,
+        p_new_status: newStatus,
+      });
 
-          if (error) throw new Error(`Erro ao baixar estoque para ${item.products?.name}: ${error.message}`);
-        }
-      } 
-      // Case 2: Increment stock (e.g., pago -> pendente or any paid status -> cancelado)
-      else if (wasStockDebited && !willStockBeDebited) {
-        for (const item of items) {
-          const productId = Number(item.products?.id);
-          if (isNaN(productId)) continue;
+      if (error) throw new Error(error.message);
 
-          const { error } = await supabase.rpc('increase_stock', {
-            product_id_input: productId,
-            quantity_input: item.quantity
-          });
-
-          if (error) throw new Error(`Erro ao devolver estoque para ${item.products?.name}: ${error.message}`);
-        }
-      }
-  
-      const { data, error } = await supabase
-        .from("orders")
-        .update({ status: newStatus })
-        .eq("id", order.id)
-        .select()
+      const { data: fresh, error: fetchError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', order.id)
         .single();
-  
-      if (error) throw error;
-      setOrder(data);
-      alert(`Status do pedido ${order.order_code} atualizado para ${newStatus.toUpperCase()}`);
-    
+      if (fetchError) throw new Error(fetchError.message);
+      setOrder(fresh);
+
+      const skipped: { name: string; quantity: number }[] = data?.skipped_returns || [];
+
+      if (data?.changed === false) {
+        alert(`O pedido ${order.order_code} já estava como ${String(data.to).toUpperCase()} no banco (mudado em outra aba?). Tela atualizada.`);
+      } else if (skipped.length > 0) {
+        // A operação concluiu, mas parte da devolução não pôde ser feita —
+        // avisa alto, com nome e quantidade, e fica registrado no stock_log.
+        const lista = skipped.map(s => `  • "${s.name}" — ${s.quantity} un.`).join('\n');
+        alert(
+          `Status do pedido ${order.order_code} atualizado para ${newStatus.toUpperCase()}.\n\n` +
+          `ATENÇÃO: o estoque dos itens abaixo NÃO foi devolvido, porque o produto não existe mais no cadastro:\n${lista}\n\n` +
+          `Isso ficou registrado no histórico de estoque como "devolução não aplicada". Se o produto voltar ao cadastro, ajuste o estoque à mão.`
+        );
+      } else {
+        alert(`Status do pedido ${order.order_code} atualizado para ${newStatus.toUpperCase()}`);
+      }
     } catch (error: any) {
-      console.error("Erro ao atualizar status:", error);
-      alert(`Erro: ${error.message}`);
+      console.error('Erro ao atualizar status:', error);
+      alert(explainStatusError(error?.message));
     } finally {
       setIsUpdating(false);
     }
@@ -128,7 +143,7 @@ function OrderDetailsContent() {
 
   const handleDeleteOrder = async () => {
     if (!order || isUpdating || order.status === 'cancelado') return;
-    if (!confirm(`Tem certeza que deseja CANCELAR o pedido ${order.order_code}? Esta ação devolverá o estoque se o pedido já estava pago ou entregue.`)) return;
+    if (!confirm(`Tem certeza que deseja CANCELAR o pedido ${order.order_code}? Se o pedido estiver como PAGO, o estoque de todos os itens volta.`)) return;
   
     await handleStatusChange("cancelado");
   };
