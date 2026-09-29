@@ -182,12 +182,23 @@ function ProductsContent() {
         .eq("id", productId);
 
       if (error) throw error;
-      
+
       alert("Produto excluído com sucesso!");
       loadProducts();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao excluir produto:", error);
-      alert("Erro ao excluir produto");
+      // 23503 = foreign_key_violation. O banco recusa apagar produto que já
+      // aparece em pedido (ON DELETE RESTRICT): apagar levaria junto o
+      // histórico de vendas e mudaria relatório de mês fechado.
+      if (error?.code === '23503' || /foreign key|viola/i.test(error?.message || '')) {
+        alert(
+          'Este produto não pode ser excluído porque já aparece em pedidos (ou tem reserva ativa).\n\n' +
+          'Apagar apagaria também o histórico de vendas dele e mudaria os relatórios já fechados.\n\n' +
+          'Para tirar do site, zere o estoque — produto esgotado não aparece na vitrine.'
+        );
+        return;
+      }
+      alert(`Erro ao excluir produto: ${error?.message || error}`);
     }
   };
 
