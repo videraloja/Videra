@@ -21,15 +21,19 @@ const nextConfig: NextConfig = {
     },
   ];
 },
-  // Configurações de otimização de imagens (importante para e-commerce)
+  // Imagens NÃO passam mais pelo otimizador da Vercel (/_next/image): a cota
+  // do plano Hobby estourou e ele passou a responder 402. Quem redimensiona
+  // agora é o wsrv.nl, via lib/imageLoader.ts.
   images: {
+    loader: 'custom',
+    loaderFile: './lib/imageLoader.ts',
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '**', // Permite imagens de qualquer domínio HTTPS
+        hostname: 'synudoglvwbogfzbcdii.supabase.co',
       },
     ],
-    formats: ['image/avif', 'image/webp'], // Formatos modernos
+    formats: ['image/webp'],
   },
   
   // Melhorar performance no dev mode
