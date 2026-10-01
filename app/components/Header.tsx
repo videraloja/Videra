@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import SearchField from './SearchField';
+import { wsrvUrl } from '@/lib/imageLoader';
 import './header.css';
 
 const NICHO_ICONS = {
@@ -210,10 +211,15 @@ export default function Header({ onSearch, searchTerm = '', hideSearch = false }
     }
   };
 
-  // Escolhe a imagem de fundo correta (desktop ou mobile)
-  const currentBackgroundImage = (isMobile && theme?.backgroundImage?.mobileUrl)
-    ? theme.backgroundImage.mobileUrl
-    : theme?.backgroundImage?.url || undefined;
+  // Escolhe a imagem de fundo correta (desktop ou mobile). Passa pelo wsrv
+  // como o resto das imagens do Supabase — por ser background-image de CSS,
+  // essa não chega no loader do next/image e ficava baixando o original.
+  const currentBackgroundImage = wsrvUrl(
+    (isMobile && theme?.backgroundImage?.mobileUrl)
+      ? theme.backgroundImage.mobileUrl
+      : theme?.backgroundImage?.url || undefined,
+    isMobile ? 828 : 1920
+  );
 
 
   useEffect(() => {

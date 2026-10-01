@@ -11,6 +11,19 @@
 
 const SUPABASE_HOST = 'synudoglvwbogfzbcdii.supabase.co';
 
+// Mesma conversão, para imagem aplicada por CSS (background-image), que não
+// passa pelo next/image e por isso não chega no loader abaixo.
+export function wsrvUrl(src: string | undefined, width: number, quality = 75): string | undefined {
+  if (!src || !src.includes(SUPABASE_HOST)) return src;
+  const params = new URLSearchParams({
+    url: src,
+    w: String(width),
+    q: String(quality),
+    output: 'webp',
+  });
+  return `https://wsrv.nl/?${params.toString()}`;
+}
+
 export default function wsrvImageLoader({
   src,
   width,
