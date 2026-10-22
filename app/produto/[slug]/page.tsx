@@ -7,7 +7,13 @@ import { resolveBrand } from '@/lib/productBrand';
 import { CATEGORY_ROUTES } from '@/lib/categoryRoutes';
 import ProductDetailClient from './ProductDetailClient';
 
-export const revalidate = 300;
+// 1 dia, não 5 minutos: cada revalidação é um ISR Write na Vercel, e 120
+// produtos a cada 5 min estouravam a cota do plano (o site é pausado ao
+// passar de 100%). Não atrasa nada que o cliente veja: preço e nome voltam
+// na hora porque o admin chama /api/revalidate ao salvar (revalidateProduct),
+// e o estoque nunca veio deste HTML — é buscado no cliente via RPC
+// get_available_stock a cada carregamento.
+export const revalidate = 86400;
 
 const PRODUCT_COLUMNS = 'id, name, slug, price, original_price, sale_price, on_sale, image_url, gallery_urls, category, product_type, stock, collection, collection_name, is_preorder, description, brand';
 const RELATED_LIMIT = 10;
