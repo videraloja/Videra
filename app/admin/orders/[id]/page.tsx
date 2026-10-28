@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import AuthGuard from "@/app/components/AuthGuard";
+import { revalidateProductPages } from "@/lib/revalidateProduct";
 import ThemeToggle from "../../../components/ThemeToggle";
 
 interface Order {
@@ -26,6 +27,7 @@ interface OrderItem {
     id: number;
     name: string;
     image_url: string;
+    slug: string | null;
   } | null;
 }
 
@@ -54,7 +56,7 @@ function OrderDetailsContent() {
 
         const { data: itemsData, error: itemsError } = await supabase
           .from("order_items")
-          .select("*, products(id, name, image_url)")
+          .select("*, products(id, name, image_url, slug)")
           .eq("order_id", id);
 
         if (itemsError) throw itemsError;
@@ -116,6 +118,15 @@ function OrderDetailsContent() {
         .single();
       if (fetchError) throw new Error(fetchError.message);
       setOrder(fresh);
+
+      // Marcar pago (ou desfazer) muda o estoque, e o HTML da página de
+      // produto guarda o availability do JSON-LD por 1 dia. Sem isso, um
+      // produto que esgota numa venda continuaria anunciado como disponível
+      // no dado estruturado até o cache vencer.
+      if (data?.changed && (order.status === 'pago') !== (newStatus === 'pago')) {
+        const slugs = [...new Set(items.map(i => i.products?.slug).filter(Boolean))] as string[];
+        await Promise.all(slugs.map(slug => revalidateProductPages(slug, null)));
+      }
 
       const skipped: { name: string; quantity: number }[] = data?.skipped_returns || [];
 
