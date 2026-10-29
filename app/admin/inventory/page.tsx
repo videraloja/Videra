@@ -125,8 +125,9 @@ function InventoryContent() {
       const { data: ordersThisMonth, error: ordersError } = await supabase
         .from('orders')
         .select('id')
-        .gte('created_at', startOfMonth)
-        .eq('status', 'pago');
+        .eq('status', 'pago')
+        .not('paid_at', 'is', null)
+        .gte('paid_at', startOfMonth);
       if (ordersError) throw new Error(`pedidos do mês: ${ordersError.message}`);
 
       const orderIdsThisMonth = ordersThisMonth?.map(o => o.id) || [];
@@ -238,10 +239,12 @@ function InventoryContent() {
       // 2. Buscar vendas reais do mês selecionado via order_items
       const { data: ordersInMonth, error: ordersError } = await supabase
         .from("orders")
+        // Data do pagamento, não do pedido — ver comentário em reports.
         .select("id")
-        .gte("created_at", startDate)
-        .lte("created_at", endDate)
-        .eq("status", "pago");
+        .eq("status", "pago")
+        .not("paid_at", "is", null)
+        .gte("paid_at", startDate)
+        .lte("paid_at", endDate);
 
       if (ordersError) throw ordersError;
 

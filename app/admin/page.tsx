@@ -40,8 +40,10 @@ function AdminDashboardContent() {
         const { data: monthOrders, error: monthError } = await supabase
           .from('orders')
           .select('id')
+          // Faturamento do mês pela data do pagamento, igual aos relatórios.
           .eq('status', 'pago')
-          .gte('created_at', startOfMonth.toISOString());
+          .not('paid_at', 'is', null)
+          .gte('paid_at', startOfMonth.toISOString());
 
         if (!monthError && monthOrders) {
           const orderIds = monthOrders.map(order => order.id);

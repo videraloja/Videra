@@ -44,7 +44,7 @@ function PedidosContent() {
   }, []);
 
   // 🆕 ESTADOS DOS FILTROS COM PERSISTÊNCIA NO LOCALSTORAGE
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pendente' | 'pago' | 'cancelado'>(() => {
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pendente' | 'reservado' | 'pago' | 'cancelado'>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('ordersStatusFilter') as any) || 'all';
     }
@@ -139,6 +139,7 @@ function PedidosContent() {
     switch (status) {
       case 'pendente': return { bg: '#fef3c7', text: '#92400e', border: '#f59e0b' };
       case 'pago': return { bg: '#d1fae5', text: '#065f46', border: '#10b981' };
+      case 'reservado': return { bg: '#dbeafe', text: '#1e40af', border: '#3b82f6' };
       case 'cancelado': return { bg: '#fee2e2', text: '#991b1b', border: '#ef4444' };
       default: return { bg: '#f3f4f6', text: '#374151', border: '#9ca3af' };
     }
@@ -224,6 +225,7 @@ function PedidosContent() {
   const totalOrders = filteredOrders.length;
   const pendingOrders = filteredOrders.filter(o => o.status === 'pendente').length;
   const paidOrders = filteredOrders.filter(o => o.status === 'pago').length;
+  const reservedOrders = filteredOrders.filter(o => o.status === 'reservado').length;
   const cancelledOrders = filteredOrders.filter(o => o.status === 'cancelado').length;
   const totalValue = ordersForList.reduce((sum, order) => sum + order.total, 0);
 
@@ -353,6 +355,16 @@ function PedidosContent() {
           border: '1px solid var(--border-color)',
           textAlign: 'center'
         }}>
+          <div style={{ fontSize: 14, color: '#3b82f6', marginBottom: 8 }}>Reservados</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: '#3b82f6' }}>{reservedOrders}</div>
+        </div>
+        <div style={{
+          background: 'var(--bg-card)',
+          padding: 20,
+          borderRadius: 12,
+          border: '1px solid var(--border-color)',
+          textAlign: 'center'
+        }}>
           <div style={{ fontSize: 14, color: '#10b981', marginBottom: 8 }}>Pagos</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: '#10b981' }}>{paidOrders}</div>
         </div>
@@ -423,6 +435,7 @@ function PedidosContent() {
             >
               <option value="all">Todos</option>
               <option value="pendente">Pendentes</option>
+              <option value="reservado">Reservados</option>
               <option value="pago">Pagos</option>
               <option value="cancelado">Cancelados</option> 
             </select>
@@ -531,10 +544,13 @@ function PedidosContent() {
             if (isPendingPreorder) {
               const expiryDate = new Date(new Date(order.created_at).getTime() + 60 * 60 * 1000);
               const timeRemaining = formatTimeRemaining(expiryDate);
+              // "PRÉ-VENDA" na frente de propósito: sem isso, isto aqui fala
+              // de reserva e o status novo se chama RESERVADO — são coisas
+              // diferentes (aqui é a trava de 1h do carrinho).
               if (timeRemaining === 'Expirado') {
-                reservationDisplay = 'RESERVA EXPIRADA';
+                reservationDisplay = 'PRÉ-VENDA — RESERVA DE 1H EXPIRADA';
               } else {
-                reservationDisplay = `RESERVA EXPIRA EM ${timeRemaining}`;
+                reservationDisplay = `PRÉ-VENDA — RESERVA DE 1H EXPIRA EM ${timeRemaining}`;
               }
             } else if (order.is_preorder) {
               reservationDisplay = `${order.status.toUpperCase()} (PRÉ-VENDA)`;

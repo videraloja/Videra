@@ -123,7 +123,8 @@ function OrderDetailsContent() {
       // produto guarda o availability do JSON-LD por 1 dia. Sem isso, um
       // produto que esgota numa venda continuaria anunciado como disponível
       // no dado estruturado até o cache vencer.
-      if (data?.changed && (order.status === 'pago') !== (newStatus === 'pago')) {
+      const debitava = (s: string) => s === 'pago' || s === 'reservado';
+      if (data?.changed && debitava(order.status) !== debitava(newStatus)) {
         const slugs = [...new Set(items.map(i => i.products?.slug).filter(Boolean))] as string[];
         await Promise.all(slugs.map(slug => revalidateProductPages(slug, null)));
       }
@@ -154,7 +155,7 @@ function OrderDetailsContent() {
 
   const handleDeleteOrder = async () => {
     if (!order || isUpdating || order.status === 'cancelado') return;
-    if (!confirm(`Tem certeza que deseja CANCELAR o pedido ${order.order_code}? Se o pedido estiver como PAGO, o estoque de todos os itens volta.`)) return;
+    if (!confirm(`Tem certeza que deseja CANCELAR o pedido ${order.order_code}? Se o pedido estiver como PAGO ou RESERVADO, o estoque de todos os itens volta.`)) return;
   
     await handleStatusChange("cancelado");
   };
@@ -162,6 +163,7 @@ function OrderDetailsContent() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pago': return { bg: '#d1fae5', text: '#065f46', border: '#10b981' };
+      case 'reservado': return { bg: '#dbeafe', text: '#1e40af', border: '#3b82f6' };
       case 'cancelado': return { bg: '#fee2e2', text: '#991b1b', border: '#ef4444' };
       default: return { bg: "#fef3c7", text: "#92400e", border: "#f59e0b" };
     }
@@ -205,10 +207,11 @@ function OrderDetailsContent() {
             <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>Status Atual</div>
             <div style={{ ...getStatusColor(order.status), padding: '8px 12px', borderRadius: 20, display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 8, fontWeight: 600, fontSize: 14 }}>
               {(() => {
+                // "RESERVADO" agora é um status de verdade (estoque separado
+                // pra quem paga depois). Pré-venda pendente usava esse mesmo
+                // rótulo e virou "PRÉ-VENDA PENDENTE", pra não confundir.
                 if (order.is_preorder) {
-                  if (order.status === 'pendente') {
-                    return 'RESERVADO';
-                  }
+                  if (order.status === 'pendente') return 'PRÉ-VENDA PENDENTE';
                   return `${order.status.toUpperCase()} (PRÉ-VENDA)`;
                 }
                 return order.status.toUpperCase();
@@ -228,7 +231,15 @@ function OrderDetailsContent() {
               onClick={() => handleStatusChange("pendente")}
               disabled={isUpdating || order.status === "pendente"}
               style={{ background: order.status === "pendente" ? "#f59e0b" : "var(--bg-secondary)", color: order.status === "pendente" ? "white" : "var(--text-primary)", padding: "10px 16px", border: `1px solid ${order.status === "pendente" ? "#f59e0b" : "var(--border-color)"}`, borderRadius: 8, cursor: "pointer", fontWeight: 600, display: "flex", alignItems: "center", gap: 8, opacity: isUpdating || order.status === "pendente" ? 0.6 : 1 }}>
-              {order.is_preorder ? 'Reservado' : 'Pendente'}
+              {/* Era "Reservado" em pré-venda — mesmo nome do status novo. */}
+              Pendente
+            </button>
+            <button
+              onClick={() => handleStatusChange("reservado")}
+              disabled={isUpdating || order.status === "reservado"}
+              title="Separa o estoque agora, sem contar como venda. O pedido só entra no relatório quando for marcado como Pago."
+              style={{ background: order.status === "reservado" ? "#3b82f6" : "var(--bg-secondary)", color: order.status === "reservado" ? "white" : "var(--text-primary)", padding: "10px 16px", border: `1px solid ${order.status === "reservado" ? "#3b82f6" : "var(--border-color)"}`, borderRadius: 8, cursor: "pointer", fontWeight: 600, display: "flex", alignItems: "center", gap: 8, opacity: isUpdating || order.status === "reservado" ? 0.6 : 1 }}>
+              Reservado
             </button>
             <button
               onClick={() => handleStatusChange("pago")}
