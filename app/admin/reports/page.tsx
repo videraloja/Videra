@@ -58,10 +58,14 @@ function ReportsContent() {
 
       const { data: orders, error: ordersError } = await supabase
         .from("orders")
-        .select("id, created_at")
-        .in("status", ["pago", "entregue"])
-        .gte("created_at", startDateTime)
-        .lte("created_at", endDateTime);
+        // Pela data do PAGAMENTO, não do pedido: um pedido reservado hoje e
+        // pago mês que vem conta no mês que vem. Reservado não tem paid_at,
+        // então não entra em relatório nenhum.
+        .select("id, paid_at")
+        .eq("status", "pago")
+        .not("paid_at", "is", null)
+        .gte("paid_at", startDateTime)
+        .lte("paid_at", endDateTime);
 
       if (ordersError) throw ordersError;
 
